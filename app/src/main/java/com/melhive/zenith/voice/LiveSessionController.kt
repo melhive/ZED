@@ -108,7 +108,7 @@ class LiveSessionController(
         stt = sttFactory()
         tts = ttsFactory()
         monitor = BargeInMonitor(s)
-        focus = AudioFocus(context) { s.launch { onFocusLost() } }
+        focus = AudioFocus(context) { reason -> s.launch { onInterrupted(reason) } }
         _state.value = LiveUiState(active = true, orb = OrbState.IDLE, sttEngine = stt?.engineName.orEmpty())
 
         s.launch {
@@ -118,7 +118,6 @@ class LiveSessionController(
             tts?.setRate(cfg.speechRate)
             conversationId = conversations.create("ZENITH LIVE session")
             if (tts?.awaitReady() != true) _state.update { it.copy(speakerOn = false, statusDetail = "Text-to-speech is unavailable; replies will be shown only") }
-            focus?.acquire()
             if (!recognitionAvailable()) {
                 setOrb(OrbState.ERROR, "No speech recognition service on this phone. Use the keyboard or system voice input below, or install Google's speech services.")
                 com.melhive.zenith.android.CrashReporter.recordNonFatal("live", IllegalStateException("No speech recognition service available"))
@@ -156,7 +155,7 @@ class LiveSessionController(
     fun toggleSpeaker() {
         val on = !_state.value.speakerOn
         _state.update { it.copy(speakerOn = on) }
-        if (!on) { tts?.stop(); pendingUtterances.clear(); monitor?.stop(); if (replyFinished) listen() }
+        if (!on) { tts?.stop(); pendingUtterances.clear(); monitor?.stop(); focus?.release(); if (replyFinished) listen() }
     }
 
     /** Tap on the orb: interrupt speech, cancel the pending request, or start listening. */
@@ -196,6 +195,7 @@ class LiveSessionController(
         monitor?.stop()
         tts?.stop()
         pendingUtterances.clear()
+        focus?.release()
         if (!replyFinished) { requestJob?.cancel(); orchestrator.cancelCurrent(); replyFinished = true }
         // Give the barge-in recorder a moment to release the microphone before the recognizer opens it.
         scope?.launch { delay(200); listen() }
@@ -294,6 +294,7 @@ class LiveSessionController(
         val id = tts?.speak(text, flush = false) ?: return
         pendingUtterances += id
         if (_state.value.orb != OrbState.SPEAKING) {
+            focus?.acquire()
             setOrb(OrbState.SPEAKING)
             startBargeIn()
         }
@@ -325,6 +326,7 @@ class LiveSessionController(
             is TtsEvent.Done, is TtsEvent.Stopped, is TtsEvent.Error -> {
                 val id = when (e) { is TtsEvent.Done -> e.utteranceId; is TtsEvent.Stopped -> e.utteranceId; is TtsEvent.Error -> e.utteranceId; else -> null }
                 pendingUtterances.remove(id)
+                if (pendingUtterances.isEmpty()) focus?.release()
                 if (pendingUtterances.isEmpty() && replyFinished && _state.value.orb == OrbState.SPEAKING) {
                     monitor?.stop()
                     setOrb(OrbState.COMPLETED)
@@ -345,9 +347,10 @@ class LiveSessionController(
         scope?.launch { delay(500); _state.update { it.copy(echoCancellation = m.echoCancellerActive) } }
     }
 
-    private fun onFocusLost() {
+    private fun onInterrupted(reason: String) {
         if (!_state.value.active) return
-        tts?.stop(); pendingUtterances.clear(); monitor?.stop(); stt?.cancel()
-        setOrb(OrbState.IDLE, "Paused — audio focus lost (call or other app)")
+        listenJob?.cancel()
+        tts?.stop(); pendingUtterances.clear(); monitor?.stop(); stt?.cancel(); focus?.release()
+        setOrb(OrbState.IDLE, "$reason. Tap the orb to continue.")
     }
 }
