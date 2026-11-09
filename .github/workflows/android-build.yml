@@ -66,6 +66,15 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+      - name: Upload Room schemas
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: room-schemas
+          path: app/schemas/
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Summary
         if: always()
         run: |

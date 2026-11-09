@@ -89,8 +89,10 @@ class TaskEngine(private val context: Context, private val dao: TaskDao) {
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .addTag(TAG)
             .build()
+        // Record the work id before enqueueing, touching only that column: the worker may start
+        // immediately and must not have its status overwritten by a stale copy of the row.
+        dao.setWorkId(task.id, request.id.toString())
         workManager.enqueueUniqueWork(workName(task.id), ExistingWorkPolicy.REPLACE, request)
-        dao.update(task.copy(workId = request.id.toString()))
     }
 
     /** Applies a validated status transition. Returns the updated task, or null if illegal. */

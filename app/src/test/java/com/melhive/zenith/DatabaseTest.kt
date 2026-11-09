@@ -76,7 +76,7 @@ class DatabaseTest {
         dao.replaceDoc(null, KnowledgeDocEntity(treeUri = "t", path = "recipes.md", name = "recipes.md", sizeBytes = 10, modifiedAt = 1, indexedAt = 1, chunkCount = 1),
             listOf("Banana bread recipe with walnuts."))
         assertEquals(3, dao.chunkCount())
-        val hits = dao.searchChunks("\"invoice\"*")
+        val hits = dao.searchChunks("\"invoice*\"")
         assertEquals(1, hits.size)
         // Repository ranking path (files are not needed for search).
         val repo = KnowledgeRepository(dao, com.melhive.zenith.files.SafFileSystem(ApplicationProvider.getApplicationContext(), db.folders()))

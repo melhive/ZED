@@ -61,8 +61,8 @@ class KnowledgeRepository(private val dao: KnowledgeDao, private val files: SafF
     suspend fun search(query: String, limit: Int = 5): List<KnowledgeHit> = withContext(Dispatchers.IO) {
         val terms = Tokenizer.tokens(query).distinct().take(12)
         if (terms.isEmpty()) return@withContext emptyList()
-        // FTS4 query: OR of quoted prefix terms. Quotes are stripped from tokens so input cannot alter syntax.
-        val match = terms.joinToString(" OR ") { "\"${it.replace("\"", "")}\"*" }
+        // FTS4 query: OR of quoted prefix terms ("term*"). Tokens are letters/digits only, so input cannot alter syntax.
+        val match = terms.joinToString(" OR ") { "\"${it.replace("\"", "")}*\"" }
         val candidates = try { dao.searchChunks(match, 80) } catch (e: Exception) { emptyList() }
         if (candidates.isEmpty()) return@withContext emptyList()
         val ranked = Bm25().rank(query, candidates.map { Bm25.Doc(it.id, it.text) }, limit)

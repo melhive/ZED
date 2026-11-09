@@ -147,6 +147,9 @@ interface TaskDao {
     @Query("UPDATE tasks SET progressCurrent = :current, progressTotal = :total, progressLabel = :label WHERE id = :id")
     suspend fun setProgress(id: Long, current: Long?, total: Long?, label: String?)
 
+    @Query("UPDATE tasks SET workId = :workId WHERE id = :id")
+    suspend fun setWorkId(id: Long, workId: String)
+
     @Query("DELETE FROM tasks WHERE status IN ('SUCCEEDED','FAILED','CANCELLED')")
     suspend fun clearFinished()
 

@@ -41,6 +41,8 @@ class LocalModelRuntime(private val cacheDir: File) {
     val state: StateFlow<State> = _state.asStateFlow()
 
     private val lock = Mutex()
+    /** One inference at a time: chat and LIVE share a single engine. */
+    private val generationLock = Mutex()
     private var engine: Engine? = null
     private var loadedKey: String? = null
     @Volatile private var activeConversation: com.google.ai.edge.litertlm.Conversation? = null
@@ -87,10 +89,17 @@ class LocalModelRuntime(private val cacheDir: File) {
      * under ZENITH's control (persisted in Room) rather than inside the runtime.
      */
     fun generate(modelId: String, file: File, backend: LocalBackend, request: GenerationRequest): Flow<GenerationEvent> = flow {
+        generationLock.withLock { generateLocked(modelId, file, backend, request) }
+    }.catch { t ->
+        if (t is kotlinx.coroutines.CancellationException) throw t
+        emit(GenerationEvent.Error("Local model error: ${t.message ?: t.javaClass.simpleName}"))
+    }.flowOn(Dispatchers.Default)
+
+    private suspend fun kotlinx.coroutines.flow.FlowCollector<GenerationEvent>.generateLocked(modelId: String, file: File, backend: LocalBackend, request: GenerationRequest) {
         val e = ensureLoaded(modelId, file, backend)
         val turns = normalizeTurns(request.turns)
         val last = turns.lastOrNull()
-        if (last == null || last.role != Role.USER) { emit(GenerationEvent.Error("Nothing to answer")); return@flow }
+        if (last == null || last.role != Role.USER) { emit(GenerationEvent.Error("Nothing to answer")); return }
         val initial = turns.dropLast(1).map { t ->
             if (t.role == Role.ASSISTANT) Message.model(t.content) else Message.user(t.content)
         }
@@ -111,10 +120,7 @@ class LocalModelRuntime(private val cacheDir: File) {
             activeConversation = null
             runCatching { conversation.close() }
         }
-    }.catch { t ->
-        if (t is kotlinx.coroutines.CancellationException) throw t
-        emit(GenerationEvent.Error("Local model error: ${t.message ?: t.javaClass.simpleName}"))
-    }.flowOn(Dispatchers.Default)
+    }
 }
 
 class LocalLiteRtProvider(
