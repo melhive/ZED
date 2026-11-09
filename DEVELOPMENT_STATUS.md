@@ -27,16 +27,17 @@ Native Android personal AI assistant (Kotlin, Jetpack Compose). Three intelligen
 | P6 Local AI | ✅ Integrated | Compiles against LiteRT-LM 0.19.1; **inference not yet run on a device** |
 | P7 Model Manager & online AI | ✅ Compiled + parsing tested | ProvidersTest (OpenAI, Claude, Gemini SSE + errors); live calls need user keys |
 | P8 ZENITH LIVE | ✅ Compiled | VAD unit-tested; **STT/TTS/barge-in need device validation** |
-| P9 Background tasks | ✅ Compiled | State machine + graph unit-tested; WorkManager execution needs device validation |
+| P9 Background tasks | ✅ Compiled | State machine + graph unit-tested; dependents start when prerequisites finish; WorkManager execution needs device validation |
 | P10 Advanced intelligence | ✅ First version | FTS + BM25 retrieval tested; skills registry; research via provider search |
-| P11 Security & release | 🔶 In progress | Security controls + audit done; release workflow ready (needs signing secrets); device benchmarks pending |
+| P11 Security & release | 🔶 In progress | Security controls + audit done; release workflow verified green (unsigned); signing secrets and device benchmarks pending |
 
 ## Test results (latest CI run)
 
 | Suite | Tests | Result |
 |---|---|---|
 | `:core:test` (JVM) | 28 | ✅ pass (also runs locally in Termux via `scripts/test-core.sh`) |
-| `:app:testDebugUnitTest` (Robolectric, MockWebServer) | 15 | ✅ pass |
+| `:app:testDebugUnitTest` (Robolectric, MockWebServer, Compose UI) | 18 | ✅ pass |
+| Release build (R8 minify + resource shrinking, APK + AAB) | — | ✅ builds (unsigned until signing secrets are added) |
 
 Failed tests: none.
 
@@ -48,7 +49,7 @@ Failed tests: none.
 | Room persistence, FTS search, migrations guard | ✅ (Robolectric) | ✅ | | |
 | ToolManager pipeline (validation, confirmation, denial, audit) | ✅ (Robolectric) | ✅ | | |
 | Online provider streaming parsers | ✅ (mock server) | ✅ | | Real calls need API keys |
-| Compose UI / navigation | | ✅ | ✅ | |
+| Compose UI / navigation | components (orb all states, dialog) | ✅ | ✅ screens | |
 | SAF file operations | | ✅ | ✅ | |
 | Alarms, timers, calendar intents | | ✅ | ✅ (depends on installed clock/calendar apps) | |
 | Reminders (AlarmManager), boot rescheduling, notifications | | ✅ | ✅ | |
