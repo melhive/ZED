@@ -36,8 +36,8 @@ Native Android personal AI assistant (Kotlin, Jetpack Compose). Three intelligen
 
 | Suite | Tests | Result |
 |---|---|---|
-| `:core:test` (JVM) | 28 | ✅ pass (also runs locally in Termux via `scripts/test-core.sh`) |
-| `:app:testDebugUnitTest` (Robolectric, MockWebServer, Compose UI) | 18 | ✅ pass |
+| `:core:test` (JVM) | 34 | ✅ pass (also runs locally in Termux via `scripts/test-core.sh`) |
+| `:app:testDebugUnitTest` (Robolectric, MockWebServer, Compose UI, orchestrator) | 25 | ✅ pass |
 | Release build (R8 minify + resource shrinking, APK + AAB) | — | ✅ builds (unsigned until signing secrets are added) |
 
 Failed tests: none.
@@ -60,6 +60,14 @@ Failed tests: none.
 | Keystore secret storage | | ✅ | ✅ | |
 | STT / TTS / sentence streaming / barge-in / audio focus | VAD only | ✅ | ✅ | |
 
+## Conversation intelligence (v0.1.6+)
+
+- **Auto mode** (default): online provider (key set + connected) → on-device model → native. First downloaded model activates itself.
+- Natural conversational system prompt; full chat history as context; one automatic retry on transient errors; regenerate.
+- On-device: LiteRT-LM session reused across turns (only the new message is processed), compact stable system prompt.
+- Without any model: small talk (personalized with the user's name), calculator, unit conversion, date math, and honest guidance.
+- Orchestrator behaviour (history, tool round-trip, retry, native fallback, regenerate) is covered by tests with a scripted model.
+
 ## Model integration status
 
 - Runtime: LiteRT-LM 0.19.1 (arm64-v8a, x86_64), API verified from the published AAR.
@@ -79,13 +87,12 @@ Tool pipeline enforced (validation → skill → capability → confirmation →
 
 ## Known issues / limitations
 
-1. Nothing has been run on a physical device yet; all device-dependent behaviour is unverified.
+1. Nothing has been run on a physical device yet; all device-dependent behaviour is unverified. Crash and error reports can now be shared from Diagnostics → Problem reports.
 2. Small on-device models may not follow the `zenith-tool` protocol reliably; native commands remain the dependable path for actions.
 3. Knowledge index reads text formats only (no PDF text extraction yet).
 4. Barge-in may miss the first syllable after interruption; quality depends on echo cancellation.
 5. Default online model names (e.g. `gemini-2.5-flash`, `gpt-4.1-mini`) may be outdated — use "List models" in Model Manager.
-6. A configuration change (rotation) while in ZENITH LIVE restarts the voice session.
-7. Release signing requires repository secrets (see `docs/BUILDING.md`).
+6. Release signing requires repository secrets (see `docs/BUILDING.md`).
 
 ## Exact next steps
 
