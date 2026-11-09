@@ -13,6 +13,7 @@ Native Android personal AI assistant (Kotlin, Jetpack Compose). Three intelligen
 | Default branch | `main` (stable merges) |
 | Latest commit | see `git log -1` (this file is updated with each milestone) |
 | Build status | ✅ GitHub Actions **Android Build** green: core tests, Android unit tests, debug APK |
+| Releases | ✅ Signed release **v0.1.4** published. Install/share link: https://github.com/melhive/ZENITH/releases/latest/download/zenith.apk. Every push to `main` publishes the next version (installs over the old one). |
 
 ## Milestones
 
@@ -88,7 +89,7 @@ Tool pipeline enforced (validation → skill → capability → confirmation →
 
 ## Exact next steps
 
-1. Install the debug APK from the latest green run (Actions → Android Build → `zenith-debug-apk`).
+1. Install the release from https://github.com/melhive/ZENITH/releases/latest/download/zenith.apk (uninstall any debug build first).
 2. Device validation checklist:
    - Grant a folder in Files; run "create file test/hello.txt with content hi", "list files in test", "organize my downloads" → approve plan in Tasks.
    - "set an alarm for 7am", "set a timer for 1 minute", "schedule meeting tomorrow at 3pm".
