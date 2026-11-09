@@ -41,6 +41,7 @@ import com.melhive.zenith.settings.LocalBackend
 import com.melhive.zenith.settings.OnlineProviderKind
 import com.melhive.zenith.ui.components.SectionTitle
 import com.melhive.zenith.ui.components.StatusPill
+import com.melhive.zenith.ui.components.WrapRow
 import com.melhive.zenith.ui.components.ZenithCard
 import com.melhive.zenith.ui.theme.ZenithColors
 
@@ -68,7 +69,7 @@ fun ModelsScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
         item {
             ZenithCard {
                 SectionTitle("Active intelligence")
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                WrapRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(s.mode == IntelligenceMode.AUTO, { vm.setMode(IntelligenceMode.AUTO) }, { Text("Auto") })
                     FilterChip(s.mode == IntelligenceMode.NATIVE_ONLY, { vm.setMode(IntelligenceMode.NATIVE_ONLY) }, { Text("Native") })
                     FilterChip(s.mode == IntelligenceMode.LOCAL, { vm.setMode(IntelligenceMode.LOCAL) }, { Text("On-device") })
@@ -99,13 +100,13 @@ fun ModelsScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
                     is LocalModelRuntime.State.Ready -> "${r.modelId} loaded on ${r.backend} in ${r.loadMillis} ms, ${r.contextTokens} token context"
                     is LocalModelRuntime.State.Failed -> "failed to load ${r.modelId}: ${r.message}"
                 })
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                WrapRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(s.localBackend == LocalBackend.CPU, { vm.setBackend(LocalBackend.CPU) }, { Text("CPU") })
                     FilterChip(s.localBackend == LocalBackend.GPU, { vm.setBackend(LocalBackend.GPU) }, { Text("GPU") })
                     if (runtime is LocalModelRuntime.State.Ready) TextButton(onClick = { vm.unload() }) { Text("Unload (free RAM)") }
                 }
                 Text("Context size (how much conversation the model can hold)", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                WrapRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf(0 to "Auto", 2048 to "2K", 4096 to "4K", 8192 to "8K").forEach { (v, label) ->
                         FilterChip(s.localContextTokens == v, { vm.setContextTokens(v) }, { Text(label) })
                     }
@@ -122,7 +123,7 @@ fun ModelsScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
             ZenithCard(accent = if (active) ZenithColors.Cyan else ZenithColors.Outline) {
                 Row { Text(m.displayName, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f)); if (active) StatusPill("Active", ZenithColors.Cyan) }
                 Text("${DeviceInfo.formatBytes(m.sizeBytes)} · ${m.source} · ${if (m.verified) "SHA-256 verified" else "unverified import"}", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
+                WrapRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
                     if (!active) Button(onClick = { vm.activate(m) }) { Text("Use") }
                     OutlinedButton(onClick = { vm.load(m) }) { Text("Load now") }
                     TextButton(onClick = { vm.remove(m) }) { Text("Remove", color = ZenithColors.Red) }
@@ -151,7 +152,7 @@ fun ModelsScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
                 Text("${DeviceInfo.formatBytes(m.sizeBytes)} download · recommended RAM ${DeviceInfo.formatBytes(m.minRamBytes)} · ${m.recommendedBackend} · ${m.license} · context ${m.contextTokens} tokens",
                     style = MaterialTheme.typography.labelSmall, color = ZenithColors.Muted)
                 report.reasons.forEach { Text("• $it", style = MaterialTheme.typography.labelSmall, color = ZenithColors.Muted) }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
+                WrapRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
                     when {
                         isInstalled -> StatusPill("Installed", ZenithColors.Green)
                         taskId != null -> OutlinedButton(onClick = onOpenTasks) { Text("Downloading — view task #$taskId") }
@@ -165,7 +166,7 @@ fun ModelsScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
         item { SectionTitle("Online providers") }
         item {
             ZenithCard(accent = ZenithColors.Violet) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                WrapRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     OnlineProviderKind.entries.forEach { k ->
                         FilterChip(s.onlineProvider == k, { vm.setProvider(k) }, { Text(when (k) { OnlineProviderKind.GEMINI -> "Gemini"; OnlineProviderKind.OPENAI -> "OpenAI"; OnlineProviderKind.ANTHROPIC -> "Claude"; OnlineProviderKind.OPENAI_COMPATIBLE -> "Custom" }) })
                     }
@@ -187,7 +188,7 @@ fun ModelsScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
                     label = { Text(if (hasKey) "API key saved — enter to replace" else "API key") },
                     visualTransformation = PasswordVisualTransformation(),
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                WrapRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(enabled = keyInput.isNotBlank(), onClick = { vm.saveKey(kind, keyInput); keyInput = "" }) { Text("Save key") }
                     if (hasKey) TextButton(onClick = { vm.removeKey(kind) }) { Text("Remove key", color = ZenithColors.Red) }
                 }
@@ -199,7 +200,7 @@ fun ModelsScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
                         }
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                WrapRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = { vm.setModel(kind, modelInput) }) { Text("Save model") }
                     TextButton(onClick = { vm.fetchModels(kind); modelMenu = true }) { Text("List models") }
                     TextButton(enabled = !testing, onClick = { vm.testProvider(kind) }) { Text(if (testing) "Testing…" else "Test connection") }

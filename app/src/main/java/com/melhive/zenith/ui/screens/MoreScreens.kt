@@ -47,6 +47,7 @@ import com.melhive.zenith.core.skills.SkillRegistry
 import com.melhive.zenith.ui.components.IconLabel
 import com.melhive.zenith.ui.components.SectionTitle
 import com.melhive.zenith.ui.components.StatusPill
+import com.melhive.zenith.ui.components.WrapRow
 import com.melhive.zenith.ui.components.ZenithCard
 import com.melhive.zenith.ui.navigation.Routes
 import com.melhive.zenith.ui.navigation.rememberContainer
@@ -114,8 +115,21 @@ fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
     val c = rememberContainer()
     val scope = rememberCoroutineScope()
     val s by c.settings.settings.collectAsStateWithLifecycle(initialValue = null)
+    var editName by remember { mutableStateOf(false) }
     val settings = s ?: return
     ListScreen("Settings", onBack = onBack) {
+        item {
+            val facts by c.memory.facts.collectAsStateWithLifecycle(initialValue = emptyList())
+            val name = facts.firstNotNullOfOrNull { Regex("^my name is (.+)$", RegexOption.IGNORE_CASE).find(it.text.trim())?.groupValues?.get(1) }
+            ZenithCard {
+                SectionTitle("You")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(name?.let { "ZENITH calls you $it" } ?: "ZENITH doesn't know your name yet", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { editName = true }) { Text(if (name == null) "Set name" else "Change") }
+                }
+            }
+            if (editName) NameDialog(initial = name ?: "", onDismiss = { editName = false }) { n -> scope.launch { c.memory.setUserName(n); editName = false } }
+        }
         item {
             ZenithCard {
                 SectionTitle("Voice")
@@ -160,7 +174,7 @@ fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
                     style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted,
                 )
                 SwitchRow("Check for updates", "Ask GitHub Releases for a newer version when ZENITH starts", settings.checkUpdates) { scope.launch { c.settings.setCheckUpdates(it) } }
-                Row {
+                WrapRow {
                     TextButton(onClick = { scope.launch { c.updates.check() } }) { Text("Check now") }
                     (update as? com.melhive.zenith.android.UpdateState.Available)?.let { u ->
                         TextButton(onClick = { uriHandler.openUri(u.info.apkUrl) }) { Text("Download update") }
@@ -205,7 +219,7 @@ fun DiagnosticsScreen(onBack: () -> Unit) {
                     Text(if (crash != null) "ZENITH crashed last time. Share the report so it can be fixed." else "Some background errors were recorded.", style = MaterialTheme.typography.bodySmall)
                     val report = listOfNotNull(crash, errors?.let { "Recent errors:\n$it" }).joinToString("\n\n")
                     Text(report.take(1500), style = MonoStyle, color = ZenithColors.Muted)
-                    Row {
+                    WrapRow {
                         TextButton(onClick = {
                             val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_SUBJECT, "ZENITH problem report").putExtra(Intent.EXTRA_TEXT, report)
                             context.startActivity(Intent.createChooser(send, "Share report"))
@@ -224,7 +238,7 @@ fun DiagnosticsScreen(onBack: () -> Unit) {
                     StatusPill(if (granted) "Granted" else "Not granted", if (granted) ZenithColors.Green else ZenithColors.Amber)
                 }
                 Text(p.reason, style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
-                if (!granted) Row {
+                if (!granted) WrapRow {
                     Button(onClick = { launcher.launch(p.permission) }) { Text("Request") }
                     TextButton(onClick = { context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))) }) { Text("App settings") }
                 }

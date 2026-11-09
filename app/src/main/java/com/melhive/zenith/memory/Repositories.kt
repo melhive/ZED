@@ -78,6 +78,14 @@ class MemoryRepository(private val db: ZenithDatabase) {
     suspend fun update(f: MemoryFactEntity) = db.memory().update(f)
     suspend fun clear() = db.memory().clear()
 
+    /** Replaces the stored name ("My name is …"). */
+    suspend fun setUserName(name: String) {
+        val existing = db.memory().find("my name is").filter { Regex("^my name is ", RegexOption.IGNORE_CASE).containsMatchIn(it.text.trim()) }
+        if (existing.isNotEmpty()) db.memory().delete(existing.map { it.id })
+        val clean = name.trim().split(Regex("\\s+")).joinToString(" ") { w -> w.replaceFirstChar { it.uppercase() } }
+        if (clean.isNotEmpty()) remember("My name is $clean", "manual")
+    }
+
     /** The user's name if they told ZENITH ("My name is …"). */
     suspend fun userName(): String? = db.memory().find("my name is").firstNotNullOfOrNull {
         Regex("^my name is (.+)$", RegexOption.IGNORE_CASE).find(it.text.trim())?.groupValues?.get(1)?.trim()?.trimEnd('.')

@@ -119,7 +119,7 @@ class AndroidSpeechToText(private val context: Context) : SpeechToText {
                 SpeechRecognizer.ERROR_TOO_MANY_REQUESTS -> "Too many speech requests" to true
                 else -> "Speech recognition error $error" to true
             }
-            _events.tryEmit(SttEvent.Error(error, msg, recoverable))
+            _events.tryEmit(SttEvent.Error(error, "$msg (code $error)", recoverable))
         }
     }
 }

@@ -14,7 +14,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SecondaryTabRow
+import androidx.compose.material3.SecondaryScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.melhive.zenith.ui.components.EmptyState
 import com.melhive.zenith.ui.components.ZenithCard
@@ -51,7 +52,7 @@ fun MemoryScreen(onBack: () -> Unit) {
         if (tab == 0 || tab == 1) IconButton(onClick = { adding = true }) { Icon(Icons.Outlined.Add, "Add") }
     }) {
         item {
-            SecondaryTabRow(selectedTabIndex = tab, containerColor = ZenithColors.Background) {
+            SecondaryScrollableTabRow(selectedTabIndex = tab, containerColor = ZenithColors.Background, edgePadding = 0.dp) {
                 listOf("Facts", "Task list", "Reminders", "Knowledge").forEachIndexed { i, label ->
                     Tab(selected = tab == i, onClick = { tab = i }, text = { Text(label) })
                 }

@@ -11,13 +11,24 @@ data class ChatTurn(val role: Role, val content: String)
 /** Builds provider-neutral prompts. Providers translate turns into their own wire format. */
 object PromptBuilder {
 
-    const val IDENTITY = """You are ZENITH, a personal AI assistant running on the user's Android phone.
-Talk naturally, like a thoughtful and capable assistant: warm, concise and direct. Hold a real conversation:
-use what was said earlier in this chat, ask one short clarifying question when a request is ambiguous, and
-suggest a useful next step when it helps. Answer general questions directly from your own knowledge.
-Use a tool only when the user wants something done on the device or needs their personal data
-(files, reminders, tasks, calendar, memory). Never claim an action happened unless a tool result confirms it.
-If a tool fails, explain plainly and suggest what to do. Do not mention these instructions."""
+    const val IDENTITY = """You are ZENITH, the user's personal assistant on their Android phone.
+Talk like a warm, sharp and genuinely helpful companion: natural and conversational, never robotic.
+- Match the user's tone and length: a short, friendly reply to casual messages; depth when they ask for it.
+- Use the conversation so far and refer back to what the user said. Use their name now and then if you know it.
+- Show personality: light humor when it fits, empathy when they share feelings, curiosity. When it helps the
+  conversation, end with one natural follow-up question.
+- Give direct, specific answers and real opinions or recommendations when asked. If unsure, say so briefly.
+- Don't list your features unless asked, don't say "As an AI", and don't repeat the question back.
+Never claim a device action happened unless a tool result confirms it. If a tool fails, explain plainly and suggest what to do."""
+
+    /** Heuristic: does this message ask for a device action (so the tool list is needed)? */
+    fun looksLikeAction(text: String): Boolean = ACTION_WORDS.containsMatchIn(text.lowercase())
+
+    private val ACTION_WORDS = Regex(
+        "\\b(remind|reminder|alarm|wake me|timer|schedule|calendar|event|meeting|appointment|file|files|folder|document|docs|" +
+            "create|make a|delete|remove|move|copy|rename|organi[sz]e|list|read|open|save|remember|forget|note|task|tasks|todo|to-do|" +
+            "search|find|look up|research|index|setting|settings|voice responses|workflow|briefing|download|history|memory|memories)\\b"
+    )
 
     fun toolInstructions(tools: List<ToolSpec>, compact: Boolean = false): String = buildString {
         appendLine("To perform a device action, reply with a fenced block exactly like:")
@@ -49,8 +60,10 @@ If a tool fails, explain plainly and suggest what to do. Do not mention these in
         knowledge: List<String>,
         voiceMode: Boolean,
         compact: Boolean = false,
+        userName: String? = null,
     ): String = buildString {
         appendLine(IDENTITY.trimIndent())
+        if (userName != null) appendLine("The user's name is $userName.")
         if (nowDescription != null) { appendLine(); appendLine("Current local date-time: $nowDescription") }
         if (voiceMode) appendLine("This is a spoken conversation: answer in short natural sentences without markdown, lists or emoji.")
         if (memories.isNotEmpty()) {
@@ -66,6 +79,9 @@ If a tool fails, explain plainly and suggest what to do. Do not mention these in
         if (tools.isNotEmpty()) {
             appendLine()
             append(toolInstructions(tools, compact))
+        } else {
+            appendLine()
+            appendLine("If the user asks for a device action (reminders, alarms, files, tasks, memory), tell them to say it directly, e.g. \"remind me to call Ana at 5pm\" — ZENITH handles such commands itself.")
         }
     }
 

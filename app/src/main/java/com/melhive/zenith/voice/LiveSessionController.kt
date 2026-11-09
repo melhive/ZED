@@ -119,7 +119,10 @@ class LiveSessionController(
             conversationId = conversations.create("ZENITH LIVE session")
             if (tts?.awaitReady() != true) _state.update { it.copy(speakerOn = false, statusDetail = "Text-to-speech is unavailable; replies will be shown only") }
             focus?.acquire()
-            listen()
+            if (!recognitionAvailable()) {
+                setOrb(OrbState.ERROR, "No speech recognition service on this phone. Use the keyboard or system voice input below, or install Google's speech services.")
+                com.melhive.zenith.android.CrashReporter.recordNonFatal("live", IllegalStateException("No speech recognition service available"))
+            } else listen()
         }
         s.launch { stt!!.events.collect { onStt(it) } }
         s.launch { tts!!.events.collect { onTts(it) } }
@@ -165,6 +168,20 @@ class LiveSessionController(
             else -> { consecutiveErrors = 0; if (_state.value.micMuted) toggleMute() else listen() }
         }
     }
+
+    /** Sends typed text or text from the system voice-input popup (fallbacks when live recognition fails). */
+    fun submitText(text: String) {
+        if (!_state.value.active || text.isBlank()) return
+        listenJob?.cancel(); stt?.cancel(); monitor?.stop()
+        tts?.stop(); pendingUtterances.clear()
+        if (!replyFinished) { requestJob?.cancel(); orchestrator.cancelCurrent() }
+        consecutiveErrors = 0
+        submit(text.trim())
+    }
+
+    /** True when Android reports a usable speech recognition service. */
+    fun recognitionAvailable(): Boolean = android.speech.SpeechRecognizer.isRecognitionAvailable(context) ||
+        (android.os.Build.VERSION.SDK_INT >= 31 && android.speech.SpeechRecognizer.isOnDeviceRecognitionAvailable(context))
 
     /** Cancels only the current assistant request (not background tasks). */
     fun cancelRequest() {
@@ -215,6 +232,7 @@ class LiveSessionController(
                 if (_state.value.orb != OrbState.LISTENING) return // stale error from a cancelled recognizer
                 if (e.code == android.speech.SpeechRecognizer.ERROR_NO_MATCH || e.code == android.speech.SpeechRecognizer.ERROR_SPEECH_TIMEOUT) { onNothingHeard(); return }
                 consecutiveErrors++
+                com.melhive.zenith.android.CrashReporter.recordNonFatal("live speech", IllegalStateException(e.message))
                 if (e.recoverable && consecutiveErrors < 3) {
                     setOrb(OrbState.ERROR, e.message)
                     scope?.launch { delay(1200L * consecutiveErrors); if (_state.value.orb == OrbState.ERROR) listen() }
@@ -283,6 +301,7 @@ class LiveSessionController(
 
     private fun onReply(reply: AssistantReply) {
         replyFinished = true
+        if (!reply.ok) com.melhive.zenith.android.CrashReporter.recordNonFatal("live reply", IllegalStateException(reply.text))
         _state.update { it.copy(transcript = it.transcript + LiveTurn(false, reply.text)) }
         if (_state.value.speakerOn) {
             // Speak whatever was not already streamed.

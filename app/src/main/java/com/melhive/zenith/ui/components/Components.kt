@@ -147,3 +147,17 @@ fun ConfirmationDialog(request: ConfirmationRequest, onAnswer: (Boolean) -> Unit
         containerColor = ZenithColors.SurfaceHigh,
     )
 }
+
+/** A row of chips or buttons that wraps onto the next line instead of squeezing or overlapping on narrow screens. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+fun WrapRow(
+    modifier: Modifier = Modifier,
+    horizontalArrangement: Arrangement.Horizontal = Arrangement.spacedBy(8.dp),
+    content: @Composable androidx.compose.foundation.layout.FlowRowScope.() -> Unit,
+) = androidx.compose.foundation.layout.FlowRow(
+    modifier = modifier,
+    horizontalArrangement = horizontalArrangement,
+    verticalArrangement = Arrangement.spacedBy(2.dp),
+    content = content,
+)

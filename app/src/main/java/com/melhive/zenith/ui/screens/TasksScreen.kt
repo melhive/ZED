@@ -16,6 +16,16 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -27,6 +37,7 @@ import com.melhive.zenith.ui.components.EmptyState
 import com.melhive.zenith.ui.components.RealProgress
 import com.melhive.zenith.ui.components.SectionTitle
 import com.melhive.zenith.ui.components.StatusPill
+import com.melhive.zenith.ui.components.WrapRow
 import com.melhive.zenith.ui.components.ZenithCard
 import com.melhive.zenith.ui.navigation.rememberContainer
 import com.melhive.zenith.ui.theme.MonoStyle
@@ -62,9 +73,17 @@ fun TasksScreen(onOpen: (Long) -> Unit) {
     val completed = tasks.filter { it.statusEnum() == TaskStatus.SUCCEEDED }
     val failed = tasks.filter { it.statusEnum() == TaskStatus.FAILED || it.statusEnum() == TaskStatus.CANCELLED }
 
+    var menu by remember { mutableStateOf(false) }
     ListScreen("Tasks", onBack = null, subtitle = "Background work keeps running while you use ZENITH", actions = {
-        if (active.isNotEmpty() || queued.isNotEmpty()) TextButton(onClick = { scope.launch { c.taskEngine.cancelAll() } }) { Text("Cancel all", color = ZenithColors.Red) }
-        if (completed.isNotEmpty() || failed.isNotEmpty()) TextButton(onClick = { scope.launch { c.taskEngine.clearFinished() } }) { Text("Clear finished") }
+        if (tasks.isNotEmpty()) Box {
+            IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, "Task options") }
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(text = { Text("Cancel all active tasks", color = ZenithColors.Red) }, enabled = active.isNotEmpty() || queued.isNotEmpty(),
+                    onClick = { menu = false; scope.launch { c.taskEngine.cancelAll() } })
+                DropdownMenuItem(text = { Text("Clear finished tasks") }, enabled = completed.isNotEmpty() || failed.isNotEmpty(),
+                    onClick = { menu = false; scope.launch { c.taskEngine.clearFinished() } })
+            }
+        }
     }) {
         if (tasks.isEmpty()) item { EmptyState("No tasks yet", "Try “organize my downloads”, “index my documents”, or download a model in Model Manager.") }
         fun section(title: String, list: List<TaskEntity>) {
@@ -105,7 +124,7 @@ fun TaskCard(t: TaskEntity, onOpen: (Long) -> Unit) {
         }
         t.resultSummary?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = ZenithColors.Green, modifier = Modifier.padding(top = 6.dp)) }
         t.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = ZenithColors.Red, modifier = Modifier.padding(top = 6.dp)) }
-        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        WrapRow(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             when (s) {
                 TaskStatus.AWAITING_CONFIRMATION -> {
                     Button(onClick = { scope.launch { c.taskEngine.confirm(t.id) } }, colors = ButtonDefaults.buttonColors(containerColor = ZenithColors.Cyan)) { Text("Approve plan") }

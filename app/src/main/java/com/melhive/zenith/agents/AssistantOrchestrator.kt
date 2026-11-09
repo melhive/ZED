@@ -126,7 +126,7 @@ class AssistantOrchestrator(
         return try {
             val provider = providers.active()
             val reply = if (attachmentText == null) handleNative(conversationId, trimmed, modelAvailable = provider != null) else null
-            val final = reply ?: if (provider != null) handleWithModel(conversationId, provider, voice) else nativeConversation(conversationId, trimmed)
+            val final = reply ?: if (provider != null) handleWithModel(conversationId, provider, voice, trimmed) else nativeConversation(conversationId, trimmed)
             setPhase(if (final.ok) AssistantPhase.COMPLETED else AssistantPhase.ERROR, if (final.ok) null else final.text, conversationId)
             final
         } catch (e: CancellationException) {
@@ -196,14 +196,18 @@ class AssistantOrchestrator(
         return AssistantReply(reply, true, "native")
     }
 
-    private suspend fun handleWithModel(conversationId: Long, provider: IntelligenceProvider, voice: Boolean): AssistantReply {
+    private suspend fun handleWithModel(conversationId: Long, provider: IntelligenceProvider, voice: Boolean, userText: String): AssistantReply {
         val s = settings.current()
         val isLocal = provider.id == "local"
         val researchAvailable = providers.research() != null
         // Very small on-device windows (e.g. 1280 tokens) cannot hold the tool list; such models just converse.
         val localContext = (provider as? com.melhive.zenith.intelligence.LocalLiteRtProvider)?.contextTokens
         val tinyContext = localContext != null && localContext < 2048
-        val toolSpecs = if (tinyContext) emptyList() else skills.enabledTools(s.enabledSkills).filter { it.name != "web.research" || researchAvailable }
+        // Casual conversation gets a lean, persona-focused prompt; the tool list is included only when the
+        // message looks like a device request (more room for the conversation, more natural replies).
+        val useTools = !tinyContext && PromptBuilder.looksLikeAction(userText)
+        val toolSpecs = if (!useTools) emptyList() else skills.enabledTools(s.enabledSkills).filter { it.name != "web.research" || researchAvailable }
+        val userName = memory.userName()
         val memories = memory.list(if (tinyContext) 5 else 30).map { it.text }
         val origin = if (isLocal) ToolRequest.Origin.LOCAL_MODEL else ToolRequest.Origin.ONLINE_MODEL
         val sourceTag = if (isLocal) "local" else "online:${provider.id}"
@@ -227,6 +231,7 @@ class AssistantOrchestrator(
                 knowledge = if (isLocal) emptyList() else knowledgeSnippets,
                 voiceMode = voice,
                 compact = isLocal,
+                userName = userName,
             )
             val request = GenerationRequest(
                 system = system,

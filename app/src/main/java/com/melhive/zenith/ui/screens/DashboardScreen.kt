@@ -69,6 +69,7 @@ import com.melhive.zenith.ui.components.RealProgress
 import com.melhive.zenith.ui.components.SectionTitle
 import com.melhive.zenith.ui.components.StatusPill
 import com.melhive.zenith.ui.components.TaskIndicator
+import com.melhive.zenith.ui.components.WrapRow
 import com.melhive.zenith.ui.components.ZenithCard
 import com.melhive.zenith.ui.components.ZenithOrb
 import com.melhive.zenith.ui.navigation.Routes
@@ -140,6 +141,7 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
     }
 
     var ask by rememberSaveable { mutableStateOf("") }
+    var askName by remember { mutableStateOf(false) }
     fun submitAsk() {
         val text = ask.trim()
         if (text.isEmpty()) return
@@ -161,6 +163,8 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(greeting(LocalTime.now().hour) + (userName?.let { ", $it" } ?: ""), style = MaterialTheme.typography.headlineSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (userName == null) Text("What should I call you?", style = MaterialTheme.typography.labelMedium, color = ZenithColors.Cyan,
+                    modifier = Modifier.clickable { askName = true }.padding(vertical = 2.dp))
                 Text(zdt.format(DateTimeFormatter.ofPattern("EEE, d MMM")) + " · " + DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(now)),
                     style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
             }
@@ -195,7 +199,7 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
             ZenithCard(accent = ZenithColors.Green, onClick = { uriHandler.openUri(u.info.apkUrl) }) {
                 SectionTitle("Update available")
                 Text("ZENITH ${u.info.versionName} is ready. Download it and tap Install — it replaces this version and keeps your data.", style = MaterialTheme.typography.bodySmall)
-                Row {
+                WrapRow {
                     TextButton(onClick = { uriHandler.openUri(u.info.apkUrl) }) { Text("Download update") }
                     TextButton(onClick = { uriHandler.openUri(u.info.pageUrl) }) { Text("What's new") }
                 }
@@ -218,7 +222,7 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
                     Text("I already handle commands, calculations and small talk. For real conversations add an AI brain:", style = MaterialTheme.typography.bodyMedium)
                     Text("• On-device: ${recommended.name}, ${DeviceInfo.formatBytes(recommended.sizeBytes)} download, private and offline.\n• Online: Gemini, OpenAI or Claude with your API key — fastest.",
                         style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
-                    Row {
+                    WrapRow {
                         TextButton(onClick = { scope.launch { c.taskEngine.create(TaskTypes.MODEL_DOWNLOAD, "Download ${recommended.name}", mapOf("model" to recommended.id)) } }) { Text("Download on-device model") }
                         TextButton(onClick = { onNavigate(Routes.MODELS) }) { Text("Use online AI") }
                     }
@@ -270,9 +274,23 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
         }
         Spacer(Modifier.height(8.dp))
     }
+
+    if (askName) NameDialog(initial = "", onDismiss = { askName = false }) { name -> scope.launch { c.memory.setUserName(name) }; askName = false }
 }
 
-private fun greeting(hour: Int) = when (hour) { in 5..11 -> "Good morning"; in 12..17 -> "Good afternoon"; in 18..22 -> "Good evening"; else -> "Hello" }
+@Composable
+fun NameDialog(initial: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    var name by remember { mutableStateOf(initial) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("What should I call you?") },
+        text = { OutlinedTextField(name, { name = it }, singleLine = true, placeholder = { Text("Your name") }, modifier = Modifier.fillMaxWidth()) },
+        confirmButton = { TextButton(enabled = name.isNotBlank(), onClick = { onSave(name) }) { Text("Save") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Not now") } },
+    )
+}
+
+private fun greeting(hour: Int) = when (hour) { in 5..11 -> "Good Morning"; in 12..17 -> "Good Afternoon"; in 18..22 -> "Good Evening"; else -> "Hello" }
 
 @Composable
 private fun QuickAction(icon: ImageVector, label: String, tint: Color, modifier: Modifier, onClick: () -> Unit) {

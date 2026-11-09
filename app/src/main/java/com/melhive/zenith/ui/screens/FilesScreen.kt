@@ -45,6 +45,7 @@ import com.melhive.zenith.tools.ToolOutcome
 import com.melhive.zenith.ui.components.EmptyState
 import com.melhive.zenith.ui.components.IconLabel
 import com.melhive.zenith.ui.components.SectionTitle
+import com.melhive.zenith.ui.components.WrapRow
 import com.melhive.zenith.ui.components.ZenithCard
 import com.melhive.zenith.ui.navigation.rememberContainer
 import com.melhive.zenith.ui.theme.MonoStyle
@@ -107,7 +108,7 @@ fun FilesScreen(onBack: () -> Unit) {
             }
         } else {
             item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                WrapRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { run("files.organize", mapOf("path" to path!!)) }) { Text("Organize") }
                     OutlinedButton(onClick = { run("docs.index", mapOf("path" to path!!)) }) { Text("Index for search") }
                 }

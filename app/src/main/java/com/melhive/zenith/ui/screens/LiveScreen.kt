@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -35,6 +36,11 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.material.icons.automirrored.outlined.Send
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -68,6 +74,18 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit) {
     val activeTasks = tasks.count { !it.statusEnum().terminal }
 
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> if (granted) live.start() }
+    // Fallback: the phone's own voice-typing popup (works even when background recognition fails).
+    val systemVoice = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let { live.submitText(it) }
+    }
+    var typing by remember { mutableStateOf(false) }
+    var typed by remember { mutableStateOf("") }
+    fun launchSystemVoice() {
+        val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Speak to ZENITH")
+        runCatching { systemVoice.launch(intent) }.onFailure { typing = true }
+    }
     LaunchedEffect(Unit) {
         if (PermissionCatalog.isGranted(context, PermissionCatalog.MICROPHONE)) live.start() else permission.launch(Manifest.permission.RECORD_AUDIO)
     }
@@ -108,9 +126,24 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit) {
             Text(
                 state.partial.ifEmpty { state.statusDetail ?: hintFor(state.orb) },
                 style = MaterialTheme.typography.bodyMedium, color = ZenithColors.Muted, textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().height(48.dp).padding(top = 4.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(top = 4.dp), maxLines = 4,
             )
 
+            if (state.orb == OrbState.ERROR || typing) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { launchSystemVoice() }) { Text("System voice input") }
+                    TextButton(onClick = { typing = !typing }) { Text(if (typing) "Hide keyboard" else "Type instead") }
+                }
+            }
+            if (typing) {
+                OutlinedTextField(
+                    value = typed, onValueChange = { typed = it }, singleLine = true, modifier = Modifier.fillMaxWidth().imePadding(),
+                    placeholder = { Text("Type to ZENITH") },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Send),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSend = { live.submitText(typed); typed = "" }),
+                    trailingIcon = { IconButton(onClick = { live.submitText(typed); typed = "" }) { Icon(Icons.AutoMirrored.Outlined.Send, "Send") } },
+                )
+            }
             Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                 FilledTonalIconButton(onClick = live::toggleMute, modifier = Modifier.size(56.dp)) {
                     Icon(if (state.micMuted) Icons.Outlined.MicOff else Icons.Outlined.Mic, if (state.micMuted) "Unmute microphone" else "Mute microphone")

@@ -102,6 +102,8 @@ class OrchestratorTest {
         val turns = fake.requests[1].turns.map { it.content }
         assertTrue(turns.containsAll(listOf("Hey, can we chat about geography?", "Hello! How can I help?", "What's the capital of France?")))
         assertTrue(fake.requests[1].system.contains("ZENITH"))
+        // Casual chat uses the lean prompt without the tool list.
+        assertTrue(!fake.requests[1].system.contains("zenith-tool"))
     }
 
     @Test fun modelToolCallIsExecutedAndResultFedBack() = runBlocking<Unit> {
@@ -112,7 +114,7 @@ class OrchestratorTest {
         provider = fake
         val o = orchestrator()
         val id = conversations.create()
-        val reply = o.respond(id, "What's on my list?")
+        val reply = o.respond(id, "What's on my task list?")
         assertEquals("You need to buy milk.", reply.text)
         assertEquals(listOf("todo.list"), executed)
         assertTrue(fake.requests[1].turns.last().content.contains("Your tasks: buy milk"))

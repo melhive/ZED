@@ -79,9 +79,32 @@ class NativeIntelligenceTest {
         listOf("hi", "Hello Zenith!", "how are you?", "who are you", "thanks", "good night", "tell me a joke", "you're awesome", "what's my name", "ok").forEach {
             assertNotNull(talk.respond(it, ctx), it)
         }
-        assertEquals("You're Ana.", talk.respond("what's my name?", ctx))
+        assertEquals("Of course — you're Ana.", talk.respond("what's my name?", ctx))
         assertTrue(talk.respond("what's my name", SmallTalk.Context())!!.contains("my name is"))
         assertNull(talk.respond("explain how vaccines work", ctx))
         assertTrue(talk.fallback("set up a meeting sometime", SmallTalk.Context()).contains("schedule meeting"))
+    }
+
+    @Test fun conversationalFollowUpsAndFun() {
+        val talk = SmallTalk(Random(7))
+        val ctx = SmallTalk.Context(userName = "Rommel", hourOfDay = 15)
+        assertTrue(talk.respond("how are you?", ctx)!!.isNotBlank())
+        assertTrue(talk.respond("and you?", ctx)!!.contains("well") || talk.respond("and you?", ctx)!!.isNotBlank())
+        val j1 = talk.respond("tell me a joke", ctx)!!
+        val j2 = talk.respond("another one", ctx)!!
+        assertTrue(j1 != j2, "jokes should not repeat back to back")
+        val riddle = talk.respond("tell me a riddle", ctx)!!
+        assertTrue(riddle.endsWith("“I give up”.)"))
+        assertTrue(talk.respond("I give up", ctx)!!.startsWith("It's"))
+        assertTrue(talk.respond("flip a coin", ctx)!!.matches(Regex("It's (heads|tails)!")))
+        assertTrue(talk.respond("roll 2 dice", ctx)!!.contains("total"))
+        val n = talk.respond("pick a random number between 5 and 7", ctx)!!.removeSuffix(".").toInt()
+        assertTrue(n in 5..7)
+        assertTrue(talk.respond("recommend a book", ctx)!!.startsWith("Try"))
+        assertTrue(talk.respond("I'm feeling stressed", ctx)!!.isNotBlank())
+        assertTrue(talk.respond("what's the weather like today", ctx)!!.contains("weather"))
+        assertTrue(talk.respond("do you like music?", ctx)!!.contains("music"))
+        assertTrue(talk.respond("what's your favorite color", ctx)!!.contains("Cyan"))
+        assertNull(talk.respond("explain how vaccines work", ctx))
     }
 }
