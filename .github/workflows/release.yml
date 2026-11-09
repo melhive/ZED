@@ -7,7 +7,7 @@ name: Release
 # Every release is signed with the same key and gets a higher versionCode,
 # so Android installs it as an update over the previous version.
 # Required repository secrets:
-#   ZENITH_KEYSTORE_BASE64, ZENITH_KEYSTORE_PASSWORD, ZENITH_KEY_ALIAS, ZENITH_KEY_PASSWORD
+#   ZENITH_KEYSTORE_BASE64, ZENITH_KEYSTORE_PASSWORD, ZENITH_KEY_PASSWORD (key alias: zenith)
 
 on:
   push:
@@ -58,7 +58,8 @@ jobs:
       - name: Build signed release APK
         env:
           ZENITH_KEYSTORE_PASSWORD: ${{ secrets.ZENITH_KEYSTORE_PASSWORD }}
-          ZENITH_KEY_ALIAS: ${{ secrets.ZENITH_KEY_ALIAS }}
+          # The alias is not secret; keeping it out of secrets avoids GitHub masking the word in logs.
+          ZENITH_KEY_ALIAS: zenith
           ZENITH_KEY_PASSWORD: ${{ secrets.ZENITH_KEY_PASSWORD }}
         run: ./gradlew :app:assembleRelease
 
@@ -68,9 +69,14 @@ jobs:
 
       - name: Verify signature
         run: |
+          ls -la app/build/outputs/apk/release/
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          case "$APK" in *unsigned*) echo "::error::Release APK is unsigned"; exit 1;; esac
           APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
-          "$APKSIGNER" verify --print-certs app/build/outputs/apk/release/app-release.apk | grep -E "Signer #1 certificate (DN|SHA-256)"
-          cp app/build/outputs/apk/release/app-release.apk zenith.apk
+          echo "Using $APKSIGNER"
+          "$APKSIGNER" verify --verbose --print-certs "$APK" 2>&1 | tee verify.txt
+          grep -q "Verifies" verify.txt
+          cp "$APK" zenith.apk
 
       - name: Publish GitHub Release
         env:
