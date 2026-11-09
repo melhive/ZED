@@ -1,0 +1,81 @@
+name: Android Build
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+  workflow_dispatch:
+
+concurrency:
+  group: android-build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Test and build debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Set up Gradle (with dependency cache)
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Core logic tests (pure Kotlin)
+        run: ./gradlew :core:test --stacktrace
+
+      - name: Android unit tests (Robolectric, MockWebServer)
+        run: ./gradlew :app:testDebugUnitTest --stacktrace
+
+      - name: Build debug APK
+        run: ./gradlew :app:assembleDebug --stacktrace
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: zenith-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports
+          path: |
+            core/build/reports/tests/
+            app/build/reports/tests/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## ZENITH build"
+            echo "- Commit: \`${GITHUB_SHA::7}\` on \`${GITHUB_REF_NAME}\`"
+            if ls app/build/outputs/apk/debug/*.apk >/dev/null 2>&1; then
+              for f in app/build/outputs/apk/debug/*.apk; do echo "- APK: \`$(basename "$f")\` ($(du -h "$f" | cut -f1))"; done
+              echo "- Download it from the **Artifacts** section of this run (zenith-debug-apk)."
+            else
+              echo "- No APK was produced. Check the failed step above."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
