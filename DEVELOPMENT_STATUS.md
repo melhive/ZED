@@ -36,7 +36,7 @@ Native Android personal AI assistant (Kotlin, Jetpack Compose). Three intelligen
 
 | Suite | Tests | Result |
 |---|---|---|
-| `:core:test` (JVM) | 35 | ✅ pass (also runs locally in Termux via `scripts/test-core.sh`) |
+| `:core:test` (JVM) | 36 | ✅ pass (also runs locally in Termux via `scripts/test-core.sh`) |
 | `:app:testDebugUnitTest` (Robolectric, MockWebServer, Compose UI, orchestrator) | 28 | ✅ pass |
 | Release build (R8 minify + resource shrinking, APK + AAB) | — | ✅ builds (unsigned until signing secrets are added) |
 
@@ -75,6 +75,13 @@ Failed tests: none.
 - "Remember" phrasings broadened; conversational requests go to the model when available.
 - LIVE: standard recognizer first, recognizer recreated after errors, microphone released before listening, barge-in only with hardware echo cancellation.
 - Gemma 4 E2B confirmed compatible (Google: ~1.4–1.7 GB RAM on CPU, up to 32K context).
+
+## Second device-feedback round (v0.1.7)
+
+- LIVE: error codes shown and recorded in Problem reports; preflight check; system voice-input and typing fallbacks.
+- UI: wrapping chip/button rows (no overlapping text), scrollable Memory tabs, Tasks overflow menu, title-case greeting with name prompt.
+- Conversation: more human persona prompt, lean prompt for casual chat, broader native small talk with follow-ups and fun features.
+- Still needed from the device: the exact LIVE error (Diagnostics → Problem reports → Share report) if it persists.
 
 ## Model integration status
 
