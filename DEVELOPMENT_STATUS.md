@@ -36,8 +36,8 @@ Native Android personal AI assistant (Kotlin, Jetpack Compose). Three intelligen
 
 | Suite | Tests | Result |
 |---|---|---|
-| `:core:test` (JVM) | 34 | ✅ pass (also runs locally in Termux via `scripts/test-core.sh`) |
-| `:app:testDebugUnitTest` (Robolectric, MockWebServer, Compose UI, orchestrator) | 25 | ✅ pass |
+| `:core:test` (JVM) | 35 | ✅ pass (also runs locally in Termux via `scripts/test-core.sh`) |
+| `:app:testDebugUnitTest` (Robolectric, MockWebServer, Compose UI, orchestrator) | 28 | ✅ pass |
 | Release build (R8 minify + resource shrinking, APK + AAB) | — | ✅ builds (unsigned until signing secrets are added) |
 
 Failed tests: none.
@@ -67,6 +67,14 @@ Failed tests: none.
 - On-device: LiteRT-LM session reused across turns (only the new message is processed), compact stable system prompt.
 - Without any model: small talk (personalized with the user's name), calculator, unit conversion, date math, and honest guidance.
 - Orchestrator behaviour (history, tool round-trip, retry, native fallback, regenerate) is covered by tests with a scripted model.
+
+## Fixed from first device feedback (v0.1.6)
+
+- "Context window is full" errors: engine now created with an explicit window (Auto 4K/8K, selectable), history trimmed to fit, session reset before overflow, automatic recovery.
+- Chat box gap above the keyboard; Home redesigned (orb opens LIVE, "Completed" no longer sticks).
+- "Remember" phrasings broadened; conversational requests go to the model when available.
+- LIVE: standard recognizer first, recognizer recreated after errors, microphone released before listening, barge-in only with hardware echo cancellation.
+- Gemma 4 E2B confirmed compatible (Google: ~1.4–1.7 GB RAM on CPU, up to 32K context).
 
 ## Model integration status
 
