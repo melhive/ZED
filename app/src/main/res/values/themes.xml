@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="zenith_background">#FF05070D</color>
+    <color name="zenith_accent">#FF5CE1FF</color>
+    <style name="Theme.Zenith" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/zenith_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

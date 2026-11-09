@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Outer ring -->
+    <path android:strokeColor="#FF5CE1FF" android:strokeWidth="2.5" android:fillColor="#00000000"
+        android:pathData="M54,30 A24,24 0 1,1 53.99,30 Z" />
+    <!-- Core orb -->
+    <path android:fillColor="#FF7B6CFF"
+        android:pathData="M54,40 A14,14 0 1,1 53.99,40 Z" />
+    <path android:fillColor="#FFB9F3FF"
+        android:pathData="M50,46 A5,5 0 1,1 49.99,46 Z" />
+    <!-- Zenith mark -->
+    <path android:fillColor="#FF5CE1FF" android:pathData="M54,20 L57,28 L51,28 Z" />
+</vector>

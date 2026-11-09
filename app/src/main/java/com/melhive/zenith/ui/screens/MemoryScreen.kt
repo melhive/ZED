@@ -1,0 +1,147 @@
+package com.melhive.zenith.ui.screens
+
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.CheckBox
+import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SecondaryTabRow
+import androidx.compose.material3.Tab
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.melhive.zenith.ui.components.EmptyState
+import com.melhive.zenith.ui.components.ZenithCard
+import com.melhive.zenith.ui.navigation.rememberContainer
+import com.melhive.zenith.ui.theme.ZenithColors
+import kotlinx.coroutines.launch
+
+@Composable
+fun MemoryScreen(onBack: () -> Unit) {
+    val c = rememberContainer()
+    val scope = rememberCoroutineScope()
+    var tab by remember { mutableIntStateOf(0) }
+    val facts by c.memory.facts.collectAsStateWithLifecycle(initialValue = emptyList())
+    val todos by c.todos.todos.collectAsStateWithLifecycle(initialValue = emptyList())
+    val reminders by c.db.reminders().observeAll().collectAsStateWithLifecycle(initialValue = emptyList())
+    val docs by c.knowledge.documents.collectAsStateWithLifecycle(initialValue = emptyList())
+    var adding by remember { mutableStateOf(false) }
+    var confirmClear by remember { mutableStateOf(false) }
+
+    ListScreen("Memory", onBack = onBack, subtitle = "Stored only on this device", actions = {
+        if (tab == 0 || tab == 1) IconButton(onClick = { adding = true }) { Icon(Icons.Outlined.Add, "Add") }
+    }) {
+        item {
+            SecondaryTabRow(selectedTabIndex = tab, containerColor = ZenithColors.Background) {
+                listOf("Facts", "Task list", "Reminders", "Knowledge").forEachIndexed { i, label ->
+                    Tab(selected = tab == i, onClick = { tab = i }, text = { Text(label) })
+                }
+            }
+        }
+        when (tab) {
+            0 -> {
+                item { Text("ZENITH only remembers what you explicitly ask it to (“remember that…”), or what you approve when an AI model requests it.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted) }
+                if (facts.isEmpty()) item { EmptyState("No memories", "Say “remember that my sister's name is Ana”.") }
+                items(facts, key = { it.id }) { f ->
+                    ZenithCard {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(f.text, modifier = Modifier.weight(1f))
+                            IconButton(onClick = { scope.launch { c.memory.update(f.copy(pinned = !f.pinned)) } }) {
+                                Icon(Icons.Outlined.PushPin, "Pin", tint = if (f.pinned) ZenithColors.Cyan else ZenithColors.Muted)
+                            }
+                            IconButton(onClick = { scope.launch { c.memory.delete(listOf(f.id)) } }) { Icon(Icons.Outlined.Delete, "Delete", tint = ZenithColors.Muted) }
+                        }
+                        Text("${formatTime(f.createdAt)} · ${f.source.replace('_', ' ')}", style = MaterialTheme.typography.labelSmall, color = ZenithColors.Muted)
+                    }
+                }
+                if (facts.isNotEmpty()) item { TextButton(onClick = { confirmClear = true }) { Text("Forget everything", color = ZenithColors.Red) } }
+            }
+            1 -> {
+                if (todos.isEmpty()) item { EmptyState("Task list is empty", "Say “add task buy milk”.") }
+                items(todos, key = { it.id }) { t ->
+                    ZenithCard {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { scope.launch { c.todos.setDone(t, !t.done) } }) {
+                                Icon(if (t.done) Icons.Outlined.CheckBox else Icons.Outlined.CheckBoxOutlineBlank, "Toggle done", tint = if (t.done) ZenithColors.Green else ZenithColors.Muted)
+                            }
+                            Text("#${t.id} ${t.title}", modifier = Modifier.weight(1f), textDecoration = if (t.done) TextDecoration.LineThrough else null)
+                            IconButton(onClick = { scope.launch { c.todos.delete(t.id) } }) { Icon(Icons.Outlined.Delete, "Delete", tint = ZenithColors.Muted) }
+                        }
+                        t.dueAt?.let { Text("Due ${formatTime(it)}", style = MaterialTheme.typography.labelSmall, color = ZenithColors.Muted) }
+                    }
+                }
+            }
+            2 -> {
+                if (reminders.isEmpty()) item { EmptyState("No reminders", "Say “remind me to stretch in 30 minutes”.") }
+                items(reminders.sortedByDescending { it.triggerAt }, key = { it.id }) { r ->
+                    ZenithCard {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("#${r.id} ${r.text}", modifier = Modifier.weight(1f))
+                            if (r.status == "scheduled") TextButton(onClick = { scope.launch { c.reminderScheduler.cancelReminder(r.id) } }) { Text("Cancel") }
+                        }
+                        Text("${formatTime(r.triggerAt)} · ${r.status}${if (r.status == "scheduled") if (r.exact) " · exact" else " · approximate" else ""}",
+                            style = MaterialTheme.typography.labelSmall, color = ZenithColors.Muted)
+                    }
+                }
+            }
+            else -> {
+                item { Text("Documents indexed for local search. Index more with “index my documents” or from Files.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted) }
+                if (docs.isEmpty()) item { EmptyState("Index is empty", "Grant a folder in Files, then index it.") }
+                items(docs, key = { it.id }) { d ->
+                    ZenithCard {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(d.path, modifier = Modifier.weight(1f))
+                            IconButton(onClick = { scope.launch { c.knowledge.deleteDoc(d.id) } }) { Icon(Icons.Outlined.Delete, "Remove from index", tint = ZenithColors.Muted) }
+                        }
+                        Text("${d.chunkCount} chunks · indexed ${formatTime(d.indexedAt)}", style = MaterialTheme.typography.labelSmall, color = ZenithColors.Muted)
+                    }
+                }
+                if (docs.isNotEmpty()) item { TextButton(onClick = { scope.launch { c.knowledge.clear() } }) { Text("Clear index", color = ZenithColors.Red) } }
+            }
+        }
+    }
+
+    if (adding) {
+        var text by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { adding = false },
+            title = { Text(if (tab == 0) "Remember a fact" else "Add to task list") },
+            text = { OutlinedTextField(text, { text = it }, modifier = Modifier.fillMaxWidth(), singleLine = false) },
+            confirmButton = {
+                TextButton(enabled = text.isNotBlank(), onClick = {
+                    scope.launch { if (tab == 0) c.memory.remember(text, "manual") else c.todos.add(text, null) }
+                    adding = false
+                }) { Text("Save") }
+            },
+            dismissButton = { TextButton(onClick = { adding = false }) { Text("Cancel") } },
+        )
+    }
+    if (confirmClear) {
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            title = { Text("Forget everything?") },
+            text = { Text("All ${facts.size} remembered facts will be permanently deleted.") },
+            confirmButton = { TextButton(onClick = { scope.launch { c.memory.clear() }; confirmClear = false }) { Text("Delete all", color = ZenithColors.Red) } },
+            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancel") } },
+        )
+    }
+}
