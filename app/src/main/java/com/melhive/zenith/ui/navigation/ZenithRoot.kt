@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.Chat
@@ -93,7 +95,7 @@ fun ZenithRoot(requestedRoute: String?, onRouteConsumed: () -> Unit) {
     val route = backStack?.destination?.route
     val confirmations by container.confirmations.requests.collectAsStateWithLifecycle()
     // Hide the bottom bar while the keyboard is open so text fields sit directly on the keyboard.
-    val imeVisible = androidx.compose.foundation.layout.WindowInsets.isImeVisible
+    val imeVisible = WindowInsets.isImeVisible
 
     LaunchedEffect(requestedRoute) {
         if (requestedRoute != null) { nav.navigateTab(requestedRoute); onRouteConsumed() }
