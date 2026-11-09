@@ -68,6 +68,10 @@ android {
         buildConfig = true
     }
 
+    // Exported Room schemas are packaged into debug/test assets so MigrationTestHelper can
+    // rebuild every historical version and verify migrations.
+    sourceSets.getByName("debug").assets.srcDir("$projectDir/schemas")
+
     testOptions {
         unitTests.isIncludeAndroidResources = true
         unitTests.isReturnDefaultValues = true

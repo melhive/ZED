@@ -18,7 +18,7 @@ import androidx.room.migration.Migration
         GrantedFolderEntity::class, KnowledgeDocEntity::class, KnowledgeChunkEntity::class,
         KnowledgeChunkFts::class, AuditLogEntity::class,
     ],
-    version = 1,
+    version = ZenithDatabase.VERSION,
     exportSchema = true,
 )
 abstract class ZenithDatabase : RoomDatabase() {
@@ -35,6 +35,7 @@ abstract class ZenithDatabase : RoomDatabase() {
 
     companion object {
         const val NAME = "zenith.db"
+        const val VERSION = 1
 
         /** Add migrations here when the schema version increases (1→2, 2→3, …). */
         val MIGRATIONS: Array<Migration> = emptyArray()

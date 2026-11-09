@@ -44,6 +44,14 @@ import com.melhive.zenith.ui.navigation.Routes
 import com.melhive.zenith.ui.navigation.rememberContainer
 import com.melhive.zenith.ui.theme.ZenithColors
 import androidx.compose.ui.res.stringResource
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import com.melhive.zenith.android.PermissionCatalog
 
 @Composable
 fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
@@ -56,6 +64,12 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
     val activity by c.orchestrator.activity.collectAsStateWithLifecycle()
     val installedModels by c.models.installed.collectAsStateWithLifecycle(initialValue = emptyList())
     val intelligence by produceState("Checking…", settings, installedModels) { value = c.providers.describeActive() }
+
+    val context = LocalContext.current
+    var permissionCheck by remember { mutableIntStateOf(0) }
+    val notifInfo = PermissionCatalog.NOTIFICATIONS
+    val needsNotifications = remember(permissionCheck) { PermissionCatalog.applicable(notifInfo) && !PermissionCatalog.isGranted(context, notifInfo) }
+    val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { permissionCheck++ }
 
     val active = tasks.filter { !it.statusEnum().terminal }
     val upcoming = reminders.filter { it.status == "scheduled" && it.triggerAt > System.currentTimeMillis() }.take(3)
@@ -77,6 +91,14 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
             activity.phase.toOrb().label + (activity.detail?.let { " · $it" } ?: ""),
             Modifier.fillMaxWidth(), textAlign = TextAlign.Center, color = ZenithColors.Muted, style = MaterialTheme.typography.bodyMedium,
         )
+
+        if (needsNotifications) {
+            ZenithCard(accent = ZenithColors.Amber) {
+                SectionTitle("Notifications are off")
+                Text(notifInfo.reason, style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
+                TextButton(onClick = { notifLauncher.launch(notifInfo.permission) }) { Text("Allow notifications") }
+            }
+        }
 
         ZenithCard(onClick = { onNavigate(Routes.MODELS) }) {
             SectionTitle("Intelligence")
