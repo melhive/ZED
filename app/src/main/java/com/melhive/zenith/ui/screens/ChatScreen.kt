@@ -82,6 +82,7 @@ fun ChatScreen(initialConversationId: Long?, onOpenLive: () -> Unit, onOpenModel
     val notice by vm.notice.collectAsStateWithLifecycle()
     val conversations by vm.conversations.collectAsStateWithLifecycle()
     val currentId by vm.conversationId.collectAsStateWithLifecycle()
+    val usage by vm.lastUsage.collectAsStateWithLifecycle()
 
     var input by rememberSaveable { mutableStateOf("") }
     var showHistory by remember { mutableStateOf(false) }
@@ -135,6 +136,7 @@ fun ChatScreen(initialConversationId: Long?, onOpenLive: () -> Unit, onOpenModel
                 TextButton(onClick = vm::stop) { Icon(Icons.Outlined.Stop, null); Text("Stop") }
             }
         }
+        if (!busy) usage?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = ZenithColors.Muted, modifier = Modifier.padding(horizontal = 16.dp)) }
         notice?.let {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(it, color = ZenithColors.Amber, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))

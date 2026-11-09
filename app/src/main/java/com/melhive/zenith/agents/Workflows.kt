@@ -17,6 +17,7 @@ class WorkflowEngine(private val db: ZenithDatabase, private val taskEngine: Tas
     val workflows = listOf(
         Workflow("morning_briefing", "Morning briefing", "Date and time, open tasks, today's reminders and background task status.", listOf("morning briefing", "daily briefing", "briefing", "good morning")),
         Workflow("organize_downloads", "Organize downloads", "Plans sorting of your Download folder by file type (you approve the plan).", listOf("organize downloads", "organize my downloads", "clean downloads")),
+        Workflow("tidy_and_index", "Tidy and index downloads", "Plans sorting of Download, then indexes it for search once the sort completes (dependent tasks).", listOf("tidy and index", "tidy and index downloads")),
         Workflow("index_documents", "Index documents", "Indexes text documents in your granted folders for local search.", listOf("index documents", "index my documents", "update index")),
     )
 
@@ -44,6 +45,16 @@ class WorkflowEngine(private val db: ZenithDatabase, private val taskEngine: Tas
                 ToolResult(true, parts.joinToString("\n\n"))
             }
             "organize_downloads" -> step("files.organize", mapOf("path" to "Download")).let { ToolResult(it is ToolOutcome.Executed && it.result.ok, it.message) }
+            "tidy_and_index" -> {
+                val organize = step("files.organize", mapOf("path" to "Download"))
+                val organizeTask = (organize as? ToolOutcome.Executed)?.result?.taskId
+                    ?: return ToolResult(false, organize.message)
+                val index = taskEngine.create(
+                    com.melhive.zenith.tasks.TaskTypes.INDEX, "Index Download (after #$organizeTask)",
+                    mapOf("path" to "Download"), dependsOn = setOf(organizeTask),
+                )
+                ToolResult(true, organize.message + "\nTask #${index.id} will index the folder after #$organizeTask completes.")
+            }
             "index_documents" -> step("docs.index").let { ToolResult(it is ToolOutcome.Executed && it.result.ok, it.message) }
             else -> ToolResult(false, "Workflow not implemented")
         }

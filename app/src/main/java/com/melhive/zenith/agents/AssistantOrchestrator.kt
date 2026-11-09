@@ -64,6 +64,10 @@ class AssistantOrchestrator(
     /** Live text of the reply being generated (for streaming TTS / UI). */
     val streamingText: StateFlow<String> = _streamingText.asStateFlow()
 
+    private val _lastUsage = MutableStateFlow<String?>(null)
+    /** Token usage of the last online reply, when the provider reports it. */
+    val lastUsage: StateFlow<String?> = _lastUsage.asStateFlow()
+
     private var currentJob: Job? = null
 
     fun submit(conversationId: Long, text: String, attachmentName: String? = null, attachmentText: String? = null, voice: Boolean = false, onReply: (AssistantReply) -> Unit = {}): Job {
@@ -212,7 +216,8 @@ class AssistantOrchestrator(
                         if (now - lastFlush > 120) { conversations.updateMessage(id, sb.toString(), "streaming"); lastFlush = now }
                     }
                     is GenerationEvent.Error -> error = e.message
-                    is GenerationEvent.Usage, is GenerationEvent.Done -> Unit
+                    is GenerationEvent.Usage -> _lastUsage.value = "${provider.label}: ${e.inputTokens ?: "?"} input / ${e.outputTokens ?: "?"} output tokens"
+                    is GenerationEvent.Done -> Unit
                 }
             }
         } catch (e: CancellationException) {

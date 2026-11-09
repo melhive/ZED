@@ -79,6 +79,7 @@ class TaskWorker(appContext: Context, params: WorkerParameters) : CoroutineWorke
     private suspend fun succeed(task: TaskEntity, summary: String): Result {
         engine.transition(task.id, TaskStatus.SUCCEEDED) { it.copy(resultSummary = summary) }
         engine.log(task.id, "Completed: $summary")
+        engine.kickDependents(task.id)
         Notifications.post(applicationContext, Notifications.CHANNEL_TASKS, task.id.toInt(), "Completed: ${task.title}", summary, "tasks")
         return Result.success()
     }

@@ -46,6 +46,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         a.conversationId == id && a.phase in setOf(AssistantPhase.THINKING, AssistantPhase.EXECUTING, AssistantPhase.RESEARCHING, AssistantPhase.SEARCHING)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
     val activity = c.orchestrator.activity
+    val lastUsage = c.orchestrator.lastUsage
 
     val attachment = MutableStateFlow<Attachment?>(null)
     val listening = MutableStateFlow(false)

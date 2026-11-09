@@ -124,6 +124,7 @@ class TaskEngine(private val context: Context, private val dao: TaskDao) {
         workManager.cancelUniqueWork(workName(id))
         val t = transition(id, TaskStatus.CANCELLED) { it.copy(error = null, progressLabel = "Cancelled") } ?: return false
         log(t.id, "Cancelled by user", "warn")
+        kickDependents(t.id) // dependents re-evaluate and fail fast as blocked
         return true
     }
 
@@ -142,6 +143,16 @@ class TaskEngine(private val context: Context, private val dao: TaskDao) {
         log(id, "Retry requested (attempt ${t.attempt})")
         enqueue(t)
         return true
+    }
+
+    /** Re-enqueues queued tasks that depend on [completedId] so they start immediately. */
+    suspend fun kickDependents(completedId: Long) {
+        for (t in dao.active()) {
+            if (t.statusEnum() == TaskStatus.QUEUED && completedId in t.dependencyIds()) {
+                log(t.id, "Dependency #$completedId completed; starting")
+                enqueue(t)
+            }
+        }
     }
 
     suspend fun clearFinished() = dao.clearFinished()
