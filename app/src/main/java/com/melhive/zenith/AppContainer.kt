@@ -76,6 +76,8 @@ class AppContainer(private val context: Context) {
         LiveSessionController(context, orchestrator, conversations, settings, { AndroidSpeechToText(context) }, { AndroidTextToSpeech(context) })
     }
 
+    val updates = com.melhive.zenith.android.UpdateChecker()
+
     /** A one-shot TTS engine for reading chat replies aloud. */
     val chatTts by lazy { AndroidTextToSpeech(context) }
 }

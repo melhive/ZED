@@ -19,6 +19,8 @@ class ZenithApp : Application() {
             runCatching { container.taskEngine.recover() }
             runCatching { container.reminderScheduler.rescheduleAll() }
             runCatching { container.audit.prune() }
+            // Update check against GitHub Releases (public metadata only); can be turned off in Settings.
+            runCatching { if (container.settings.current().checkUpdates) container.updates.check() }
         }
     }
 

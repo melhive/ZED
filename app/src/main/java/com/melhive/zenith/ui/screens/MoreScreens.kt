@@ -144,6 +144,37 @@ fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
             }
         }
         item {
+            val update by c.updates.state.collectAsStateWithLifecycle()
+            val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+            ZenithCard {
+                SectionTitle("App updates")
+                Text("Installed: ZENITH ${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})", style = MaterialTheme.typography.bodySmall)
+                Text(
+                    when (val u = update) {
+                        com.melhive.zenith.android.UpdateState.Unknown -> "Not checked yet"
+                        com.melhive.zenith.android.UpdateState.Checking -> "Checking GitHub…"
+                        com.melhive.zenith.android.UpdateState.UpToDate -> "You have the latest version"
+                        is com.melhive.zenith.android.UpdateState.Available -> "Version ${u.info.versionName} is available"
+                        is com.melhive.zenith.android.UpdateState.Failed -> "Check failed: ${u.message}"
+                    },
+                    style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted,
+                )
+                SwitchRow("Check for updates", "Ask GitHub Releases for a newer version when ZENITH starts", settings.checkUpdates) { scope.launch { c.settings.setCheckUpdates(it) } }
+                Row {
+                    TextButton(onClick = { scope.launch { c.updates.check() } }) { Text("Check now") }
+                    (update as? com.melhive.zenith.android.UpdateState.Available)?.let { u ->
+                        TextButton(onClick = { uriHandler.openUri(u.info.apkUrl) }) { Text("Download update") }
+                    }
+                    val ctx = LocalContext.current
+                    TextButton(onClick = {
+                        val send = Intent(Intent.ACTION_SEND).setType("text/plain")
+                            .putExtra(Intent.EXTRA_TEXT, "Install ZENITH on Android: ${com.melhive.zenith.android.UpdateChecker.LATEST_APK}")
+                        ctx.startActivity(Intent.createChooser(send, "Share ZENITH"))
+                    }) { Text("Share app") }
+                }
+            }
+        }
+        item {
             ZenithCard(onClick = { onNavigate(Routes.MODELS) }) { IconLabel(Icons.Outlined.Psychology, "Models & providers", "Configure intelligence layers in Model Manager") }
         }
     }

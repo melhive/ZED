@@ -25,7 +25,7 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = (System.getenv("ZENITH_VERSION_CODE") ?: "1").toInt()
-        versionName = "0.1.0"
+        versionName = System.getenv("ZENITH_VERSION_NAME") ?: "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
         // LiteRT-LM ships native libraries for these ABIs only.
@@ -50,8 +50,10 @@ android {
             versionNameSuffix = "-debug"
         }
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // Minification stays off until the release build has been validated on a device:
+            // an R8 problem would only show up as a crash at runtime.
+            isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             val release = signingConfigs.getByName("release")
             if (release.storeFile != null) signingConfig = release

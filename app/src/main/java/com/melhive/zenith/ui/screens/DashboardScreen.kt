@@ -52,6 +52,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.melhive.zenith.android.PermissionCatalog
+import com.melhive.zenith.android.UpdateState
+import androidx.compose.ui.platform.LocalUriHandler
 
 @Composable
 fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
@@ -70,6 +72,9 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
     val notifInfo = PermissionCatalog.NOTIFICATIONS
     val needsNotifications = remember(permissionCheck) { PermissionCatalog.applicable(notifInfo) && !PermissionCatalog.isGranted(context, notifInfo) }
     val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { permissionCheck++ }
+
+    val update by c.updates.state.collectAsStateWithLifecycle()
+    val uriHandler = LocalUriHandler.current
 
     val active = tasks.filter { !it.statusEnum().terminal }
     val upcoming = reminders.filter { it.status == "scheduled" && it.triggerAt > System.currentTimeMillis() }.take(3)
@@ -91,6 +96,17 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
             activity.phase.toOrb().label + (activity.detail?.let { " · $it" } ?: ""),
             Modifier.fillMaxWidth(), textAlign = TextAlign.Center, color = ZenithColors.Muted, style = MaterialTheme.typography.bodyMedium,
         )
+
+        (update as? UpdateState.Available)?.let { u ->
+            ZenithCard(accent = ZenithColors.Green, onClick = { uriHandler.openUri(u.info.apkUrl) }) {
+                SectionTitle("Update available")
+                Text("ZENITH ${u.info.versionName} is ready. Download it and tap Install — it replaces this version and keeps your data.", style = MaterialTheme.typography.bodySmall)
+                Row {
+                    TextButton(onClick = { uriHandler.openUri(u.info.apkUrl) }) { Text("Download update") }
+                    TextButton(onClick = { uriHandler.openUri(u.info.pageUrl) }) { Text("What's new") }
+                }
+            }
+        }
 
         if (needsNotifications) {
             ZenithCard(accent = ZenithColors.Amber) {

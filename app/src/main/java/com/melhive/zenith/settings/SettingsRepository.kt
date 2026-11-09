@@ -42,6 +42,7 @@ data class AppSettings(
     val bargeIn: Boolean = true,
     val glow: Boolean = true,
     val onboardingDone: Boolean = false,
+    val checkUpdates: Boolean = true,
 ) {
     fun modelFor(kind: OnlineProviderKind): String = onlineModels[kind]?.takeIf { it.isNotBlank() } ?: kind.defaultModel
 }
@@ -64,6 +65,7 @@ class SettingsRepository(private val context: Context) {
         val bargeIn = booleanPreferencesKey("barge_in")
         val glow = booleanPreferencesKey("glow")
         val onboarding = booleanPreferencesKey("onboarding_done")
+        val checkUpdates = booleanPreferencesKey("check_updates")
         fun model(kind: OnlineProviderKind) = stringPreferencesKey("online_model_${kind.name.lowercase()}")
     }
 
@@ -85,6 +87,7 @@ class SettingsRepository(private val context: Context) {
             bargeIn = p[K.bargeIn] ?: defaults.bargeIn,
             glow = p[K.glow] ?: defaults.glow,
             onboardingDone = p[K.onboarding] ?: false,
+            checkUpdates = p[K.checkUpdates] ?: defaults.checkUpdates,
         )
     }
 
@@ -103,6 +106,7 @@ class SettingsRepository(private val context: Context) {
     suspend fun setAutoIndex(v: Boolean) = context.dataStore.edit { it[K.autoIndex] = v }
     suspend fun setBargeIn(v: Boolean) = context.dataStore.edit { it[K.bargeIn] = v }
     suspend fun setGlow(v: Boolean) = context.dataStore.edit { it[K.glow] = v }
+    suspend fun setCheckUpdates(v: Boolean) = context.dataStore.edit { it[K.checkUpdates] = v }
     suspend fun setOnboardingDone() = context.dataStore.edit { it[K.onboarding] = true }
     suspend fun setSkillEnabled(id: String, enabled: Boolean) = context.dataStore.edit { p ->
         val current = p[K.skills] ?: AppSettings().enabledSkills
