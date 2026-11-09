@@ -14,8 +14,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
-/** Which intelligence layer answers free-form requests. Native commands always work. */
-enum class IntelligenceMode { NATIVE_ONLY, LOCAL, ONLINE }
+/**
+ * Which intelligence layer answers free-form requests. Native commands always work.
+ * AUTO picks the best available: online (key set and connected) → on-device model → native.
+ */
+enum class IntelligenceMode { AUTO, NATIVE_ONLY, LOCAL, ONLINE }
 
 enum class OnlineProviderKind(val label: String, val defaultModel: String) {
     GEMINI("Google Gemini", "gemini-2.5-flash"),
@@ -27,7 +30,7 @@ enum class OnlineProviderKind(val label: String, val defaultModel: String) {
 enum class LocalBackend { CPU, GPU }
 
 data class AppSettings(
-    val mode: IntelligenceMode = IntelligenceMode.NATIVE_ONLY,
+    val mode: IntelligenceMode = IntelligenceMode.AUTO,
     val activeLocalModelId: String? = null,
     val localBackend: LocalBackend = LocalBackend.CPU,
     val onlineProvider: OnlineProviderKind = OnlineProviderKind.GEMINI,

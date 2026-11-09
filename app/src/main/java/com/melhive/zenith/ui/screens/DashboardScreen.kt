@@ -49,6 +49,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.melhive.zenith.android.PermissionCatalog
@@ -75,6 +77,10 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
 
     val update by c.updates.state.collectAsStateWithLifecycle()
     val uriHandler = LocalUriHandler.current
+
+    val configured by produceState<Boolean?>(null, settings, installedModels) { value = c.providers.anyConfigured() }
+    val modelDownload = tasks.firstOrNull { it.type == "model_download" && !it.statusEnum().terminal }
+    val scope = rememberCoroutineScope()
 
     val active = tasks.filter { !it.statusEnum().terminal }
     val upcoming = reminders.filter { it.status == "scheduled" && it.triggerAt > System.currentTimeMillis() }.take(3)
@@ -116,11 +122,37 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
             }
         }
 
+        if (configured == false || modelDownload != null) {
+            val recommended = remember(installedModels) {
+                val e2b = com.melhive.zenith.models.ModelCatalog.find("gemma-4-e2b-it")!!
+                val small = com.melhive.zenith.models.ModelCatalog.find("qwen3-0.6b")!!
+                if (c.models.assess(e2b).level == com.melhive.zenith.models.Compatibility.COMPATIBLE) e2b else small
+            }
+            ZenithCard(accent = ZenithColors.Violet) {
+                SectionTitle("Make ZENITH conversational")
+                if (modelDownload != null) {
+                    Text("Downloading ${recommended.name.takeIf { modelDownload.title.contains(it) } ?: "model"}… you can keep using ZENITH.", style = MaterialTheme.typography.bodyMedium)
+                    RealProgress(modelDownload.progressCurrent, modelDownload.progressTotal, Modifier.padding(vertical = 6.dp), ZenithColors.Violet)
+                    Text(modelDownload.progressLabel ?: "Starting", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
+                } else {
+                    Text("Right now I answer commands, calculations and small talk. For real conversations, add an AI brain:", style = MaterialTheme.typography.bodyMedium)
+                    Text("• On-device: ${recommended.name}, ${com.melhive.zenith.android.DeviceInfo.formatBytes(recommended.sizeBytes)} download, works offline and private.\n• Online: Gemini, OpenAI or Claude with your API key — fastest and smartest.",
+                        style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
+                    Row {
+                        TextButton(onClick = {
+                            scope.launch { c.taskEngine.create(com.melhive.zenith.tasks.TaskTypes.MODEL_DOWNLOAD, "Download ${recommended.name}", mapOf("model" to recommended.id)) }
+                        }) { Text("Download on-device model") }
+                        TextButton(onClick = { onNavigate(Routes.MODELS) }) { Text("Use online AI") }
+                    }
+                }
+            }
+        }
+
         ZenithCard(onClick = { onNavigate(Routes.MODELS) }) {
             SectionTitle("Intelligence")
             val modeColor = when (settings?.mode) { IntelligenceMode.LOCAL -> ZenithColors.Teal; IntelligenceMode.ONLINE -> ZenithColors.Violet; else -> ZenithColors.Cyan }
             StatusPill(
-                when (settings?.mode) { IntelligenceMode.LOCAL -> "On-device AI"; IntelligenceMode.ONLINE -> "Online AI"; else -> "Native mode" }, modeColor,
+                when (settings?.mode) { IntelligenceMode.AUTO -> "Auto"; IntelligenceMode.LOCAL -> "On-device AI"; IntelligenceMode.ONLINE -> "Online AI"; else -> "Native mode" }, modeColor,
             )
             Spacer(Modifier.height(8.dp))
             Text(intelligence, style = MaterialTheme.typography.bodyMedium)

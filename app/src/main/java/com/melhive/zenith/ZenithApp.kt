@@ -2,6 +2,7 @@ package com.melhive.zenith
 
 import android.app.Application
 import android.content.ComponentCallbacks2
+import com.melhive.zenith.android.CrashReporter
 import com.melhive.zenith.android.Notifications
 import kotlinx.coroutines.launch
 
@@ -11,6 +12,7 @@ class ZenithApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        CrashReporter.install(this)
         container = AppContainer(this)
         Notifications.createChannels(this)
         container.appScope.launch {

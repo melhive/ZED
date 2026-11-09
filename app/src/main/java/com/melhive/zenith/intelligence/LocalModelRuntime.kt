@@ -3,6 +3,7 @@ package com.melhive.zenith.intelligence
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.Content
 import com.google.ai.edge.litertlm.Contents
+import com.google.ai.edge.litertlm.Conversation
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
@@ -12,6 +13,7 @@ import com.melhive.zenith.core.intelligence.Role
 import com.melhive.zenith.settings.LocalBackend
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,7 +28,11 @@ import java.io.File
 /**
  * Owns the LiteRT-LM [Engine]. Loading a multi-GB model takes seconds and a
  * lot of RAM, so the engine is loaded lazily, kept while in use, and released
- * on [unload] (e.g. when the user switches model or memory is low).
+ * on [unload] (model switch, memory pressure).
+ *
+ * Conversation sessions are reused across turns: when the new request extends
+ * the previous one by exactly one user message, only that message is sent, so
+ * the model does not re-process the whole history on every turn.
  */
 class LocalModelRuntime(private val cacheDir: File) {
 
@@ -45,12 +51,17 @@ class LocalModelRuntime(private val cacheDir: File) {
     private val generationLock = Mutex()
     private var engine: Engine? = null
     private var loadedKey: String? = null
-    @Volatile private var activeConversation: com.google.ai.edge.litertlm.Conversation? = null
+    @Volatile private var activeConversation: Conversation? = null
+
+    /** The live LiteRT-LM conversation and the user turns it has already seen. */
+    private class Session(val key: String, val system: String, val conversation: Conversation, val userTurns: MutableList<String>)
+    private var session: Session? = null
 
     suspend fun ensureLoaded(modelId: String, file: File, backend: LocalBackend): Engine = lock.withLock {
         val key = "${file.absolutePath}|$backend"
         engine?.let { if (loadedKey == key) return it }
         withContext(Dispatchers.IO) {
+            closeSession()
             engine?.close(); engine = null; loadedKey = null
             require(file.exists()) { "Model file is missing: ${file.name}" }
             _state.value = State.Loading(modelId)
@@ -73,9 +84,15 @@ class LocalModelRuntime(private val cacheDir: File) {
         }
     }
 
+    private fun closeSession() {
+        session?.let { runCatching { it.conversation.close() } }
+        session = null
+    }
+
     suspend fun unload() = lock.withLock {
         withContext(Dispatchers.IO) {
             activeConversation?.let { runCatching { it.cancelProcess() } }
+            closeSession()
             engine?.close(); engine = null; loadedKey = null
             _state.value = State.Unloaded
         }
@@ -83,11 +100,6 @@ class LocalModelRuntime(private val cacheDir: File) {
 
     fun cancelActive() { activeConversation?.let { runCatching { it.cancelProcess() } } }
 
-    /**
-     * Streams a reply. A fresh LiteRT-LM conversation is created per request,
-     * seeded with the system instruction and prior turns, so history stays
-     * under ZENITH's control (persisted in Room) rather than inside the runtime.
-     */
     fun generate(modelId: String, file: File, backend: LocalBackend, request: GenerationRequest): Flow<GenerationEvent> = flow {
         generationLock.withLock { generateLocked(modelId, file, backend, request) }
     }.catch { t ->
@@ -95,32 +107,46 @@ class LocalModelRuntime(private val cacheDir: File) {
         emit(GenerationEvent.Error("Local model error: ${t.message ?: t.javaClass.simpleName}"))
     }.flowOn(Dispatchers.Default)
 
-    private suspend fun kotlinx.coroutines.flow.FlowCollector<GenerationEvent>.generateLocked(modelId: String, file: File, backend: LocalBackend, request: GenerationRequest) {
+    private suspend fun FlowCollector<GenerationEvent>.generateLocked(modelId: String, file: File, backend: LocalBackend, request: GenerationRequest) {
         val e = ensureLoaded(modelId, file, backend)
         val turns = normalizeTurns(request.turns)
         val last = turns.lastOrNull()
         if (last == null || last.role != Role.USER) { emit(GenerationEvent.Error("Nothing to answer")); return }
-        val initial = turns.dropLast(1).map { t ->
-            if (t.role == Role.ASSISTANT) Message.model(t.content) else Message.user(t.content)
+        val previousUserTurns = turns.dropLast(1).filter { it.role == Role.USER }.map { it.content }
+        val message = request.volatileContext?.let { "$it\n\n${last.content}" } ?: last.content
+
+        val current = session
+        val reuse = current != null && request.sessionKey != null && current.key == request.sessionKey &&
+            current.system == request.system && current.userTurns == previousUserTurns
+        val s = if (reuse) current!! else {
+            closeSession()
+            val conversation = e.createConversation(
+                ConversationConfig(
+                    systemInstruction = Contents.of(request.system),
+                    initialMessages = turns.dropLast(1).map { t -> if (t.role == Role.ASSISTANT) Message.model(t.content) else Message.user(t.content) },
+                    samplerConfig = SamplerConfig(40, 0.95, 0.7, 0),
+                )
+            )
+            Session(request.sessionKey ?: "", request.system, conversation, previousUserTurns.toMutableList()).also { session = it }
         }
-        val config = ConversationConfig(
-            systemInstruction = Contents.of(request.system),
-            initialMessages = initial,
-            samplerConfig = SamplerConfig(40, 0.95, 0.7, 0),
-        )
-        val conversation = e.createConversation(config)
-        activeConversation = conversation
+
+        activeConversation = s.conversation
+        var completed = false
         try {
-            conversation.sendMessageAsync(last.content).collect { msg ->
+            s.conversation.sendMessageAsync(message).collect { msg ->
                 val text = msg.contents.contents.filterIsInstance<Content.Text>().joinToString("") { it.text }
                 if (text.isNotEmpty()) emit(GenerationEvent.Delta(text))
             }
+            completed = true
+            s.userTurns += last.content
             emit(GenerationEvent.Done("stop"))
         } finally {
             activeConversation = null
-            runCatching { conversation.close() }
+            // A cancelled or failed generation leaves the runtime state uncertain: start fresh next time.
+            if (!completed) closeSession()
         }
     }
+
 }
 
 class LocalLiteRtProvider(

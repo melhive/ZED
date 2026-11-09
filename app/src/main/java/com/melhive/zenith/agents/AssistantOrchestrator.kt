@@ -2,6 +2,7 @@ package com.melhive.zenith.agents
 
 import com.melhive.zenith.core.command.CommandParser
 import com.melhive.zenith.core.command.ParsedCommand
+import com.melhive.zenith.core.conversation.SmallTalk
 import com.melhive.zenith.core.intelligence.ContextWindow
 import com.melhive.zenith.core.intelligence.PromptBuilder
 import com.melhive.zenith.core.intelligence.Role
@@ -11,7 +12,8 @@ import com.melhive.zenith.core.tools.ToolRequest
 import com.melhive.zenith.intelligence.GenerationEvent
 import com.melhive.zenith.intelligence.GenerationRequest
 import com.melhive.zenith.intelligence.IntelligenceProvider
-import com.melhive.zenith.intelligence.ProviderRegistry
+import com.melhive.zenith.intelligence.LocalModelRuntime
+import com.melhive.zenith.intelligence.ProviderSource
 import com.melhive.zenith.knowledge.KnowledgeRepository
 import com.melhive.zenith.memory.ConversationRepository
 import com.melhive.zenith.memory.MemoryRepository
@@ -22,11 +24,13 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.LocalTime
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
@@ -38,9 +42,10 @@ data class AssistantReply(val text: String, val ok: Boolean, val source: String)
 
 /**
  * Handles one user turn end to end:
- *  1. Deterministic native commands are tried first (no model needed).
- *  2. Otherwise the active intelligence provider generates a reply, with
- *     enabled tools described in the system prompt.
+ *  1. Deterministic native commands and computations are tried first (no model needed).
+ *  2. Otherwise the active intelligence provider holds the conversation, with
+ *     enabled tools described in the system prompt. Without a provider, the
+ *     native small-talk layer answers social messages and explains its limits.
  *  3. Tool calls in model output are extracted as untrusted requests and run
  *     through the ToolManager (validation → permission → confirmation).
  *  4. Results are fed back for up to [MAX_ROUNDS] rounds, then the final
@@ -51,12 +56,13 @@ class AssistantOrchestrator(
     private val conversations: ConversationRepository,
     private val memory: MemoryRepository,
     private val knowledge: KnowledgeRepository,
-    private val providers: ProviderRegistry,
+    private val providers: ProviderSource,
     private val tools: ToolManager,
     private val skills: SkillRegistry,
     private val settings: SettingsRepository,
 ) {
     private val parser = CommandParser()
+    private val smallTalk = SmallTalk()
     private val _activity = MutableStateFlow(AssistantActivity())
     val activity: StateFlow<AssistantActivity> = _activity.asStateFlow()
 
@@ -80,6 +86,21 @@ class AssistantOrchestrator(
         return job
     }
 
+    /** Discards the last answer and asks again with the same user message. */
+    fun regenerate(conversationId: Long): Job? {
+        currentJob?.cancel()
+        val job = appScope.launch {
+            val text = conversations.popLastExchange(conversationId) ?: return@launch
+            val attachmentSplit = text.split("\n\n[Attached file: ", limit = 2)
+            if (attachmentSplit.size == 2) {
+                val name = attachmentSplit[1].substringBefore("]")
+                respond(conversationId, attachmentSplit[0], name, attachmentSplit[1].substringAfter("]\n", ""))
+            } else respond(conversationId, text)
+        }
+        currentJob = job
+        return job
+    }
+
     fun cancelCurrent() {
         currentJob?.cancel()
         providers.localRuntime.cancelActive()
@@ -97,13 +118,14 @@ class AssistantOrchestrator(
         _streamingText.value = ""
         return try {
             val reply = if (attachmentText == null) handleNative(conversationId, trimmed) else null
-            val final = reply ?: handleWithModel(conversationId, voice)
-            setPhase(if (final.ok) AssistantPhase.COMPLETED else AssistantPhase.ERROR, conv = conversationId)
+            val final = reply ?: handleConversation(conversationId, trimmed, voice)
+            setPhase(if (final.ok) AssistantPhase.COMPLETED else AssistantPhase.ERROR, if (final.ok) null else final.text, conversationId)
             final
         } catch (e: CancellationException) {
             setPhase(AssistantPhase.IDLE)
             throw e
         } catch (e: Exception) {
+            com.melhive.zenith.android.CrashReporter.recordNonFatal("assistant", e)
             val msg = "Something went wrong: ${e.message ?: e.javaClass.simpleName}"
             conversations.addMessage(conversationId, "assistant", msg, status = "error", source = "system")
             setPhase(AssistantPhase.ERROR, msg, conversationId)
@@ -121,6 +143,10 @@ class AssistantOrchestrator(
             is ParsedCommand.Clarify -> {
                 conversations.addMessage(conversationId, "assistant", cmd.message, source = "native")
                 AssistantReply(cmd.message, true, "native")
+            }
+            is ParsedCommand.Answer -> {
+                conversations.addMessage(conversationId, "assistant", cmd.text, source = "native")
+                AssistantReply(cmd.text, true, "native")
             }
             is ParsedCommand.Tool -> {
                 val outcome = runTool(conversationId, cmd.request)
@@ -143,21 +169,32 @@ class AssistantOrchestrator(
         return tools.execute(request)
     }
 
-    private suspend fun handleWithModel(conversationId: Long, voice: Boolean): AssistantReply {
-        val provider = providers.active()
-        if (provider == null) {
-            val why = providers.describeActive()
-            val msg = "I can only run native commands right now ($why). Say “help” to see them, or set up an on-device model or online provider in Model Manager for open-ended conversation."
-            conversations.addMessage(conversationId, "assistant", msg, source = "native")
-            return AssistantReply(msg, true, "native")
-        }
+    private suspend fun handleConversation(conversationId: Long, text: String, voice: Boolean): AssistantReply {
+        val provider = providers.active() ?: return nativeConversation(conversationId, text)
+        return handleWithModel(conversationId, provider, voice)
+    }
+
+    /** No model available: social replies or an honest, helpful explanation. */
+    private suspend fun nativeConversation(conversationId: Long, text: String): AssistantReply {
+        val ctx = SmallTalk.Context(
+            userName = memory.userName(),
+            modelConfiguredButUnavailable = providers.anyConfigured(),
+            hourOfDay = LocalTime.now().hour,
+        )
+        val reply = smallTalk.respond(text, ctx) ?: smallTalk.fallback(text, ctx)
+        conversations.addMessage(conversationId, "assistant", reply, source = "native")
+        return AssistantReply(reply, true, "native")
+    }
+
+    private suspend fun handleWithModel(conversationId: Long, provider: IntelligenceProvider, voice: Boolean): AssistantReply {
         val s = settings.current()
+        val isLocal = provider.id == "local"
         val researchAvailable = providers.research() != null
         val toolSpecs = skills.enabledTools(s.enabledSkills).filter { it.name != "web.research" || researchAvailable }
         val memories = memory.list(30).map { it.text }
-        val origin = if (provider.id == "local") ToolRequest.Origin.LOCAL_MODEL else ToolRequest.Origin.ONLINE_MODEL
-        val sourceTag = if (provider.id == "local") "local" else "online:${provider.id}"
-        val contextChars = if (provider.id == "local") 6_000 else 60_000
+        val origin = if (isLocal) ToolRequest.Origin.LOCAL_MODEL else ToolRequest.Origin.ONLINE_MODEL
+        val sourceTag = if (isLocal) "local" else "online:${provider.id}"
+        val contextChars = if (isLocal) 8_000 else 60_000
 
         var lastText = ""
         for (round in 1..MAX_ROUNDS) {
@@ -165,17 +202,37 @@ class AssistantOrchestrator(
             val lastUser = history.lastOrNull { it.role == Role.USER }?.content.orEmpty()
             val knowledgeSnippets = if (s.useKnowledge && round == 1) {
                 setPhase(AssistantPhase.SEARCHING, "documents", conversationId)
-                runCatching { knowledge.search(lastUser, 3) }.getOrDefault(emptyList()).map { "${it.docPath}: ${it.text.take(700)}" }
+                runCatching { knowledge.search(lastUser, 3) }.getOrDefault(emptyList()).map { "${it.docPath}: ${it.text.take(if (isLocal) 400 else 700)}" }
             } else emptyList()
+            val now = ZonedDateTime.now().format(DateTimeFormatter.ofPattern("EEEE yyyy-MM-dd'T'HH:mm (VV)"))
+            // On-device: keep the system prompt stable so the runtime can reuse its session; time and
+            // document excerpts travel with the newest user message instead.
             val system = PromptBuilder.systemPrompt(
                 tools = toolSpecs,
-                nowDescription = ZonedDateTime.now().format(DateTimeFormatter.ofPattern("EEEE yyyy-MM-dd'T'HH:mm (VV)")),
+                nowDescription = if (isLocal) null else now,
                 memories = memories,
-                knowledge = knowledgeSnippets,
+                knowledge = if (isLocal) emptyList() else knowledgeSnippets,
                 voiceMode = voice,
+                compact = isLocal,
             )
-            setPhase(AssistantPhase.THINKING, provider.label, conversationId)
-            val result = stream(conversationId, provider, GenerationRequest(system, ContextWindow.fit(history, contextChars)), sourceTag)
+            val request = GenerationRequest(
+                system = system,
+                turns = ContextWindow.fit(history, contextChars),
+                maxOutputTokens = if (isLocal) 1024 else 4096,
+                sessionKey = "conversation-$conversationId",
+                volatileContext = if (isLocal) PromptBuilder.volatileContext(now, knowledgeSnippets) else null,
+            )
+            val loading = isLocal && providers.localRuntime.state.value !is LocalModelRuntime.State.Ready
+            setPhase(AssistantPhase.THINKING, if (loading) "Loading on-device model (first reply takes longer)…" else provider.label, conversationId)
+
+            var result = stream(conversationId, provider, request, sourceTag)
+            if (!result.ok && result.retryable) {
+                // One automatic retry for transient failures (network blips, rate limits, 5xx).
+                setPhase(AssistantPhase.THINKING, "Retrying…", conversationId)
+                conversations.deleteMessage(result.messageId)
+                delay(1500)
+                result = stream(conversationId, provider, request, sourceTag)
+            }
             if (!result.ok) return AssistantReply(result.text, false, sourceTag)
 
             val extraction = ToolCallExtractor.extract(result.text, origin)
@@ -185,7 +242,7 @@ class AssistantOrchestrator(
                 if (extraction.errors.isNotEmpty()) {
                     conversations.addMessage(conversationId, "tool", "Ignored malformed tool call(s): ${extraction.errors.joinToString("; ")}", source = "system")
                 }
-                return AssistantReply(lastText, true, sourceTag)
+                return AssistantReply(lastText.ifBlank { "(no response)" }, true, sourceTag)
             }
             for (req in extraction.requests) {
                 val outcome = runTool(conversationId, req)
@@ -199,38 +256,39 @@ class AssistantOrchestrator(
         return AssistantReply(lastText.ifBlank { note }, true, sourceTag)
     }
 
-    private data class StreamResult(val messageId: Long, val text: String, val ok: Boolean)
+    private data class StreamResult(val messageId: Long, val text: String, val ok: Boolean, val retryable: Boolean = false)
 
     private suspend fun stream(conversationId: Long, provider: IntelligenceProvider, request: GenerationRequest, source: String): StreamResult {
         val id = conversations.addMessage(conversationId, "assistant", "", status = "streaming", source = source)
         val sb = StringBuilder()
         var lastFlush = 0L
-        var error: String? = null
+        var error: GenerationEvent.Error? = null
+        var first = true
         try {
             provider.generate(request).collect { e ->
                 when (e) {
                     is GenerationEvent.Delta -> {
+                        if (first) { first = false; setPhase(AssistantPhase.THINKING, provider.label, conversationId) }
                         sb.append(e.text)
                         _streamingText.value = sb.toString()
                         val now = System.currentTimeMillis()
                         if (now - lastFlush > 120) { conversations.updateMessage(id, sb.toString(), "streaming"); lastFlush = now }
                     }
-                    is GenerationEvent.Error -> error = e.message
+                    is GenerationEvent.Error -> error = e
                     is GenerationEvent.Usage -> _lastUsage.value = "${provider.label}: ${e.inputTokens ?: "?"} input / ${e.outputTokens ?: "?"} output tokens"
                     is GenerationEvent.Done -> Unit
                 }
             }
         } catch (e: CancellationException) {
-            withContext(NonCancellable) { conversations.updateMessage(id, sb.toString().ifBlank { "(stopped)" } , "cancelled") }
+            withContext(NonCancellable) { conversations.updateMessage(id, sb.toString().ifBlank { "(stopped)" }, "cancelled") }
             throw e
         }
         val err = error
         return if (err != null && sb.isBlank()) {
-            conversations.updateMessage(id, err, "error")
-            setPhase(AssistantPhase.ERROR, err, conversationId)
-            StreamResult(id, err, false)
+            conversations.updateMessage(id, err.message, "error")
+            StreamResult(id, err.message, false, err.retryable)
         } else {
-            if (err != null) sb.append("\n\n[Interrupted: $err]")
+            if (err != null) sb.append("\n\n[Interrupted: ${err.message}]")
             conversations.updateMessage(id, sb.toString(), "complete")
             StreamResult(id, sb.toString(), true)
         }
@@ -238,4 +296,3 @@ class AssistantOrchestrator(
 
     companion object { const val MAX_ROUNDS = 3 }
 }
-

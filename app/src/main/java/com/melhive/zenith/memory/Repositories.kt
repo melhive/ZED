@@ -38,6 +38,7 @@ class ConversationRepository(private val db: ZenithDatabase) {
     }
 
     suspend fun updateMessage(id: Long, content: String, status: String) = db.messages().updateContent(id, content, status)
+    suspend fun deleteMessage(id: Long) = db.messages().delete(id)
 
     /** Recent turns for model context. Tool results are included; failed/cancelled partials are skipped. */
     suspend fun history(conversationId: Long, limit: Int = 40): List<ChatTurn> =
@@ -52,6 +53,13 @@ class ConversationRepository(private val db: ZenithDatabase) {
 
     suspend fun search(query: String): List<MessageEntity> = db.messages().search(likeEscape(query.trim()), 20)
     suspend fun recoverInterrupted() = db.messages().markInterruptedStreams()
+
+    /** Removes the last user message and everything after it; returns that message's text. */
+    suspend fun popLastExchange(conversationId: Long): String? {
+        val last = db.messages().lastUser(conversationId) ?: return null
+        db.messages().deleteFrom(conversationId, last.id)
+        return last.content
+    }
 }
 
 class MemoryRepository(private val db: ZenithDatabase) {
@@ -69,6 +77,11 @@ class MemoryRepository(private val db: ZenithDatabase) {
     suspend fun delete(ids: List<Long>) = db.memory().delete(ids)
     suspend fun update(f: MemoryFactEntity) = db.memory().update(f)
     suspend fun clear() = db.memory().clear()
+
+    /** The user's name if they told ZENITH ("My name is …"). */
+    suspend fun userName(): String? = db.memory().find("my name is").firstNotNullOfOrNull {
+        Regex("^my name is (.+)$", RegexOption.IGNORE_CASE).find(it.text.trim())?.groupValues?.get(1)?.trim()?.trimEnd('.')
+    }
 }
 
 class TodoRepository(private val db: ZenithDatabase) {

@@ -196,6 +196,25 @@ fun DiagnosticsScreen(onBack: () -> Unit) {
     LaunchedEffect(Unit) { refresh++ }
 
     ListScreen("Permissions & Diagnostics", onBack = onBack, actions = { TextButton(onClick = { refresh++ }) { Text("Refresh") } }) {
+        item {
+            val crash = remember(refresh) { com.melhive.zenith.android.CrashReporter.lastCrash() }
+            val errors = remember(refresh) { com.melhive.zenith.android.CrashReporter.errors() }
+            if (crash != null || errors != null) {
+                ZenithCard(accent = ZenithColors.Red) {
+                    SectionTitle("Problem reports")
+                    Text(if (crash != null) "ZENITH crashed last time. Share the report so it can be fixed." else "Some background errors were recorded.", style = MaterialTheme.typography.bodySmall)
+                    val report = listOfNotNull(crash, errors?.let { "Recent errors:\n$it" }).joinToString("\n\n")
+                    Text(report.take(1500), style = MonoStyle, color = ZenithColors.Muted)
+                    Row {
+                        TextButton(onClick = {
+                            val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_SUBJECT, "ZENITH problem report").putExtra(Intent.EXTRA_TEXT, report)
+                            context.startActivity(Intent.createChooser(send, "Share report"))
+                        }) { Text("Share report") }
+                        TextButton(onClick = { com.melhive.zenith.android.CrashReporter.clear(); refresh++ }) { Text("Clear") }
+                    }
+                }
+            }
+        }
         item { SectionTitle("Permissions") }
         items(PermissionCatalog.ALL.filter { PermissionCatalog.applicable(it) }) { p ->
             val granted = remember(refresh) { PermissionCatalog.isGranted(context, p) }

@@ -86,6 +86,8 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun regenerate() { _conversationId.value?.let { c.chatTts.stop(); c.orchestrator.regenerate(it) } }
+
     fun stop() { c.orchestrator.cancelCurrent(); c.chatTts.stop() }
 
     fun setMode(mode: IntelligenceMode) { viewModelScope.launch { c.settings.setMode(mode) } }

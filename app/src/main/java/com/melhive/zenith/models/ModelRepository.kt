@@ -29,6 +29,9 @@ class ModelRepository(private val context: Context, private val dao: ModelDao) {
 
     suspend fun get(id: String) = dao.get(id)
 
+    /** Most recently installed model whose file is present. */
+    suspend fun firstInstalled(): InstalledModelEntity? = dao.all().firstOrNull { fileFor(it).exists() }
+
     fun assess(c: CatalogModel, device: DeviceSnapshot = DeviceInfo.snapshot(context)): CompatibilityReport = assess(c.minRamBytes, c.sizeBytes, device)
 
     fun assess(minRam: Long, sizeBytes: Long, device: DeviceSnapshot = DeviceInfo.snapshot(context)): CompatibilityReport {

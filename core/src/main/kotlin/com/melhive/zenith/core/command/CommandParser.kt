@@ -1,5 +1,8 @@
 package com.melhive.zenith.core.command
 
+import com.melhive.zenith.core.compute.Calculator
+import com.melhive.zenith.core.compute.DateMath
+import com.melhive.zenith.core.compute.UnitConverter
 import com.melhive.zenith.core.time.TimeParser
 import com.melhive.zenith.core.tools.ToolRequest
 import java.time.LocalDateTime
@@ -8,6 +11,8 @@ sealed interface ParsedCommand {
     data class Tool(val request: ToolRequest) : ParsedCommand
     data object Help : ParsedCommand
     data class Clarify(val message: String) : ParsedCommand
+    /** A deterministic answer computed locally (calculation, conversion, date math). */
+    data class Answer(val text: String) : ParsedCommand
     data object NotACommand : ParsedCommand
 }
 
@@ -35,7 +40,25 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
             val result = rule.build(m) ?: continue
             return result
         }
-        return ParsedCommand.NotACommand
+        return compute(text) ?: ParsedCommand.NotACommand
+    }
+
+    /** Deterministic computations that need no tool and no model. */
+    private fun compute(text: String): ParsedCommand? {
+        when (val c = UnitConverter.tryConvert(text)) {
+            is UnitConverter.Result.Ok -> return ParsedCommand.Answer(c.conversion.describe())
+            is UnitConverter.Result.Error -> return ParsedCommand.Answer(c.message)
+            null -> Unit
+        }
+        DateMath.tryAnswer(text, clock().toLocalDate())?.let { return ParsedCommand.Answer(it) }
+        Calculator.normalize(text)?.let { expr ->
+            return try {
+                ParsedCommand.Answer("${Calculator.display(text)} = ${Calculator.format(Calculator.evaluate(expr))}")
+            } catch (e: Calculator.CalcException) {
+                ParsedCommand.Answer("I can't compute that: ${e.message}.")
+            }
+        }
+        return null
     }
 
     private class Rule(val regex: Regex, val build: (MatchResult) -> ParsedCommand?)
@@ -134,6 +157,7 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         // Memory.
         Rule(rx("(?:delete|remove|erase) (?:the )?(?:memory|memories|fact)(?: about)? (.+)")) { m -> tool("memory.forget", "query" to m.groupValues[1]) },
         Rule(rx("what do you (?:remember|know about me)|(?:list|show)(?: me)? (?:my |your )?memor(?:y|ies)|memories")) { tool("memory.list") },
+        Rule(rx("(?:my name is|i'?m called|you can call me) ([\\p{L}][\\p{L} .'-]{0,40})")) { m -> tool("memory.remember", "fact" to "My name is ${clean(m.groupValues[1]).replaceFirstChar { it.uppercase() }}") },
         Rule(rx("remember (?:that )?(.+)")) { m -> tool("memory.remember", "fact" to m.groupValues[1]) },
         Rule(rx("forget (?:that |about )?(.+)")) { m -> tool("memory.forget", "query" to m.groupValues[1]) },
 

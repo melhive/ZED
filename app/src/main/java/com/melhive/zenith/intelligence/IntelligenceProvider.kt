@@ -10,6 +10,10 @@ data class GenerationRequest(
     val maxOutputTokens: Int = 4096,
     /** Ask the provider to use its web search tool (research mode). */
     val webSearch: Boolean = false,
+    /** Stable id of the conversation, so on-device runtimes can reuse their session. */
+    val sessionKey: String? = null,
+    /** Per-turn context prepended to the newest user message (on-device models only). */
+    val volatileContext: String? = null,
 )
 
 sealed interface GenerationEvent {

@@ -119,6 +119,7 @@ class ToolManager(
             audit.record(spec.name, origin, request.args, "failed", "security: ${e.message}")
             ToolOutcome.Failed(spec, "Android denied access (${e.message}). The permission may have been revoked.")
         } catch (e: Exception) {
+            com.melhive.zenith.android.CrashReporter.recordNonFatal("tool ${spec.name}", e)
             audit.record(spec.name, origin, request.args, "failed", e.toString())
             ToolOutcome.Failed(spec, e.message ?: e.javaClass.simpleName)
         }

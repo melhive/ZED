@@ -35,6 +35,10 @@ import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.SuggestionChip
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.combinedClickable
+import com.melhive.zenith.ui.components.MarkdownText
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -67,6 +71,7 @@ import com.melhive.zenith.ui.components.StatusPill
 import com.melhive.zenith.ui.components.ZenithOrb
 import com.melhive.zenith.ui.theme.ZenithColors
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun ChatScreen(initialConversationId: Long?, onOpenLive: () -> Unit, onOpenModels: () -> Unit) {
     val vm: ChatViewModel = viewModel()
@@ -102,9 +107,10 @@ fun ChatScreen(initialConversationId: Long?, onOpenLive: () -> Unit, onOpenModel
         ScreenHeader("Chat", subtitle = null) {
             Box {
                 AssistChip(onClick = { modeMenu = true }, label = {
-                    Text(when (settings?.mode) { IntelligenceMode.LOCAL -> "On-device"; IntelligenceMode.ONLINE -> settings?.onlineProvider?.label ?: "Online"; else -> "Native" })
+                    Text(when (settings?.mode) { IntelligenceMode.AUTO -> "Auto"; IntelligenceMode.LOCAL -> "On-device"; IntelligenceMode.ONLINE -> settings?.onlineProvider?.label ?: "Online"; else -> "Native" })
                 })
                 DropdownMenu(expanded = modeMenu, onDismissRequest = { modeMenu = false }) {
+                    DropdownMenuItem(text = { Text("Auto (best available)") }, onClick = { vm.setMode(IntelligenceMode.AUTO); modeMenu = false })
                     DropdownMenuItem(text = { Text("Native commands only") }, onClick = { vm.setMode(IntelligenceMode.NATIVE_ONLY); modeMenu = false })
                     DropdownMenuItem(text = { Text("On-device model") }, onClick = { vm.setMode(IntelligenceMode.LOCAL); modeMenu = false })
                     DropdownMenuItem(text = { Text("Online provider") }, onClick = { vm.setMode(IntelligenceMode.ONLINE); modeMenu = false })
@@ -120,11 +126,18 @@ fun ChatScreen(initialConversationId: Long?, onOpenLive: () -> Unit, onOpenModel
             if (messages.isEmpty()) {
                 Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     ZenithOrb(activity.phase.toOrb(), size = 140.dp)
-                    EmptyState("How can I help?", "Try “what can you do”, “add task buy milk”, or ask anything once a model is configured.")
+                    EmptyState("How can I help?", "Ask anything, or try one of these:")
+                    val suggestions = listOf("What can you do?", "Remind me to stretch in 30 minutes", "What is 18% of 250?", "How many days until Christmas?", "Organize my downloads", "Tell me a joke")
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        suggestions.forEach { s -> SuggestionChip(onClick = { vm.send(s) }, label = { Text(s) }) }
+                    }
                 }
             } else {
                 LazyColumn(state = listState, contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
-                    items(messages, key = { it.id }) { MessageBubble(it) }
+                    val lastAssistantId = messages.lastOrNull { it.role == "assistant" }?.id
+                    items(messages, key = { it.id }) { m ->
+                        MessageBubble(m, showRegenerate = !busy && m.id == lastAssistantId && m.source != "native", onRegenerate = vm::regenerate)
+                    }
                 }
             }
         }
@@ -194,8 +207,10 @@ fun ChatScreen(initialConversationId: Long?, onOpenLive: () -> Unit, onOpenModel
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun MessageBubble(m: MessageEntity) {
+private fun MessageBubble(m: MessageEntity, showRegenerate: Boolean = false, onRegenerate: () -> Unit = {}) {
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     val isUser = m.role == "user"
     if (m.role == "tool") {
         Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
@@ -218,18 +233,29 @@ private fun MessageBubble(m: MessageEntity) {
         else -> ZenithColors.SurfaceHigh
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start) {
-        Column(Modifier.widthIn(max = 320.dp).background(color, RoundedCornerShape(16.dp)).padding(12.dp)) {
+        Column(
+            Modifier.widthIn(max = 330.dp).background(color, RoundedCornerShape(16.dp))
+                .combinedClickable(onClick = {}, onLongClick = { clipboard.setText(androidx.compose.ui.text.AnnotatedString(m.content)) })
+                .padding(12.dp)
+        ) {
             if (m.attachmentName != null) Text("📎 ${m.attachmentName}", style = MaterialTheme.typography.labelSmall, color = ZenithColors.Teal)
             val text = if (isUser && m.attachmentName != null) m.content.substringBefore("\n\n[Attached file:") else m.content
-            SelectionContainer {
-                Text(text.ifEmpty { if (m.status == "streaming") "…" else "" } + if (m.status == "streaming") " ▍" else "", style = MaterialTheme.typography.bodyLarge)
-            }
+            val shown = text.ifEmpty { if (m.status == "streaming") "…" else "" } + if (m.status == "streaming") " ▍" else ""
+            if (isUser) Text(shown, style = MaterialTheme.typography.bodyLarge) else SelectionContainer { MarkdownText(shown) }
             val meta = buildList {
                 m.source?.let { add(when { it == "native" -> "native"; it.startsWith("local") -> "on-device"; it.startsWith("online:") -> it.removePrefix("online:"); else -> it }) }
                 if (m.status == "cancelled") add("stopped")
                 if (m.status == "error") add("error")
             }
             if (!isUser && meta.isNotEmpty()) Text(meta.joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = ZenithColors.Muted)
+            if (!isUser && m.status != "streaming") Row {
+                TextButton(onClick = { clipboard.setText(androidx.compose.ui.text.AnnotatedString(m.content)) }, contentPadding = PaddingValues(horizontal = 6.dp)) {
+                    Text("Copy", style = MaterialTheme.typography.labelSmall, color = ZenithColors.Muted)
+                }
+                if (showRegenerate) TextButton(onClick = onRegenerate, contentPadding = PaddingValues(horizontal = 6.dp)) {
+                    Text("Regenerate", style = MaterialTheme.typography.labelSmall, color = ZenithColors.Cyan)
+                }
+            }
         }
     }
 }

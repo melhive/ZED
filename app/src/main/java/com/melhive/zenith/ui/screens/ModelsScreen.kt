@@ -69,12 +69,14 @@ fun ModelsScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
             ZenithCard {
                 SectionTitle("Active intelligence")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(s.mode == IntelligenceMode.AUTO, { vm.setMode(IntelligenceMode.AUTO) }, { Text("Auto") })
                     FilterChip(s.mode == IntelligenceMode.NATIVE_ONLY, { vm.setMode(IntelligenceMode.NATIVE_ONLY) }, { Text("Native") })
                     FilterChip(s.mode == IntelligenceMode.LOCAL, { vm.setMode(IntelligenceMode.LOCAL) }, { Text("On-device") })
                     FilterChip(s.mode == IntelligenceMode.ONLINE, { vm.setMode(IntelligenceMode.ONLINE) }, { Text("Online") })
                 }
                 Text(
                     when (s.mode) {
+                        IntelligenceMode.AUTO -> "Uses the best available: ${s.onlineProvider.label} when its key is set and you're online, otherwise the on-device model, otherwise native commands."
                         IntelligenceMode.NATIVE_ONLY -> "Deterministic commands only. No model, no network."
                         IntelligenceMode.LOCAL -> "Free-form requests use the active on-device model. Native commands still run first."
                         IntelligenceMode.ONLINE -> "Free-form requests go to ${s.onlineProvider.label} (${s.modelFor(s.onlineProvider).ifBlank { "model not set" }}). Native commands still run locally."

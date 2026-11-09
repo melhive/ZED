@@ -65,6 +65,7 @@ class TaskWorker(appContext: Context, params: WorkerParameters) : CoroutineWorke
             }
             throw e
         } catch (e: Exception) {
+            com.melhive.zenith.android.CrashReporter.recordNonFatal("task ${task.type}", e)
             fail(task, e.message ?: e.javaClass.simpleName)
         }
     }
@@ -143,7 +144,9 @@ class TaskWorker(appContext: Context, params: WorkerParameters) : CoroutineWorke
             engine.setProgress(task.id, done, total, phase)
             runCatching { setForeground(foregroundInfo(task, done, total, phase)) }
         }
-        return succeed(task, "${model.name} installed and verified (SHA-256)")
+        // First model installed becomes the active one so conversation works right away.
+        if (container.settings.current().activeLocalModelId == null) container.settings.setActiveLocalModel(model.id)
+        return succeed(task, "${model.name} installed and verified (SHA-256). It is ready to use.")
     }
 
     private fun foregroundInfo(task: TaskEntity, done: Long, total: Long, phase: String): ForegroundInfo {

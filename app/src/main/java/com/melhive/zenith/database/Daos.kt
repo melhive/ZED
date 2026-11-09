@@ -49,6 +49,15 @@ interface MessageDao {
     @Query("UPDATE messages SET content = :content, status = :status WHERE id = :id")
     suspend fun updateContent(id: Long, content: String, status: String)
 
+    @Query("SELECT * FROM messages WHERE conversationId = :conversationId AND role = 'user' ORDER BY id DESC LIMIT 1")
+    suspend fun lastUser(conversationId: Long): MessageEntity?
+
+    @Query("DELETE FROM messages WHERE id = :id")
+    suspend fun delete(id: Long)
+
+    @Query("DELETE FROM messages WHERE conversationId = :conversationId AND id >= :fromId")
+    suspend fun deleteFrom(conversationId: Long, fromId: Long)
+
     @Query("UPDATE messages SET status = 'cancelled' WHERE status = 'streaming'")
     suspend fun markInterruptedStreams()
 
@@ -166,6 +175,9 @@ interface ModelDao {
 
     @Query("SELECT * FROM installed_models WHERE id = :id")
     suspend fun get(id: String): InstalledModelEntity?
+
+    @Query("SELECT * FROM installed_models ORDER BY installedAt DESC")
+    suspend fun all(): List<InstalledModelEntity>
 
     @Upsert suspend fun upsert(m: InstalledModelEntity)
 

@@ -106,6 +106,17 @@ class EngineLogicTest {
         assertFalse("alarm.set" in p)
     }
 
+    @Test fun compactPromptIsShorterAndOmitsVolatileParts() {
+        val tools = SkillRegistry.DEFAULT.enabledTools(SkillRegistry.DEFAULT.skills.map { it.id }.toSet())
+        val full = PromptBuilder.systemPrompt(tools, "Monday 10:00", emptyList(), listOf("doc"), voiceMode = false)
+        val compact = PromptBuilder.systemPrompt(tools, null, emptyList(), emptyList(), voiceMode = false, compact = true)
+        assertTrue(compact.length < full.length * 0.7, "compact ${compact.length} vs full ${full.length}")
+        assertTrue("- file.delete(path)" in compact)
+        assertFalse("Current local date-time" in compact)
+        val ctx = PromptBuilder.volatileContext("Monday 10:00", listOf("notes.txt: hello"))
+        assertTrue(ctx.startsWith("[Context — now: Monday 10:00]") && "notes.txt" in ctx)
+    }
+
     @Test fun skillRegistryCoversEveryTool() {
         val reg = SkillRegistry.DEFAULT
         val covered = reg.skills.flatMap { it.toolNames }.toSet()

@@ -35,7 +35,10 @@ import java.io.File
 
 /** Manual dependency container. One instance per process, owned by [ZenithApp]. */
 class AppContainer(private val context: Context) {
-    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    /** Background scope: failures are recorded for Diagnostics instead of crashing the app. */
+    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default + kotlinx.coroutines.CoroutineExceptionHandler { _, e ->
+        com.melhive.zenith.android.CrashReporter.recordNonFatal("background", e)
+    })
 
     val db: ZenithDatabase by lazy { ZenithDatabase.build(context) }
     val settings by lazy { SettingsRepository(context) }
@@ -55,7 +58,7 @@ class AppContainer(private val context: Context) {
     val models by lazy { ModelRepository(context, db.models()) }
     val modelDownloader by lazy { ModelDownloader(models) { secrets.get(SecretStore.HF_TOKEN) } }
     val localRuntime by lazy { LocalModelRuntime(File(context.cacheDir, "litertlm").apply { mkdirs() }) }
-    val providers by lazy { ProviderRegistry(settings, secrets, models, localRuntime) }
+    val providers by lazy { ProviderRegistry(context, settings, secrets, models, localRuntime) }
 
     val taskEngine by lazy { TaskEngine(context, db.tasks()) }
     val confirmations = ConfirmationBroker()
