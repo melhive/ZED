@@ -127,7 +127,12 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
             tool("todo.complete", "item" to m.groupValues[1].ifEmpty { m.groupValues[2] })
         },
 
+        Rule(rx("(?:delete|remove|erase) (?:the )?(?:task|todo|to-do)(?: item)? (.+)")) { m ->
+            ParsedCommand.Clarify("To finish “${clean(m.groupValues[1])}” say “complete ${clean(m.groupValues[1])}”. To delete a task-list item, open Memory → Task list.")
+        },
+
         // Memory.
+        Rule(rx("(?:delete|remove|erase) (?:the )?(?:memory|memories|fact)(?: about)? (.+)")) { m -> tool("memory.forget", "query" to m.groupValues[1]) },
         Rule(rx("what do you (?:remember|know about me)|(?:list|show)(?: me)? (?:my |your )?memor(?:y|ies)|memories")) { tool("memory.list") },
         Rule(rx("remember (?:that )?(.+)")) { m -> tool("memory.remember", "fact" to m.groupValues[1]) },
         Rule(rx("forget (?:that |about )?(.+)")) { m -> tool("memory.forget", "query" to m.groupValues[1]) },
@@ -155,7 +160,7 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         Rule(rx("(?:create|make|new) (?:a |an )?(?:new )?(?:text )?(?:file|note|document) (?:called |named )?(.+?)(?:\\s+(?:with (?:the )?(?:content|text)|containing|saying|that says)\\s+(.+))?")) { m ->
             tool("file.create", "path" to m.groupValues[1], "content" to m.groupValues[2])
         },
-        Rule(rx("(?:list|show)(?: me)? (?:the )?(?:files|contents|folders)(?: (?:in|of|inside) (?:the )?(?:folder )?(.+))?|what(?:'s| is) in (?:the )?(?:folder )?(.+)")) { m ->
+        Rule(rx("(?:list|show)(?: me)? (?:the |my )?(?:files|contents|folders)(?: (?:in|of|inside) (?:the )?(?:folder )?(.+))?|what(?:'s| is) in (?:the )?(?:folder )?(.+)")) { m ->
             tool("file.list", "path" to m.groupValues[1].ifEmpty { m.groupValues[2] })
         },
         Rule(rx("(?:read|open|show)(?: me)? (?:the )?(?:file|document|note) (.+)|read (.+\\.[A-Za-z0-9]{1,5})")) { m -> tool("file.read", "path" to m.groupValues[1].ifEmpty { m.groupValues[2] }) },

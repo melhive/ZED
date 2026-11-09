@@ -90,6 +90,13 @@ class CommandParserTest {
         assertEquals("web.research" to mapOf("query" to "best telescopes 2026"), tool("research best telescopes 2026"))
     }
 
+    @Test fun removalsAreRoutedToTheRightPlace() {
+        assertIs<ParsedCommand.Clarify>(parser.parse("remove task buy milk"))
+        assertEquals("memory.forget" to mapOf("query" to "sister"), tool("delete memory about sister"))
+        assertEquals("file.list", tool("show me my files").first)
+        assertEquals("file.delete", tool("delete notes.txt").first)
+    }
+
     @Test fun nonCommandsFallThrough() {
         listOf("Explain quantum entanglement simply", "How are you today", "Write me a poem about the sea", "").forEach {
             assertEquals(ParsedCommand.NotACommand, parser.parse(it), it)
