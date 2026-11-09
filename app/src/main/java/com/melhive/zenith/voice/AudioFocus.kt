@@ -19,7 +19,7 @@ class AudioFocus(context: Context, private val onInterrupted: (reason: String) -
     private var held = false
 
     private val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
-        .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANT).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
+        .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
         .setOnAudioFocusChangeListener { change ->
             when {
                 isCallActive() -> onInterrupted("Paused for a phone call")
@@ -42,6 +42,16 @@ class AudioFocus(context: Context, private val onInterrupted: (reason: String) -
         am.abandonAudioFocusRequest(request)
         held = false
     }
+
+    /** True when wired, USB or Bluetooth headphones/earbuds are the output (no speaker echo). */
+    fun headphonesConnected(): Boolean = runCatching {
+        am.getDevices(AudioManager.GET_DEVICES_OUTPUTS).any {
+            it.type in setOf(
+                android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES, android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET,
+                android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP, android.media.AudioDeviceInfo.TYPE_USB_HEADSET,
+            ) || (android.os.Build.VERSION.SDK_INT >= 31 && it.type == android.media.AudioDeviceInfo.TYPE_BLE_HEADSET)
+        }
+    }.getOrDefault(false)
 
     fun isCallActive(): Boolean = am.mode == AudioManager.MODE_IN_CALL || am.mode == AudioManager.MODE_IN_COMMUNICATION
 }

@@ -113,7 +113,7 @@ class LiveSessionController(
 
         s.launch {
             val cfg = settings.current()
-            bargeInEnabled = cfg.bargeIn && BargeInMonitor.supported()
+            bargeInEnabled = cfg.bargeIn
             _state.update { it.copy(speakerOn = cfg.voiceResponses) }
             tts?.setRate(cfg.speechRate)
             conversationId = conversations.create("ZENITH LIVE session")
@@ -338,7 +338,8 @@ class LiveSessionController(
     }
 
     private fun startBargeIn() {
-        if (!bargeInEnabled || _state.value.micMuted) return
+        // On the loudspeaker ZENITH would hear itself; talk-over interruption needs headphones. Tap the orb otherwise.
+        if (!bargeInEnabled || _state.value.micMuted || focus?.headphonesConnected() != true) return
         val m = monitor ?: return
         m.start(
             onLevel = { lvl -> _state.update { it.copy(micLevel = lvl) } },

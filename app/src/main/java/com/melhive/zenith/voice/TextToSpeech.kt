@@ -60,7 +60,8 @@ class AndroidTextToSpeech(context: Context) : TextToSpeechEngine {
     private fun configure() {
         val t = tts ?: return
         t.setAudioAttributes(
-            AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANT).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()
+            // Media usage: plays at normal media loudness on the loudspeaker and follows the media volume keys.
+            AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()
         )
         val locale = Locale.getDefault()
         val offline = runCatching {

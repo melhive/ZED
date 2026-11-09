@@ -134,7 +134,7 @@ fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
             ZenithCard {
                 SectionTitle("Voice")
                 SwitchRow("Voice responses", "Speak replies in ZENITH LIVE and after voice input", settings.voiceResponses) { scope.launch { c.settings.setVoiceResponses(it) } }
-                SwitchRow("Barge-in", "Stop speaking when you start talking (uses echo cancellation)", settings.bargeIn) { scope.launch { c.settings.setBargeIn(it) } }
+                SwitchRow("Interrupt by talking", "With headphones or earbuds, start talking to cut ZENITH off. On the loudspeaker, tap the orb instead.", settings.bargeIn) { scope.launch { c.settings.setBargeIn(it) } }
                 Text("Speech rate: ${"%.1f".format(settings.speechRate)}×", style = MaterialTheme.typography.titleSmall)
                 Slider(value = settings.speechRate, onValueChange = { v -> scope.launch { c.settings.setSpeechRate(v) } }, valueRange = 0.5f..2.0f, steps = 14)
             }

@@ -15,9 +15,11 @@ import kotlinx.coroutines.launch
 
 /**
  * Listens to the microphone while ZENITH is speaking and reports when the
- * user starts talking (barge-in). Uses the VOICE_COMMUNICATION source with the
- * platform acoustic echo canceller when available so ZENITH's own voice is
- * suppressed. Only runs during a visible ZENITH LIVE session.
+ * user starts talking (barge-in). Uses the VOICE_RECOGNITION source: the
+ * VOICE_COMMUNICATION source would switch the phone into call mode, which
+ * routes ZENITH's voice through the quiet call path. Because the loudspeaker
+ * would otherwise trigger it, LIVE only enables barge-in when headphones are
+ * connected. Only runs during a visible ZENITH LIVE session.
  *
  * Reliability depends on the device's echo canceller; this requires
  * physical-device validation.
@@ -35,7 +37,7 @@ class BargeInMonitor(private val scope: CoroutineScope) {
             val minBuf = AudioRecord.getMinBufferSize(rate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
             if (minBuf <= 0) return@launch
             val record = try {
-                AudioRecord(MediaRecorder.AudioSource.VOICE_COMMUNICATION, rate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, maxOf(minBuf, 3200) * 2)
+                AudioRecord(MediaRecorder.AudioSource.VOICE_RECOGNITION, rate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, maxOf(minBuf, 3200) * 2)
             } catch (e: Exception) { return@launch }
             if (record.state != AudioRecord.STATE_INITIALIZED) { record.release(); return@launch }
             val aec = if (AcousticEchoCanceler.isAvailable()) runCatching { AcousticEchoCanceler.create(record.audioSessionId)?.apply { enabled = true } }.getOrNull() else null

@@ -10,7 +10,7 @@
 | Voice activity detection | `core.voice.VoiceActivityDetector` (adaptive energy VAD) for barge-in | Unit-tested |
 | Text-to-speech | `AndroidTextToSpeech`; prefers an installed voice that does not need the network | Compiled |
 | Streaming responses | Model output is spoken **sentence by sentence while it is still being generated** | Compiled |
-| Barge-in | While speaking, `BargeInMonitor` listens with the platform acoustic echo canceller + noise suppressor; detected speech stops playback, cancels generation if still running, and starts listening | Compiled; **reliability depends on the device echo canceller** |
+| Barge-in | With headphones connected, `BargeInMonitor` (VOICE_RECOGNITION source, so the phone never enters call mode) detects speech, stops playback and starts listening. On the loudspeaker: tap the orb. | Compiled |
 | Interruption | Tap the orb while speaking | Compiled |
 | Mic mute / speaker toggle / cancel request / end session | Buttons on the LIVE screen | Compiled |
 | Transcript | Session transcript on screen and persisted as a "ZENITH LIVE session" conversation | Compiled |

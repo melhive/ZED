@@ -163,7 +163,7 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit) {
             Text(
                 buildString {
                     append(state.sttEngine.ifEmpty { "Speech recognition" })
-                    if (state.orb == OrbState.SPEAKING) append(if (state.echoCancellation) " · echo cancellation on" else " · echo cancellation unavailable")
+                    if (state.orb == OrbState.SPEAKING) append(" · tap the orb to interrupt")
                     append(" · ending the session does not cancel tasks")
                 },
                 style = MaterialTheme.typography.labelSmall, color = ZenithColors.Muted.copy(alpha = 0.7f), textAlign = TextAlign.Center,
@@ -178,7 +178,7 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit) {
 private fun hintFor(o: OrbState) = when (o) {
     OrbState.IDLE -> "Tap the orb to talk"
     OrbState.LISTENING -> "Speak now — tap the orb to finish"
-    OrbState.SPEAKING -> "Start talking or tap the orb to interrupt"
+    OrbState.SPEAKING -> "Tap the orb to interrupt"
     OrbState.THINKING -> "Tap the orb to cancel"
     else -> ""
 }
