@@ -81,12 +81,13 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun load(m: InstalledModelEntity) = viewModelScope.launch {
         val s = c.settings.current()
-        runCatching { c.localRuntime.ensureLoaded(m.id, c.models.fileFor(m), s.localBackend) }
+        runCatching { c.localRuntime.ensureLoaded(m.id, c.models.fileFor(m), c.providers.localOptions(s)) }
             .onSuccess { message.value = "Loaded ${m.displayName}" }
             .onFailure { message.value = "Could not load: ${it.message}" }
     }
 
     fun unload() = viewModelScope.launch { c.localRuntime.unload() }
+    fun setContextTokens(v: Int) = viewModelScope.launch { c.localRuntime.unload(); c.settings.setLocalContextTokens(v) }
     fun setBackend(b: LocalBackend) = viewModelScope.launch { c.localRuntime.unload(); c.settings.setLocalBackend(b) }
     fun setMode(mode: IntelligenceMode) = viewModelScope.launch { c.settings.setMode(mode) }
     fun setProvider(kind: OnlineProviderKind) = viewModelScope.launch { c.settings.setOnlineProvider(kind) }

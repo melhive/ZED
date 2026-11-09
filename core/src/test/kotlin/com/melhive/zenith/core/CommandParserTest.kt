@@ -85,9 +85,24 @@ class CommandParserTest {
         assertEquals("docs.search" to mapOf("query" to "invoice 2025"), tool("search documents for invoice 2025"))
         assertEquals("docs.index", tool("index my documents").first)
         assertEquals("settings.set" to mapOf("key" to "voice_responses", "value" to "off"), tool("turn off voice responses"))
-        assertEquals("workflow.run" to mapOf("name" to "morning briefing"), tool("good morning"))
+        assertEquals("workflow.run" to mapOf("name" to "morning briefing"), tool("morning briefing"))
+        assertEquals(ParsedCommand.NotACommand, parser.parse("good morning")) // greeting, handled conversationally
         assertEquals("workflow.run" to mapOf("name" to "organize downloads"), tool("run workflow organize downloads"))
         assertEquals("web.research" to mapOf("query" to "best telescopes 2026"), tool("research best telescopes 2026"))
+    }
+
+    @Test fun rememberPhrasings() {
+        listOf(
+            "remember that I like green tea" to "I like green tea",
+            "Remember: my car is a blue Civic" to "my car is a blue Civic",
+            "please remember my locker code is 4412" to "my locker code is 4412",
+            "don't forget that Ana is allergic to nuts" to "Ana is allergic to nuts",
+            "keep in mind I work night shifts" to "I work night shifts",
+            "note that the wifi password is on the fridge" to "the wifi password is on the fridge",
+            "save this: passport expires 2029" to "passport expires 2029",
+        ).forEach { (input, fact) -> assertEquals("memory.remember" to mapOf("fact" to fact), tool(input), input) }
+        assertEquals("reminder.create" to mapOf("text" to "call Ana", "at" to "2026-11-09T17:00"), tool("remember to call Ana at 5pm"))
+        assertEquals("todo.add" to mapOf("title" to "buy batteries"), tool("don't forget to buy batteries"))
     }
 
     @Test fun removalsAreRoutedToTheRightPlace() {

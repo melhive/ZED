@@ -46,6 +46,8 @@ data class AppSettings(
     val glow: Boolean = true,
     val onboardingDone: Boolean = false,
     val checkUpdates: Boolean = true,
+    /** On-device context window in tokens; 0 = choose automatically from device RAM. */
+    val localContextTokens: Int = 0,
 ) {
     fun modelFor(kind: OnlineProviderKind): String = onlineModels[kind]?.takeIf { it.isNotBlank() } ?: kind.defaultModel
 }
@@ -69,6 +71,7 @@ class SettingsRepository(private val context: Context) {
         val glow = booleanPreferencesKey("glow")
         val onboarding = booleanPreferencesKey("onboarding_done")
         val checkUpdates = booleanPreferencesKey("check_updates")
+        val contextTokens = androidx.datastore.preferences.core.intPreferencesKey("local_context_tokens")
         fun model(kind: OnlineProviderKind) = stringPreferencesKey("online_model_${kind.name.lowercase()}")
     }
 
@@ -91,6 +94,7 @@ class SettingsRepository(private val context: Context) {
             glow = p[K.glow] ?: defaults.glow,
             onboardingDone = p[K.onboarding] ?: false,
             checkUpdates = p[K.checkUpdates] ?: defaults.checkUpdates,
+            localContextTokens = p[K.contextTokens] ?: 0,
         )
     }
 
@@ -109,6 +113,7 @@ class SettingsRepository(private val context: Context) {
     suspend fun setAutoIndex(v: Boolean) = context.dataStore.edit { it[K.autoIndex] = v }
     suspend fun setBargeIn(v: Boolean) = context.dataStore.edit { it[K.bargeIn] = v }
     suspend fun setGlow(v: Boolean) = context.dataStore.edit { it[K.glow] = v }
+    suspend fun setLocalContextTokens(v: Int) = context.dataStore.edit { it[K.contextTokens] = v }
     suspend fun setCheckUpdates(v: Boolean) = context.dataStore.edit { it[K.checkUpdates] = v }
     suspend fun setOnboardingDone() = context.dataStore.edit { it[K.onboarding] = true }
     suspend fun setSkillEnabled(id: String, enabled: Boolean) = context.dataStore.edit { p ->

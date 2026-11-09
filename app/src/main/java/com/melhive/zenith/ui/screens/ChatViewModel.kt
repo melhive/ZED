@@ -55,9 +55,19 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
     private var stt: AndroidSpeechToText? = null
 
+    init {
+        viewModelScope.launch {
+            c.chatFocus.collect { id -> if (id != null) { _conversationId.value = id; c.chatFocus.value = null } }
+        }
+    }
+
     fun open(initialId: Long?) {
-        if (_conversationId.value != null && initialId == null) return
-        viewModelScope.launch { _conversationId.value = initialId ?: c.conversations.latestOrCreate() }
+        if (initialId != null) { _conversationId.value = initialId; return }
+        if (_conversationId.value != null) return
+        viewModelScope.launch {
+            val id = c.conversations.latestOrCreate()
+            if (_conversationId.value == null) _conversationId.value = id
+        }
     }
 
     fun select(id: Long) { _conversationId.value = id }

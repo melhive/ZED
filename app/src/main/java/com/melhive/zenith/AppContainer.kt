@@ -81,6 +81,9 @@ class AppContainer(private val context: Context) {
 
     val updates = com.melhive.zenith.android.UpdateChecker()
 
+    /** Conversation Chat should show next (set by Home's "Ask ZENITH" box). */
+    val chatFocus = kotlinx.coroutines.flow.MutableStateFlow<Long?>(null)
+
     /** A one-shot TTS engine for reading chat replies aloud. */
     val chatTts by lazy { AndroidTextToSpeech(context) }
 }

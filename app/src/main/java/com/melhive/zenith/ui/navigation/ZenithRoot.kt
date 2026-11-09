@@ -3,6 +3,7 @@ package com.melhive.zenith.ui.navigation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.Chat
@@ -83,6 +84,7 @@ fun NavHostController.navigateTab(route: String) = navigate(route) {
     restoreState = true
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun ZenithRoot(requestedRoute: String?, onRouteConsumed: () -> Unit) {
     val container = rememberContainer()
@@ -90,6 +92,8 @@ fun ZenithRoot(requestedRoute: String?, onRouteConsumed: () -> Unit) {
     val backStack by nav.currentBackStackEntryAsState()
     val route = backStack?.destination?.route
     val confirmations by container.confirmations.requests.collectAsStateWithLifecycle()
+    // Hide the bottom bar while the keyboard is open so text fields sit directly on the keyboard.
+    val imeVisible = androidx.compose.foundation.layout.WindowInsets.isImeVisible
 
     LaunchedEffect(requestedRoute) {
         if (requestedRoute != null) { nav.navigateTab(requestedRoute); onRouteConsumed() }
@@ -98,7 +102,7 @@ fun ZenithRoot(requestedRoute: String?, onRouteConsumed: () -> Unit) {
     Scaffold(
         containerColor = ZenithColors.Background,
         bottomBar = {
-            if (route != Routes.LIVE) {
+            if (route != Routes.LIVE && !imeVisible) {
                 NavigationBar(containerColor = ZenithColors.Surface) {
                     tabs.forEach { tab ->
                         val selected = route?.substringBefore('?') == tab.route
@@ -114,7 +118,9 @@ fun ZenithRoot(requestedRoute: String?, onRouteConsumed: () -> Unit) {
             }
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(if (route == Routes.LIVE) androidx.compose.foundation.layout.PaddingValues() else padding)) {
+        val contentPadding = if (route == Routes.LIVE) androidx.compose.foundation.layout.PaddingValues() else padding
+        // consumeWindowInsets prevents screens' imePadding() from adding the navigation-bar space twice.
+        Box(Modifier.fillMaxSize().padding(contentPadding).consumeWindowInsets(contentPadding)) {
             NavHost(nav, startDestination = Routes.HOME) {
                 composable(Routes.HOME) { DashboardScreen(onNavigate = { nav.navigate(it) }, onTab = { nav.navigateTab(it) }) }
                 composable(

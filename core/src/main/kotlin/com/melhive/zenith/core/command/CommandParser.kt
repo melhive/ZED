@@ -158,7 +158,15 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         Rule(rx("(?:delete|remove|erase) (?:the )?(?:memory|memories|fact)(?: about)? (.+)")) { m -> tool("memory.forget", "query" to m.groupValues[1]) },
         Rule(rx("what do you (?:remember|know about me)|(?:list|show)(?: me)? (?:my |your )?memor(?:y|ies)|memories")) { tool("memory.list") },
         Rule(rx("(?:my name is|i'?m called|you can call me) ([\\p{L}][\\p{L} .'-]{0,40})")) { m -> tool("memory.remember", "fact" to "My name is ${clean(m.groupValues[1]).replaceFirstChar { it.uppercase() }}") },
-        Rule(rx("remember (?:that )?(.+)")) { m -> tool("memory.remember", "fact" to m.groupValues[1]) },
+        // "remember to X [time]" / "don't forget to X [time]" are reminders (or task-list items without a time).
+        Rule(rx("(?:remember|don'?t forget|do not forget) to (.+)")) { m ->
+            val split = splitTrailingTime(m.groupValues[1])
+            if (split != null) tool("reminder.create", "text" to split.first, "at" to split.second.toString())
+            else tool("todo.add", "title" to m.groupValues[1])
+        },
+        Rule(rx("(?:remember|don'?t forget|do not forget|keep in mind|note|make a note|take note|save (?:this|that)?)(?: that)?[:,]? (.+)")) { m ->
+            tool("memory.remember", "fact" to m.groupValues[1])
+        },
         Rule(rx("forget (?:that |about )?(.+)")) { m -> tool("memory.forget", "query" to m.groupValues[1]) },
 
         // History and documents.
@@ -175,7 +183,7 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         Rule(rx("set (?:the )?speech rate to ([0-9.]+)")) { m -> tool("settings.set", "key" to "speech_rate", "value" to m.groupValues[1]) },
 
         // Workflows.
-        Rule(rx("good morning|(?:run |start )?(?:my )?(?:morning|daily) (?:briefing|brief|summary)")) { tool("workflow.run", "name" to "morning briefing") },
+        Rule(rx("(?:run |start |give me |show )?(?:my |the )?(?:morning|daily) (?:briefing|brief|summary)|brief me")) { tool("workflow.run", "name" to "morning briefing") },
         Rule(rx("(?:run|start|execute) (?:the )?workflow (.+)|(?:run|start|execute) (?:the |my )?(.+?) workflow")) { m -> tool("workflow.run", "name" to m.groupValues[1].ifEmpty { m.groupValues[2] }) },
 
         // Files and folders.

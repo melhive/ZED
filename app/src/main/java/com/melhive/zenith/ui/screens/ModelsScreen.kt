@@ -96,7 +96,7 @@ fun ModelsScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
                 Text("Runtime: " + when (val r = runtime) {
                     LocalModelRuntime.State.Unloaded -> "no model loaded"
                     is LocalModelRuntime.State.Loading -> "loading ${r.modelId}…"
-                    is LocalModelRuntime.State.Ready -> "${r.modelId} loaded on ${r.backend} in ${r.loadMillis} ms"
+                    is LocalModelRuntime.State.Ready -> "${r.modelId} loaded on ${r.backend} in ${r.loadMillis} ms, ${r.contextTokens} token context"
                     is LocalModelRuntime.State.Failed -> "failed to load ${r.modelId}: ${r.message}"
                 })
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -104,6 +104,14 @@ fun ModelsScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
                     FilterChip(s.localBackend == LocalBackend.GPU, { vm.setBackend(LocalBackend.GPU) }, { Text("GPU") })
                     if (runtime is LocalModelRuntime.State.Ready) TextButton(onClick = { vm.unload() }) { Text("Unload (free RAM)") }
                 }
+                Text("Context size (how much conversation the model can hold)", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(0 to "Auto", 2048 to "2K", 4096 to "4K", 8192 to "8K").forEach { (v, label) ->
+                        FilterChip(s.localContextTokens == v, { vm.setContextTokens(v) }, { Text(label) })
+                    }
+                }
+                Text("Auto picks ${LocalModelRuntime.autoContextTokens(device.totalRamBytes)} tokens for this phone. Larger holds longer chats but uses more memory. GPU is usually faster if your phone supports it.",
+                    style = MaterialTheme.typography.labelSmall, color = ZenithColors.Muted)
             }
         }
 

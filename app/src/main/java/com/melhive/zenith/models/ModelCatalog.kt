@@ -16,9 +16,10 @@ data class CatalogModel(
     val sizeBytes: Long,
     val sha256: String,
     val license: String,
-    /** Rough RAM the runtime needs; used for the compatibility check, not a guarantee. */
+    /** Device RAM we recommend (runtime uses ~1.4–1.7 GB for Gemma 4 E2B per Google's model card); a heuristic, not a guarantee. */
     val minRamBytes: Long,
     val recommendedBackend: String,
+    /** Maximum context the model supports (ZENITH uses a smaller window, see Model Manager). */
     val contextTokens: Int,
 ) {
     val downloadUrl: String get() = "https://huggingface.co/$repo/resolve/main/$fileName"
@@ -38,9 +39,9 @@ object ModelCatalog {
             sizeBytes = 2_588_147_712,
             sha256 = "181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c",
             license = "Apache-2.0",
-            minRamBytes = 6 * GB,
+            minRamBytes = 4 * GB,
             recommendedBackend = "CPU",
-            contextTokens = 4096,
+            contextTokens = 32768,
         ),
         CatalogModel(
             id = "gemma-4-e2b-it-gpu",
@@ -51,9 +52,9 @@ object ModelCatalog {
             sizeBytes = 2_008_432_640,
             sha256 = "a53a59001894c58e6bdb5b9b227709f91a2e3e556baa7d85acf9c55402ba5cf5",
             license = "Apache-2.0",
-            minRamBytes = 6 * GB,
+            minRamBytes = 4 * GB,
             recommendedBackend = "GPU",
-            contextTokens = 4096,
+            contextTokens = 32768,
         ),
         CatalogModel(
             id = "gemma-4-e4b-it-gpu",
@@ -64,9 +65,9 @@ object ModelCatalog {
             sizeBytes = 2_969_059_328,
             sha256 = "4912bb5a9c30993c51a7711f763212077458529312175df0573a78323a2bb7ff",
             license = "Apache-2.0",
-            minRamBytes = 8 * GB,
+            minRamBytes = 6 * GB,
             recommendedBackend = "GPU",
-            contextTokens = 4096,
+            contextTokens = 32768,
         ),
         CatalogModel(
             id = "qwen3-0.6b",
@@ -77,7 +78,7 @@ object ModelCatalog {
             sizeBytes = 347_251_840,
             sha256 = "2df6821ec12702dafd33915e7a1a1adc7c4b053f3672fd9555dfaf3a114c4139",
             license = "Apache-2.0",
-            minRamBytes = 3 * GB,
+            minRamBytes = 2 * GB,
             recommendedBackend = "CPU",
             contextTokens = 1280,
         ),

@@ -68,4 +68,12 @@ class BargeInMonitor(private val scope: CoroutineScope) {
     }
 
     fun stop() { job?.cancel(); job = null }
+
+    /** Stops and waits until the microphone is released (before another recorder opens it). */
+    suspend fun stopAndJoin() { job?.let { it.cancel(); it.join() }; job = null }
+
+    companion object {
+        /** Barge-in is only reliable with a hardware echo canceller; otherwise ZENITH would hear itself. */
+        fun supported(): Boolean = runCatching { AcousticEchoCanceler.isAvailable() }.getOrDefault(false)
+    }
 }

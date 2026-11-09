@@ -197,7 +197,8 @@ fun registerExecutors(tm: ToolManager, c: AppContainer, context: Context) {
     tm.register("memory.remember") { a, req ->
         val source = if (req.origin == ToolRequest.Origin.NATIVE || req.origin == ToolRequest.Origin.USER_UI) "user_command" else "model_request"
         val f = c.memory.remember(a.string("fact"), source)
-        ok("I'll remember: “${f.text}”.")
+        val name = Regex("^my name is (.+)$", RegexOption.IGNORE_CASE).find(f.text.trim())?.groupValues?.get(1)?.trimEnd('.')
+        ok(if (name != null) "Nice to meet you, $name. I'll remember your name." else "Got it — I'll remember that ${f.text.replaceFirstChar { it.lowercase() }}.")
     }
     tm.register("memory.list") { _, _ ->
         val list = c.memory.list(50)

@@ -41,7 +41,16 @@ class ProviderRegistry(
 
     suspend fun local(s: AppSettings): IntelligenceProvider? {
         val m = s.activeLocalModelId?.let { models.get(it) } ?: models.firstInstalled() ?: return null
-        return LocalLiteRtProvider(localRuntime, m.id, m.displayName, models.fileFor(m), s.localBackend)
+        val opts = localOptions(s)
+        // Never exceed the model's own maximum (e.g. Qwen3 0.6B is built for 1280 tokens).
+        val max = com.melhive.zenith.models.ModelCatalog.find(m.id)?.contextTokens ?: opts.contextTokens
+        return LocalLiteRtProvider(localRuntime, m.id, m.displayName, models.fileFor(m), opts.copy(contextTokens = minOf(opts.contextTokens, max)))
+    }
+
+    fun localOptions(s: AppSettings): LocalModelOptions {
+        val tokens = s.localContextTokens.takeIf { it > 0 }
+            ?: LocalModelRuntime.autoContextTokens(runCatching { DeviceInfo.snapshot(context).totalRamBytes }.getOrDefault(0L))
+        return LocalModelOptions(s.localBackend, tokens)
     }
 
     private fun online(): Boolean = runCatching { DeviceInfo.snapshot(context).online }.getOrDefault(false)

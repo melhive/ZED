@@ -34,10 +34,11 @@ interface SpeechToText {
 }
 
 /**
- * Android SpeechRecognizer. Prefers the on-device recognizer (API 31+) when
- * available so speech stays offline; otherwise uses the default recognition
- * service with EXTRA_PREFER_OFFLINE. Each start() is one utterance with
- * partial results; endpointing is done by the recognizer.
+ * Android SpeechRecognizer. Uses the system's default recognition service with
+ * EXTRA_PREFER_OFFLINE (offline when the language pack is installed). The
+ * dedicated on-device recognizer is used only when no default service exists,
+ * because it is unreliable on many phones. The recognizer is recreated after
+ * client/busy/disconnect errors. Each start() is one utterance.
  */
 class AndroidSpeechToText(private val context: Context) : SpeechToText {
     private val _events = MutableSharedFlow<SttEvent>(extraBufferCapacity = 64, onBufferOverflow = BufferOverflow.DROP_OLDEST)
@@ -51,7 +52,8 @@ class AndroidSpeechToText(private val context: Context) : SpeechToText {
 
     private fun create(): SpeechRecognizer {
         recognizer?.let { return it }
-        val onDevice = !onDeviceFailed && Build.VERSION.SDK_INT >= 31 && SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
+        val onDevice = !onDeviceFailed && !SpeechRecognizer.isRecognitionAvailable(context) &&
+            Build.VERSION.SDK_INT >= 31 && SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
         usingOnDevice = onDevice
         val r = if (onDevice && Build.VERSION.SDK_INT >= 31) SpeechRecognizer.createOnDeviceSpeechRecognizer(context) else SpeechRecognizer.createSpeechRecognizer(context)
         r.setRecognitionListener(listener)
@@ -95,6 +97,11 @@ class AndroidSpeechToText(private val context: Context) : SpeechToText {
         }
         override fun onEvent(eventType: Int, params: Bundle?) {}
         override fun onError(error: Int) {
+            // These leave the recognizer in a bad state on many devices: recreate it next time.
+            if (error == SpeechRecognizer.ERROR_CLIENT || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY ||
+                error == SpeechRecognizer.ERROR_SERVER_DISCONNECTED || error == SpeechRecognizer.ERROR_SERVER) {
+                recognizer?.destroy(); recognizer = null
+            }
             val (msg, recoverable) = when (error) {
                 SpeechRecognizer.ERROR_NO_MATCH -> "I didn't catch that" to true
                 SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech detected" to true

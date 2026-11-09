@@ -93,7 +93,9 @@ class LiveSessionController(
     private var spokenChars = 0
     private var replyFinished = true
     private var emptyResults = 0
+    private var consecutiveErrors = 0
     private var bargeInEnabled = true
+    private var listenJob: Job? = null
 
     fun start() {
         if (_state.value.active) return
@@ -111,7 +113,7 @@ class LiveSessionController(
 
         s.launch {
             val cfg = settings.current()
-            bargeInEnabled = cfg.bargeIn
+            bargeInEnabled = cfg.bargeIn && BargeInMonitor.supported()
             _state.update { it.copy(speakerOn = cfg.voiceResponses) }
             tts?.setRate(cfg.speechRate)
             conversationId = conversations.create("ZENITH LIVE session")
@@ -127,6 +129,7 @@ class LiveSessionController(
 
     /** Ends the voice session. Background tasks keep running. */
     fun end() {
+        listenJob?.cancel()
         requestJob?.cancel()
         monitor?.stop()
         stt?.cancel(); stt?.release()
@@ -159,7 +162,7 @@ class LiveSessionController(
             OrbState.SPEAKING -> interrupt()
             OrbState.THINKING, OrbState.SEARCHING, OrbState.RESEARCHING -> { cancelRequest(); listen() }
             OrbState.LISTENING -> stt?.stop()
-            else -> { if (_state.value.micMuted) toggleMute() else listen() }
+            else -> { consecutiveErrors = 0; if (_state.value.micMuted) toggleMute() else listen() }
         }
     }
 
@@ -185,28 +188,42 @@ class LiveSessionController(
 
     private fun listen() {
         if (!_state.value.active || _state.value.micMuted) return
-        monitor?.stop()
         _state.update { it.copy(partial = "", micLevel = 0f) }
         setOrb(OrbState.LISTENING)
-        stt?.start()
+        listenJob?.cancel()
+        listenJob = scope?.launch {
+            // Make sure the barge-in recorder has released the microphone first.
+            monitor?.stopAndJoin()
+            delay(120)
+            if (_state.value.orb == OrbState.LISTENING && !_state.value.micMuted) stt?.start()
+        }
     }
 
     private fun onStt(e: SttEvent) {
         when (e) {
             is SttEvent.Level -> if (_state.value.orb == OrbState.LISTENING) _state.update { it.copy(micLevel = e.level) }
             is SttEvent.Partial -> _state.update { it.copy(partial = e.text) }
+            is SttEvent.Ready, is SttEvent.SpeechStarted -> consecutiveErrors = 0
             is SttEvent.Final -> {
+                consecutiveErrors = 0
                 val text = e.text.trim()
                 _state.update { it.copy(partial = "", micLevel = 0f) }
                 if (text.isEmpty()) onNothingHeard() else { emptyResults = 0; submit(text) }
             }
             is SttEvent.Error -> {
                 _state.update { it.copy(micLevel = 0f) }
-                if (e.code == android.speech.SpeechRecognizer.ERROR_NO_MATCH || e.code == android.speech.SpeechRecognizer.ERROR_SPEECH_TIMEOUT) onNothingHeard()
-                else if (e.recoverable && _state.value.orb == OrbState.LISTENING) {
+                if (_state.value.orb != OrbState.LISTENING) return // stale error from a cancelled recognizer
+                if (e.code == android.speech.SpeechRecognizer.ERROR_NO_MATCH || e.code == android.speech.SpeechRecognizer.ERROR_SPEECH_TIMEOUT) { onNothingHeard(); return }
+                consecutiveErrors++
+                if (e.recoverable && consecutiveErrors < 3) {
                     setOrb(OrbState.ERROR, e.message)
-                    scope?.launch { delay(1500); if (_state.value.orb == OrbState.ERROR) listen() }
-                } else if (_state.value.orb == OrbState.LISTENING) setOrb(OrbState.ERROR, e.message)
+                    scope?.launch { delay(1200L * consecutiveErrors); if (_state.value.orb == OrbState.ERROR) listen() }
+                } else {
+                    consecutiveErrors = 0
+                    setOrb(OrbState.ERROR, "${e.message}. Tap the orb to try again." +
+                        if (e.code == android.speech.SpeechRecognizer.ERROR_NETWORK || e.code == android.speech.SpeechRecognizer.ERROR_NETWORK_TIMEOUT)
+                            " For offline use, install your language's offline speech pack in Android settings." else "")
+                }
             }
             else -> Unit
         }

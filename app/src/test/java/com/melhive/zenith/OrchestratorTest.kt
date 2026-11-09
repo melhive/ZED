@@ -141,6 +141,18 @@ class OrchestratorTest {
         assertTrue(o.respond(id, "Explain quantum entanglement").text.contains("AI model"))
     }
 
+    @Test fun withModelConversationalRequestsGoToTheModel() = runBlocking<Unit> {
+        val fake = FakeProvider(listOf(GenerationEvent.Delta("I can chat, manage files, set reminders…"), GenerationEvent.Done("stop")))
+        provider = fake
+        val o = orchestrator()
+        val id = conversations.create()
+        assertEquals("I can chat, manage files, set reminders…", o.respond(id, "what can you do?").text)
+        assertEquals(1, fake.requests.size)
+        // Exact computations stay native even with a model.
+        assertEquals("12 times 7 = 84", o.respond(id, "what is 12 times 7").text)
+        assertEquals(1, fake.requests.size)
+    }
+
     @Test fun regenerateReplacesTheLastAnswer() = runBlocking<Unit> {
         provider = FakeProvider(
             listOf(GenerationEvent.Delta("First answer"), GenerationEvent.Done("stop")),

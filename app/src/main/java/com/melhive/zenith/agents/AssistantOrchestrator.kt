@@ -36,7 +36,14 @@ import java.time.format.DateTimeFormatter
 
 enum class AssistantPhase { IDLE, THINKING, EXECUTING, RESEARCHING, SEARCHING, COMPLETED, ERROR }
 
-data class AssistantActivity(val phase: AssistantPhase = AssistantPhase.IDLE, val detail: String? = null, val conversationId: Long? = null)
+data class AssistantActivity(
+    val phase: AssistantPhase = AssistantPhase.IDLE,
+    val detail: String? = null,
+    val conversationId: Long? = null,
+    val at: Long = System.currentTimeMillis(),
+) {
+    val busy: Boolean get() = phase in setOf(AssistantPhase.THINKING, AssistantPhase.EXECUTING, AssistantPhase.RESEARCHING, AssistantPhase.SEARCHING)
+}
 
 data class AssistantReply(val text: String, val ok: Boolean, val source: String)
 
@@ -117,8 +124,9 @@ class AssistantOrchestrator(
         setPhase(AssistantPhase.THINKING, conv = conversationId)
         _streamingText.value = ""
         return try {
-            val reply = if (attachmentText == null) handleNative(conversationId, trimmed) else null
-            val final = reply ?: handleConversation(conversationId, trimmed, voice)
+            val provider = providers.active()
+            val reply = if (attachmentText == null) handleNative(conversationId, trimmed, modelAvailable = provider != null) else null
+            val final = reply ?: if (provider != null) handleWithModel(conversationId, provider, voice) else nativeConversation(conversationId, trimmed)
             setPhase(if (final.ok) AssistantPhase.COMPLETED else AssistantPhase.ERROR, if (final.ok) null else final.text, conversationId)
             final
         } catch (e: CancellationException) {
@@ -133,8 +141,15 @@ class AssistantOrchestrator(
         }
     }
 
-    private suspend fun handleNative(conversationId: Long, text: String): AssistantReply? {
-        return when (val cmd = parser.parse(text)) {
+    /**
+     * Clear device commands and exact computations are handled natively (fast, reliable, offline).
+     * When an AI model is available, conversational requests ("what can you do", requests missing
+     * details) go to the model instead of fixed replies.
+     */
+    private suspend fun handleNative(conversationId: Long, text: String, modelAvailable: Boolean): AssistantReply? {
+        val cmd = parser.parse(text)
+        if (modelAvailable && (cmd is ParsedCommand.Help || cmd is ParsedCommand.Clarify)) return null
+        return when (cmd) {
             ParsedCommand.NotACommand -> null
             ParsedCommand.Help -> {
                 conversations.addMessage(conversationId, "assistant", CommandParser.HELP_TEXT, source = "native")
@@ -169,11 +184,6 @@ class AssistantOrchestrator(
         return tools.execute(request)
     }
 
-    private suspend fun handleConversation(conversationId: Long, text: String, voice: Boolean): AssistantReply {
-        val provider = providers.active() ?: return nativeConversation(conversationId, text)
-        return handleWithModel(conversationId, provider, voice)
-    }
-
     /** No model available: social replies or an honest, helpful explanation. */
     private suspend fun nativeConversation(conversationId: Long, text: String): AssistantReply {
         val ctx = SmallTalk.Context(
@@ -190,11 +200,14 @@ class AssistantOrchestrator(
         val s = settings.current()
         val isLocal = provider.id == "local"
         val researchAvailable = providers.research() != null
-        val toolSpecs = skills.enabledTools(s.enabledSkills).filter { it.name != "web.research" || researchAvailable }
-        val memories = memory.list(30).map { it.text }
+        // Very small on-device windows (e.g. 1280 tokens) cannot hold the tool list; such models just converse.
+        val localContext = (provider as? com.melhive.zenith.intelligence.LocalLiteRtProvider)?.contextTokens
+        val tinyContext = localContext != null && localContext < 2048
+        val toolSpecs = if (tinyContext) emptyList() else skills.enabledTools(s.enabledSkills).filter { it.name != "web.research" || researchAvailable }
+        val memories = memory.list(if (tinyContext) 5 else 30).map { it.text }
         val origin = if (isLocal) ToolRequest.Origin.LOCAL_MODEL else ToolRequest.Origin.ONLINE_MODEL
         val sourceTag = if (isLocal) "local" else "online:${provider.id}"
-        val contextChars = if (isLocal) 8_000 else 60_000
+        val contextChars = if (isLocal) ((localContext ?: 4096) * 3) else 60_000
 
         var lastText = ""
         for (round in 1..MAX_ROUNDS) {
@@ -218,7 +231,7 @@ class AssistantOrchestrator(
             val request = GenerationRequest(
                 system = system,
                 turns = ContextWindow.fit(history, contextChars),
-                maxOutputTokens = if (isLocal) 1024 else 4096,
+                maxOutputTokens = when { isLocal && voice -> 384; isLocal -> 1024; voice -> 1024; else -> 4096 },
                 sessionKey = "conversation-$conversationId",
                 volatileContext = if (isLocal) PromptBuilder.volatileContext(now, knowledgeSnippets) else null,
             )

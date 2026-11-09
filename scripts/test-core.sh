@@ -14,4 +14,4 @@ else
 fi
 cd "$DEST"
 chmod +x gradlew
-./gradlew -Pzenith.coreOnly=true -Dorg.gradle.jvmargs=-Xmx1g --no-daemon :core:test "$@"
+./gradlew -Pzenith.coreOnly=true -Pkotlin.compiler.execution.strategy=in-process -Dorg.gradle.jvmargs=-Xmx768m --no-daemon :core:test "$@"
