@@ -56,7 +56,7 @@ class ToolManagerTest {
     }
     @After fun tearDown() = db.close()
 
-    @Test fun invalidRequestsNeverExecuteAndAreAudited() = runBlocking {
+    @Test fun invalidRequestsNeverExecuteAndAreAudited() = runBlocking<Unit> {
         val r = tm.execute(ToolRequest("file.delete", mapOf("path" to "../etc/passwd"), ToolRequest.Origin.ONLINE_MODEL))
         assertIs<ToolOutcome.Invalid>(r)
         val r2 = tm.execute(ToolRequest("shell.run", mapOf("cmd" to "rm -rf /"), ToolRequest.Origin.ONLINE_MODEL))
@@ -66,7 +66,7 @@ class ToolManagerTest {
         assertEquals(listOf("invalid", "invalid"), audit.map { it.outcome })
     }
 
-    @Test fun destructiveActionRequiresConfirmation() = runBlocking {
+    @Test fun destructiveActionRequiresConfirmation() = runBlocking<Unit> {
         val pending = async { tm.execute(ToolRequest("file.delete", mapOf("path" to "a.txt"), ToolRequest.Origin.NATIVE)) }
         val req = broker.requests.filter { it.isNotEmpty() }.first().single()
         assertTrue(req.destructive)
@@ -80,7 +80,7 @@ class ToolManagerTest {
         assertEquals(listOf("file.delete"), executed)
     }
 
-    @Test fun modelRequestedChangesNeedConfirmationButNativeDoNot() = runBlocking {
+    @Test fun modelRequestedChangesNeedConfirmationButNativeDoNot() = runBlocking<Unit> {
         assertIs<ToolOutcome.Executed>(tm.execute(ToolRequest("file.create", mapOf("path" to "n.txt"), ToolRequest.Origin.NATIVE)))
         val fromModel = async { tm.execute(ToolRequest("memory.remember", mapOf("fact" to "x"), ToolRequest.Origin.LOCAL_MODEL)) }
         val req = broker.requests.filter { it.isNotEmpty() }.first().single()
@@ -91,7 +91,7 @@ class ToolManagerTest {
         assertIs<ToolOutcome.Executed>(tm.execute(ToolRequest("time.now", origin = ToolRequest.Origin.ONLINE_MODEL)))
     }
 
-    @Test fun missingCapabilityAndDisabledSkillAreDenied() = runBlocking {
+    @Test fun missingCapabilityAndDisabledSkillAreDenied() = runBlocking<Unit> {
         storageGranted = false
         val r = tm.execute(ToolRequest("file.create", mapOf("path" to "n.txt"), ToolRequest.Origin.NATIVE))
         assertIs<ToolOutcome.Denied>(r)

@@ -27,7 +27,7 @@ class ProvidersTest {
     private fun sse(vararg events: String) = MockResponse().setHeader("Content-Type", "text/event-stream").setBody(events.joinToString("") { "$it\n\n" })
     private fun text(events: List<GenerationEvent>) = events.filterIsInstance<GenerationEvent.Delta>().joinToString("") { it.text }
 
-    @Test fun openAiStreamsDeltasAndUsage() = runBlocking {
+    @Test fun openAiStreamsDeltasAndUsage() = runBlocking<Unit> {
         server.enqueue(sse(
             """data: {"choices":[{"delta":{"content":"Hel"}}]}""",
             """data: {"choices":[{"delta":{"content":"lo"},"finish_reason":"stop"}]}""",
@@ -48,7 +48,7 @@ class ProvidersTest {
         assertTrue(body.contains("Tool result\\n\\nagain"))
     }
 
-    @Test fun anthropicStreamsTextDeltas() = runBlocking {
+    @Test fun anthropicStreamsTextDeltas() = runBlocking<Unit> {
         server.enqueue(sse(
             "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":20}}}",
             "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"\"}}",
@@ -66,7 +66,7 @@ class ProvidersTest {
         assertTrue(r.body.readUtf8().contains("\"fallbacks\":\"default\""))
     }
 
-    @Test fun geminiStreamsParts() = runBlocking {
+    @Test fun geminiStreamsParts() = runBlocking<Unit> {
         server.enqueue(sse(
             """data: {"candidates":[{"content":{"parts":[{"text":"Good "}],"role":"model"}}]}""",
             """data: {"candidates":[{"content":{"parts":[{"text":"morning"}],"role":"model"},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":2}}""",
@@ -79,7 +79,7 @@ class ProvidersTest {
         assertEquals("g-key", r.getHeader("x-goog-api-key"))
     }
 
-    @Test fun httpErrorsAreReportedWithoutSecrets() = runBlocking {
+    @Test fun httpErrorsAreReportedWithoutSecrets() = runBlocking<Unit> {
         server.enqueue(MockResponse().setResponseCode(401).setBody("""{"error":{"message":"Invalid key sk-abcdefghijklmnopqrstuvwxyz"}}"""))
         val p = OpenAiProvider("OpenAI", server.url("/v1").toString().trimEnd('/'), "m", { "sk-test" })
         val events = p.generate(request).toList()
@@ -88,7 +88,7 @@ class ProvidersTest {
         assertTrue("abcdefghijklmnop" !in err.message)
     }
 
-    @Test fun missingKeyFailsFast() = runBlocking {
+    @Test fun missingKeyFailsFast() = runBlocking<Unit> {
         val events = GeminiProvider("m", { null }, server.url("").toString()).generate(request).toList()
         assertTrue(events.single() is GenerationEvent.Error)
         assertEquals(0, server.requestCount)

@@ -31,7 +31,7 @@ class DatabaseTest {
     }
     @After fun tearDown() = db.close()
 
-    @Test fun conversationsPersistAndCascade() = runBlocking {
+    @Test fun conversationsPersistAndCascade() = runBlocking<Unit> {
         val repo = ConversationRepository(db)
         val id = repo.create()
         repo.addMessage(id, "user", "Plan my trip to Kyoto")
@@ -48,7 +48,7 @@ class DatabaseTest {
         assertEquals(0, db.messages().count())
     }
 
-    @Test fun memoryIsDeduplicatedAndForgettable() = runBlocking {
+    @Test fun memoryIsDeduplicatedAndForgettable() = runBlocking<Unit> {
         val repo = MemoryRepository(db)
         repo.remember("My sister is Ana", "user_command")
         repo.remember("my sister is ana", "user_command")
@@ -58,7 +58,7 @@ class DatabaseTest {
         assertTrue(repo.list().isEmpty())
     }
 
-    @Test fun todoCompletionHandlesAmbiguity() = runBlocking {
+    @Test fun todoCompletionHandlesAmbiguity() = runBlocking<Unit> {
         val repo = TodoRepository(db)
         repo.add("buy milk", null)
         repo.add("buy milk chocolate", null)
@@ -69,7 +69,7 @@ class DatabaseTest {
         assertIs<TodoRepository.CompleteResult.Ambiguous>(repo.complete("call"))
     }
 
-    @Test fun knowledgeFtsSearch() = runBlocking {
+    @Test fun knowledgeFtsSearch() = runBlocking<Unit> {
         val dao = db.knowledge()
         dao.replaceDoc(null, KnowledgeDocEntity(treeUri = "t", path = "notes/invoices.txt", name = "invoices.txt", sizeBytes = 10, modifiedAt = 1, indexedAt = 1, chunkCount = 2),
             listOf("Invoice 42 from the electricity company was paid in March.", "Unrelated grocery list: apples, bread."))
