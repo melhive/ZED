@@ -76,7 +76,11 @@ class VoiceManager(
         val created: TextToSpeechEngine = when (selection) {
             is VoiceSelection.Neural -> if (packs.isInstalled(selection.pack)) {
                 _status.value = Status(Phase.LOADING, selection.voice.name, "Loading ${selection.pack.name}…")
-                NeuralTextToSpeech(selection.pack, selection.voice, packs.dir(selection.pack), Locale.getDefault().toLanguageTag())
+                lateinit var isolated: IsolatedNeuralTts
+                isolated = IsolatedNeuralTts(context, selection.pack, selection.voice, packs.dir(selection.pack), Locale.getDefault().toLanguageTag()) { reason ->
+                    scope.launch { fallBack(isolated, reason) }
+                }
+                isolated
             } else {
                 _status.value = Status(Phase.FALLBACK, "System voice", "${selection.pack.name} is not downloaded; using the system voice")
                 AndroidTextToSpeech(context)
@@ -95,35 +99,51 @@ class VoiceManager(
         e.setRate(rate); e.setPitch(pitch)
     }
 
-    override suspend fun awaitReady(): Boolean {
+    /** Never throws: any failure is recorded and reported as "not ready". */
+    override suspend fun awaitReady(): Boolean = try {
+        awaitReadyOrThrow()
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (e: Throwable) {
+        com.melhive.zenith.android.CrashReporter.recordNonFatal("voice", e)
+        _status.value = Status(Phase.FALLBACK, "System voice", "Voice error: ${e.message ?: e.javaClass.simpleName}")
+        false
+    }
+
+    private suspend fun awaitReadyOrThrow(): Boolean {
         val e = ensure()
         if (e.awaitReady()) {
             if (_status.value.phase != Phase.FALLBACK) _status.value = when (e) {
-                is NeuralTextToSpeech -> Status(Phase.READY, e.info()?.voiceName ?: "Neural voice", "Offline neural voice · ready in ${e.loadMillis} ms")
+                is IsolatedNeuralTts -> Status(Phase.READY, e.info()?.voiceName ?: "Neural voice", "Offline neural voice · ready in ${e.loadMillis} ms")
                 else -> Status(Phase.READY, e.info()?.voiceName ?: "System voice", e.info()?.engine)
             }
             return true
         }
-        if (e is NeuralTextToSpeech) {
-            val reason = e.loadError ?: "unknown error"
-            val fallback = mutex.withLock {
-                if (engine !== e) return@withLock engine
-                forwardJob?.cancel()
-                e.release()
-                AndroidTextToSpeech(context).also { attach(it, engineKey ?: "fallback") }
-            } ?: return false
-            _status.value = Status(Phase.FALLBACK, "System voice", "Neural voice could not load ($reason); using the system voice")
+        if (e is IsolatedNeuralTts) {
+            val fallback = fallBack(e, e.loadError ?: "unknown error") ?: return false
             return fallback.awaitReady()
         }
         return false
     }
 
+    /** Replaces a failed or crashed neural voice with the phone voice so ZENITH keeps talking. */
+    private suspend fun fallBack(failed: IsolatedNeuralTts, reason: String): TextToSpeechEngine? {
+        val replacement = mutex.withLock {
+            if (engine !== failed) return@withLock engine
+            forwardJob?.cancel()
+            failed.release()
+            AndroidTextToSpeech(context).also { attach(it, engineKey ?: "fallback") }
+        }
+        _status.value = Status(Phase.FALLBACK, "System voice", "Neural voice unavailable ($reason). Using the phone voice; details are in Diagnostics.")
+        return replacement
+    }
+
     override fun speak(text: String, flush: Boolean): String? {
         val e = engine
-        if (e == null) { scope.launch { runCatching { awaitReady() } }; return null } // reloads after a memory trim
-        return e.speak(text, flush)
+        if (e == null) { scope.launch { awaitReady() }; return null } // reloads after a memory trim
+        return runCatching { e.speak(text, flush) }.onFailure { com.melhive.zenith.android.CrashReporter.recordNonFatal("voice speak", it) }.getOrNull()
     }
-    override fun stop() { engine?.stop() }
+    override fun stop() { runCatching { engine?.stop() } }
     override fun setRate(rate: Float) { this.rate = rate; engine?.setRate(rate) }
     override fun setPitch(pitch: Float) { this.pitch = pitch; engine?.setPitch(pitch) }
     override fun isSpeaking(): Boolean = engine?.isSpeaking() == true
@@ -146,16 +166,19 @@ class VoiceManager(
     }
 
     /** Speaks a sample with the current settings (used by the voice picker). */
-    suspend fun preview(text: String): Boolean {
-        if (!awaitReady()) return false
-        speak(text, flush = true)
-        return true
+    suspend fun preview(text: String): Boolean = try {
+        if (awaitReady()) speak(text, flush = true) != null else false
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (e: Throwable) {
+        com.melhive.zenith.android.CrashReporter.recordNonFatal("voice preview", e)
+        false
     }
 
     /** Installed Android voices (from the system text-to-speech engine). */
-    suspend fun systemVoices(): List<SystemVoice> {
-        (engine as? AndroidTextToSpeech)?.let { if (it.awaitReady()) return it.voices() }
+    suspend fun systemVoices(): List<SystemVoice> = runCatching {
+        (engine as? AndroidTextToSpeech)?.let { if (it.awaitReady()) return@runCatching it.voices() }
         val temp = AndroidTextToSpeech(context)
-        return try { if (temp.awaitReady()) temp.voices() else emptyList() } finally { temp.release() }
-    }
+        try { if (temp.awaitReady()) temp.voices() else emptyList() } finally { temp.release() }
+    }.getOrDefault(emptyList())
 }

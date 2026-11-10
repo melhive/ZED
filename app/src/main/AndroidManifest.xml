@@ -69,6 +69,12 @@
             </intent-filter>
         </receiver>
 
+        <!-- Neural speech runs in its own process: a native crash there cannot close the app. -->
+        <service
+            android:name=".voice.NeuralVoiceService"
+            android:exported="false"
+            android:process=":voice" />
+
         <!-- WorkManager foreground work (model downloads, long tasks). -->
         <service
             android:name="androidx.work.impl.foreground.SystemForegroundService"

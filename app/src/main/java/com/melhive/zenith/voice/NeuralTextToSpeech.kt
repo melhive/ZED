@@ -18,6 +18,7 @@ import com.melhive.zenith.core.voice.VoiceCatalog
 import com.melhive.zenith.core.voice.VoiceEngineKind
 import com.melhive.zenith.core.voice.VoicePack
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -62,7 +63,11 @@ class NeuralTextToSpeech(
     private val ready = CompletableDeferred<Boolean>()
     private val synthExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "zenith-neural-tts").apply { priority = Thread.MAX_PRIORITY } }
     private val synthDispatcher = synthExecutor.asCoroutineDispatcher()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    // Any unexpected error on the voice threads is recorded instead of crashing the app.
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + CoroutineExceptionHandler { _, e ->
+        com.melhive.zenith.android.CrashReporter.recordNonFatal("neural tts", e)
+        failAll("Speech playback failed: ${e.message ?: e.javaClass.simpleName}")
+    })
 
     private var tts: OfflineTts? = null
     private var phonemizer: EnglishPhonemizer? = null
@@ -95,7 +100,19 @@ class NeuralTextToSpeech(
             load()
             for (r in requests) synthesize(r)
         }
-        scope.launch(Dispatchers.IO) { for (c in chunks) play(c) }
+        scope.launch(Dispatchers.IO) {
+            for (c in chunks) {
+                try {
+                    play(c)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    com.melhive.zenith.android.CrashReporter.recordNonFatal("neural tts playback", e)
+                    synchronized(trackLock) { track?.let { runCatching { it.release() } }; track = null; framesWritten = 0 }
+                    finish(c.id, TtsEvent.Error(c.id, "Audio playback failed: ${e.message ?: e.javaClass.simpleName}"))
+                }
+            }
+        }
     }
 
     private fun file(name: String) = File(dir, name).absolutePath
@@ -148,14 +165,24 @@ class NeuralTextToSpeech(
     override suspend fun awaitReady(): Boolean = ready.await()
 
     override fun speak(text: String, flush: Boolean): String? {
-        if (released) return null
-        val clean = SpeechText.clean(text)
-        if (clean.isBlank()) return null
-        if (flush) stop()
         val id = "neural-${counter.incrementAndGet()}"
+        return if (speakWithId(id, text, flush)) id else null
+    }
+
+    /** Queues text under a caller-chosen utterance id (used by the voice process). */
+    fun speakWithId(id: String, text: String, flush: Boolean): Boolean {
+        if (released) return false
+        val clean = SpeechText.clean(text)
+        if (clean.isBlank()) return false
+        if (flush) stop()
         pending += id
         requests.trySend(Request(id, splitSentences(clean), generation.get()))
-        return id
+        return true
+    }
+
+    private fun failAll(message: String) {
+        val ids = synchronized(pending) { pending.toList().also { pending.clear() } }
+        ids.forEach { _events.tryEmit(TtsEvent.Error(it, message)) }
     }
 
     private suspend fun synthesize(r: Request) {
@@ -194,8 +221,10 @@ class NeuralTextToSpeech(
                 config.extra = mapOf("lang" to VoiceCatalog.supertonicLanguage(languageTag))
             }
         }
-        // Returning 0 from the callback stops generation early when the user interrupts.
-        return engine.generateWithConfigAndCallback(text, config) { if (generation.get() == gen && !released) 1 else 0 }.samples
+        // No progress callback: sherpa-onnx's JNI looks the callback up by an exact
+        // signature that Kotlin lambdas do not have, which aborts the process.
+        // An interrupted sentence simply finishes rendering and is discarded.
+        return engine.generateWithConfig(text, config).samples
     }
 
     private fun toPcm16(samples: FloatArray): ShortArray =

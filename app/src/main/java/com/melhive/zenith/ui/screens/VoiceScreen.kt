@@ -69,16 +69,23 @@ fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
     var systemVoices by remember { mutableStateOf<List<SystemVoice>?>(null) }
     var showAllSystem by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(Unit) { systemVoices = c.voice.systemVoices() }
+    LaunchedEffect(Unit) { systemVoices = runCatching { c.voice.systemVoices() }.getOrDefault(emptyList()) }
     val settings = s ?: return
     val selection = VoiceSelection.parse(settings.voiceId)
 
+    // Every action is guarded: a failure shows a message and is recorded, never closes the app.
+    fun safely(block: suspend () -> Unit) = scope.launch(start = kotlinx.coroutines.CoroutineStart.DEFAULT) {
+        try { block() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Throwable) {
+            com.melhive.zenith.android.CrashReporter.recordNonFatal("voice screen", e)
+            message = "Something went wrong: ${e.message ?: e.javaClass.simpleName}"
+        }
+    }
     val sample = "Hello${name?.let { ", $it" } ?: ""}. I'm ZENITH. It's 7:30, and you have 3 things on your list today."
-    fun choose(id: String) = scope.launch {
+    fun choose(id: String) = safely {
         c.settings.setVoiceId(id)
         if (!c.voice.preview(sample)) message = "That voice could not be loaded."
     }
-    fun previewNow() = scope.launch { if (!c.voice.preview(sample)) message = "Speech is unavailable on this phone." }
+    fun previewNow() = safely { if (!c.voice.preview(sample)) message = "Speech is unavailable on this phone." }
 
     ListScreen("Voice", onBack = onBack, subtitle = "Choose how ZENITH sounds. Every voice runs on your phone, offline.") {
         item {
@@ -106,8 +113,8 @@ fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
         }
 
         item { SpeedAndPitch(settings.speechRate, settings.speechPitch,
-            onRate = { v -> scope.launch { c.settings.setSpeechRate(v); c.voice.preview("This is how fast I'll talk.") } },
-            onPitch = { v -> scope.launch { c.settings.setSpeechPitch(v); c.voice.preview("This is how my voice will sound.") } },
+            onRate = { v -> safely { c.settings.setSpeechRate(v); c.voice.preview("This is how fast I'll talk.") } },
+            onPitch = { v -> safely { c.settings.setSpeechPitch(v); c.voice.preview("This is how my voice will sound.") } },
         ) }
 
         item { SectionTitle("Natural offline voices") }
@@ -120,18 +127,18 @@ fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
                 progress = task?.let { Triple(it.progressCurrent, it.progressTotal, it.progressLabel) },
                 selectedId = (selection as? VoiceSelection.Neural)?.voice?.id,
                 onDownload = {
-                    scope.launch {
+                    safely {
                         val free = DeviceInfo.snapshot(context).freeStorageBytes
                         val need = c.voicePacks.requiredBytes(pack)
-                        if (free < need) { message = "Not enough storage: ${DeviceInfo.formatBytes(need)} needed, ${DeviceInfo.formatBytes(free)} free."; return@launch }
+                        if (free < need) { message = "Not enough storage: ${DeviceInfo.formatBytes(need)} needed, ${DeviceInfo.formatBytes(free)} free."; return@safely }
                         val t = c.taskEngine.create(TaskTypes.VOICE_DOWNLOAD, "Download ${pack.name} voices", mapOf("pack" to pack.id))
                         message = "Downloading ${pack.name} as task #${t.id}. You can keep using ZENITH."
                     }
                 },
-                onCancel = { task?.let { t -> scope.launch { c.taskEngine.cancel(t.id) } } },
+                onCancel = { task?.let { t -> safely { c.taskEngine.cancel(t.id) } } },
                 onOpenTasks = onOpenTasks,
                 onRemove = {
-                    scope.launch {
+                    safely {
                         if ((selection as? VoiceSelection.Neural)?.pack?.id == pack.id) { c.voice.unload(); c.settings.setVoiceId(VoiceSelection.SYSTEM_DEFAULT) }
                         c.voicePacks.remove(pack)
                         message = "Removed ${pack.name} voices"
