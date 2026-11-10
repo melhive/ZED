@@ -99,6 +99,9 @@ class LiveSessionController(
     private var bargeInEnabled = true
     private var listenJob: Job? = null
 
+    private var soundStyle = ZenithSounds.Style.ARC
+    private var hideBeep = true
+
     // Real-time (Gemini Live) session, when active.
     private var rt: GeminiLiveSession? = null
     private var rtUserTurn = -1
@@ -120,6 +123,9 @@ class LiveSessionController(
 
         s.launch {
             val cfg = settings.current()
+            soundStyle = ZenithSounds.Style.parse(cfg.liveSound)
+            hideBeep = cfg.hideRecognizerBeep
+            val soundMs = ZenithSounds.play(context, soundStyle, start = true)
             bargeInEnabled = cfg.bargeIn
             _state.update { it.copy(speakerOn = cfg.voiceResponses) }
             tts?.setRate(cfg.speechRate)
@@ -130,6 +136,7 @@ class LiveSessionController(
                 _state.update { it.copy(statusDetail = "Real-time voice needs a Gemini API key (Model Manager). Using standard voice.") }
             }
             if (tts?.awaitReady() != true) _state.update { it.copy(speakerOn = false, statusDetail = "Text-to-speech is unavailable; replies will be shown only") }
+            delay(soundMs) // let the start sound finish before the microphone opens
             if (!recognitionAvailable()) {
                 setOrb(OrbState.ERROR, "No speech recognition service on this phone. Use the keyboard or system voice input below, or install Google's speech services.")
                 com.melhive.zenith.android.CrashReporter.recordNonFatal("live", IllegalStateException("No speech recognition service available"))
@@ -197,6 +204,8 @@ class LiveSessionController(
 
     /** Ends the voice session. Background tasks keep running. */
     fun end() {
+        if (_state.value.active) ZenithSounds.play(context, soundStyle, start = false)
+        BeepSuppressor.restore(context)
         rt?.close(); rt = null
         listenJob?.cancel()
         requestJob?.cancel()
@@ -295,7 +304,10 @@ class LiveSessionController(
             // Make sure the barge-in recorder has released the microphone first.
             monitor?.stopAndJoin()
             delay(120)
-            if (_state.value.orb == OrbState.LISTENING && !_state.value.micMuted) stt?.start()
+            if (_state.value.orb == OrbState.LISTENING && !_state.value.micMuted) {
+                if (hideBeep) BeepSuppressor.suppress(context)
+                stt?.start()
+            }
         }
     }
 

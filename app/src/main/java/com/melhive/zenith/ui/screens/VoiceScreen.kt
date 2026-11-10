@@ -131,6 +131,29 @@ fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
                 },
             )
         }
+        item {
+            ZenithCard {
+                SectionTitle("LIVE sounds")
+                Text("The sound when ZENITH LIVE opens and closes. Tap one to hear it.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
+                WrapRow(Modifier.padding(top = 6.dp)) {
+                    com.melhive.zenith.voice.ZenithSounds.Style.entries.forEach { st ->
+                        FilterChip(selected = settings.liveSound == st.id, onClick = {
+                            safely { c.settings.setLiveSound(st.id) }
+                            val ms = com.melhive.zenith.voice.ZenithSounds.play(context, st, start = true)
+                            if (ms > 0) scope.launch { kotlinx.coroutines.delay(ms + 450); com.melhive.zenith.voice.ZenithSounds.play(context, st, start = false) }
+                        }, label = { Text(st.label) })
+                    }
+                }
+                Text(com.melhive.zenith.voice.ZenithSounds.Style.parse(settings.liveSound).description, style = MaterialTheme.typography.labelSmall, color = ZenithColors.Cyan)
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Hide the recognizer beep", style = MaterialTheme.typography.titleSmall)
+                        Text("Silences the speech service's own “listening” sound (the Google beep) each time LIVE starts listening.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
+                    }
+                    androidx.compose.material3.Switch(checked = settings.hideRecognizerBeep, onCheckedChange = { on -> safely { c.settings.setHideRecognizerBeep(on) } })
+                }
+            }
+        }
         item { SpeedAndPitch(settings.speechRate, settings.speechPitch,
             onRate = { v -> safely { c.settings.setSpeechRate(v); c.voice.preview("This is how fast I'll talk.") } },
             onPitch = { v -> safely { c.settings.setSpeechPitch(v); c.voice.preview("This is how my voice will sound.") } },

@@ -15,6 +15,7 @@ import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Psychology
+import androidx.compose.material.icons.outlined.NewReleases
 import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Settings
@@ -63,12 +64,14 @@ fun MoreScreen(onNavigate: (String) -> Unit) {
         Entry(Routes.MODELS, Icons.Outlined.Psychology, "Model Manager", "On-device models and online providers"),
         Entry(Routes.FILES, Icons.Outlined.Folder, "Files", "Granted folders, browse and organize"),
         Entry(Routes.SKILLS, Icons.Outlined.AutoAwesome, "Skills", "Capabilities ZENITH can use"),
+        Entry(Routes.WHATS_NEW, Icons.Outlined.NewReleases, "What's new", "This version's features and every previous version"),
         Entry(Routes.ROUTINES, Icons.Outlined.AutoAwesome, "Routines & briefing", "Good morning, Good night, Focus, Driving and your daily briefing"),
         Entry(Routes.VOICE, Icons.Outlined.RecordVoiceOver, "Voice", "Natural offline voices, speed and pitch"),
         Entry(Routes.SETTINGS, Icons.Outlined.Settings, "Settings", "Voice, safety and behaviour"),
         Entry(Routes.DIAGNOSTICS, Icons.Outlined.Security, "Permissions & Diagnostics", "Permissions, voice engines, audit log"),
     )
     ListScreen("More", onBack = null) {
+        item { UpdateBanner(onOpen = { onNavigate(Routes.WHATS_NEW) }) }
         items(entries) { e -> ZenithCard(onClick = { onNavigate(e.route) }) { IconLabel(e.icon, e.title, e.subtitle) } }
         item { Text("ZENITH ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.labelSmall, color = ZenithColors.Muted, modifier = Modifier.padding(8.dp)) }
     }

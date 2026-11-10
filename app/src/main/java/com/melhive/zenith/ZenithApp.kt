@@ -21,6 +21,8 @@ class ZenithApp : Application() {
         container = AppContainer(this)
         isVoiceProcess = currentProcessName().endsWith(":voice")
         if (isVoiceProcess) return
+        // If ZENITH stopped while the recognizer beep was muted, put the volume back.
+        runCatching { com.melhive.zenith.voice.BeepSuppressor.restore(this) }
         Notifications.createChannels(this)
         container.appScope.launch {
             // Recover state after process death: streaming messages and interrupted tasks.
@@ -36,7 +38,20 @@ class ZenithApp : Application() {
                     .collect { runCatching { com.melhive.zenith.assist.ZenithWidgetProvider.refresh(this@ZenithApp) } }
             }
             // Update check against GitHub Releases (public metadata only); can be turned off in Settings.
-            runCatching { if (container.settings.current().checkUpdates) container.updates.check() }
+            runCatching {
+                if (container.settings.current().checkUpdates) {
+                    val result = container.updates.check()
+                    // Tell the user once per new version, even if they don't open the app's screens.
+                    if (result is com.melhive.zenith.android.UpdateState.Available) {
+                        val prefs = getSharedPreferences("zenith_updates", MODE_PRIVATE)
+                        if (prefs.getString("notified", null) != result.info.versionName) {
+                            Notifications.post(this@ZenithApp, Notifications.CHANNEL_TASKS, 64_000, "ZENITH ${result.info.versionName} is available",
+                                "Tap to see what's new and download the update.", "whats_new")
+                            prefs.edit().putString("notified", result.info.versionName).apply()
+                        }
+                    }
+                }
+            }
         }
     }
 
