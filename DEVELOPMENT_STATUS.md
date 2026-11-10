@@ -13,7 +13,7 @@ Native Android personal AI assistant (Kotlin, Jetpack Compose). Three intelligen
 | Default branch | `main` (stable merges) |
 | Latest commit | see `git log -1` (this file is updated with each milestone) |
 | Build status | ✅ GitHub Actions **Android Build** green: core tests, Android unit tests, debug APK |
-| Releases | ✅ Signed release **v0.1.11** published (latest). Install/share link: https://github.com/melhive/ZENITH/releases/latest/download/zenith.apk. Every push to `main` publishes the next version (installs over the old one). |
+| Releases | ✅ Signed release **v0.1.13** published (latest). Install/share link: https://github.com/melhive/ZENITH/releases/latest/download/zenith.apk. Every push to `main` publishes the next version (installs over the old one). |
 
 ## Milestones
 
