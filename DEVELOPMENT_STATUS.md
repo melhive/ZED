@@ -83,6 +83,14 @@ Failed tests: none.
 - Conversation: more human persona prompt, lean prompt for casual chat, broader native small talk with follow-ups and fun features.
 - Still needed from the device: the exact LIVE error (Diagnostics → Problem reports → Share report) if it persists.
 
+## Natural offline voices (v0.1.10)
+
+- **Voice screen** (More → Voice, or Settings → Voice): current voice with Preview/Stop, speaking speed 0.5–2× and pitch 0.7–1.3× with presets (each change plays a short sample), downloadable voice packs, phone voices list.
+- **Voice packs** (downloaded as background tasks, resumable, SHA-256 verified): Supertonic 3 — 10 voices, very fast, 31 languages, reads numbers itself (129 MB); Kokoro v1.0 — 28 American/British English voices, most expressive (132 MB). Downloading the first pack switches ZENITH to its recommended voice.
+- **Engine:** sherpa-onnx 2.0.1 (static ONNX Runtime AAR, fetched and checksum-verified at build time, arm64 only). One shared `VoiceManager` serves Chat and LIVE and falls back to the phone voice if a neural voice cannot load.
+- **Kokoro text pipeline:** `SpeechNormalizer` + `EnglishPhonemizer` (core, unit-tested; checked against the real lexicon) because sherpa-onnx 2.0's Kokoro frontend drops digits and unknown words.
+- **Needs device validation:** neural synthesis speed and memory per pack, AudioTrack playback/barge-in with neural voices, pitch via PlaybackParams, pack download + extraction (~260 MB free space needed during install).
+
 ## Model integration status
 
 - Runtime: LiteRT-LM 0.19.1 (arm64-v8a, x86_64), API verified from the published AAR.

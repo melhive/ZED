@@ -11,6 +11,7 @@ ZENITH is a native Android personal AI assistant written in Kotlin with Jetpack 
 - **Online AI (optional):** provider-independent streaming layer; keys encrypted with Android Keystore.
 - **Chat Mode:** persistent conversations, streaming replies, voice input, text attachments, tool execution with visible results.
 - **ZENITH LIVE:** full-screen voice assistant with an animated orb driven by real events, sentence-streamed speech, barge-in with echo cancellation, mute/speaker/cancel controls.
+- **Natural offline voices:** download realistic neural voices (Supertonic 3 and Kokoro, 38 voices, ~130 MB each) that run fully on the phone, or use any phone voice. Choose the voice, speaking speed and pitch in More → Voice.
 - **Task engine:** WorkManager-backed background tasks (organize folders with plan approval, index documents, download models) with real progress, cancellation, retry, dependencies and conflict detection.
 - **Local knowledge:** on-device document index (SQLite FTS4 + BM25) used as optional context.
 - **Security first:** every action goes through validation → skill/capability checks → confirmation → execution → audit. AI output is treated as untrusted.
