@@ -131,7 +131,11 @@ fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
             }
             if (editName) NameDialog(initial = name ?: "", onDismiss = { editName = false }) { n -> scope.launch { c.memory.setUserName(n); editName = false } }
         }
-        item { PersonalityCard(settings.persona, settings.userTitle, name) { persona, title -> scope.launch { c.settings.setPersona(persona); c.settings.setUserTitle(title) } } }
+        item {
+            val facts by c.memory.facts.collectAsStateWithLifecycle(initialValue = emptyList())
+            val userName = facts.firstNotNullOfOrNull { Regex("^my name is (.+)$", RegexOption.IGNORE_CASE).find(it.text.trim())?.groupValues?.get(1) }
+            PersonalityCard(settings.persona, settings.userTitle, userName) { persona, title -> scope.launch { c.settings.setPersona(persona); c.settings.setUserTitle(title) } }
+        }
         item { AssistantShortcutsCard() }
         item {
             ZenithCard {

@@ -206,13 +206,16 @@ class AssistantOrchestrator(
         val tinyContext = localContext != null && localContext < 2048
         // Casual conversation gets a lean, persona-focused prompt; the tool list is included only when the
         // message looks like a device request (more room for the conversation, more natural replies).
-        val useTools = !tinyContext && PromptBuilder.looksLikeAction(userText)
+        val nativeTools = !isLocal && provider.supportsNativeTools
+        val useTools = nativeTools || (!tinyContext && PromptBuilder.looksLikeAction(userText))
         val toolSpecs = if (!useTools) emptyList() else skills.enabledTools(s.enabledSkills).filter { it.name != "web.research" || researchAvailable }
         val userName = memory.userName()
         val memories = memory.list(if (tinyContext) 5 else 30).map { it.text }
         val origin = if (isLocal) ToolRequest.Origin.LOCAL_MODEL else ToolRequest.Origin.ONLINE_MODEL
         val sourceTag = if (isLocal) "local" else "online:${provider.id}"
         val contextChars = if (isLocal) ((localContext ?: 4096) * 3) else 60_000
+
+        if (nativeTools) return runNativeToolLoop(conversationId, provider, voice, toolSpecs, memories, userName, sourceTag, contextChars)
 
         var lastText = ""
         for (round in 1..MAX_ROUNDS) {
@@ -277,7 +280,70 @@ class AssistantOrchestrator(
         return AssistantReply(lastText.ifBlank { note }, true, sourceTag)
     }
 
-    private data class StreamResult(val messageId: Long, val text: String, val ok: Boolean, val retryable: Boolean = false)
+    /**
+     * Native function calling (online providers): tools are declared to the model, which may call
+     * several in one step and chain steps (read → decide → act). Every call still goes through the
+     * ToolManager (validation, permissions, confirmation, audit). The history is read once; this
+     * turn's tool calls and results are replayed in the provider's own format.
+     */
+    private suspend fun runNativeToolLoop(
+        conversationId: Long, provider: IntelligenceProvider, voice: Boolean, toolSpecs: List<com.melhive.zenith.core.tools.ToolSpec>,
+        memories: List<String>, userName: String?, sourceTag: String, contextChars: Int,
+    ): AssistantReply {
+        val s = settings.current()
+        val history = ContextWindow.fit(conversations.history(conversationId, 40), contextChars)
+        val lastUser = history.lastOrNull { it.role == Role.USER }?.content.orEmpty()
+        val knowledgeSnippets = if (s.useKnowledge) {
+            setPhase(AssistantPhase.SEARCHING, "documents", conversationId)
+            runCatching { knowledge.search(lastUser, 3) }.getOrDefault(emptyList()).map { "${it.docPath}: ${it.text.take(700)}" }
+        } else emptyList()
+        val now = ZonedDateTime.now().format(DateTimeFormatter.ofPattern("EEEE yyyy-MM-dd'T'HH:mm (VV)"))
+        val system = PromptBuilder.systemPrompt(
+            tools = emptyList(), nowDescription = now, memories = memories, knowledge = knowledgeSnippets, voiceMode = voice,
+            userName = userName, persona = com.melhive.zenith.core.intelligence.Persona.parse(s.persona),
+            userTitle = s.userTitle.ifBlank { null }, nativeTools = toolSpecs.isNotEmpty(),
+        )
+        val exchanges = mutableListOf<com.melhive.zenith.intelligence.ToolExchange>()
+        val summary = mutableListOf<String>()
+        for (step in 1..MAX_NATIVE_STEPS) {
+            val request = GenerationRequest(
+                system = system, turns = history, maxOutputTokens = if (voice) 1024 else 4096,
+                sessionKey = "conversation-$conversationId", tools = toolSpecs, exchanges = exchanges.toList(),
+            )
+            setPhase(AssistantPhase.THINKING, if (step == 1) provider.label else "Step $step…", conversationId)
+            var result = stream(conversationId, provider, request, sourceTag)
+            if (!result.ok && result.retryable) {
+                setPhase(AssistantPhase.THINKING, "Retrying…", conversationId)
+                conversations.deleteMessage(result.messageId)
+                delay(1500)
+                result = stream(conversationId, provider, request, sourceTag)
+            }
+            if (!result.ok) return AssistantReply(result.text, false, sourceTag)
+            if (result.calls.isEmpty()) {
+                val text = result.text.ifBlank { summary.lastOrNull() ?: "(no response)" }
+                if (result.text.isBlank()) conversations.updateMessage(result.messageId, text, "complete")
+                return AssistantReply(text, true, sourceTag)
+            }
+            if (result.text.isBlank()) conversations.updateMessage(result.messageId, "Working on it…", "complete")
+            val results = mutableListOf<com.melhive.zenith.intelligence.ToolCallResult>()
+            for (call in result.calls) {
+                val outcome = runTool(conversationId, ToolRequest(call.name, call.args, ToolRequest.Origin.ONLINE_MODEL))
+                val turn = PromptBuilder.toolResultTurn(call.name, outcome.isSuccess(), outcome.message)
+                conversations.addMessage(conversationId, "tool", turn.content, source = "tool", toolName = call.name, status = "complete")
+                results += com.melhive.zenith.intelligence.ToolCallResult(call.id, call.name, outcome.message.take(8000), outcome.isSuccess())
+                summary += outcome.message
+            }
+            exchanges += com.melhive.zenith.intelligence.ToolExchange(result.text, result.calls, results)
+        }
+        val note = "I stopped after $MAX_NATIVE_STEPS steps to stay safe. Ask me to continue if there's more to do."
+        conversations.addMessage(conversationId, "assistant", note, source = sourceTag)
+        return AssistantReply(note, true, sourceTag)
+    }
+
+    private data class StreamResult(
+        val messageId: Long, val text: String, val ok: Boolean, val retryable: Boolean = false,
+        val calls: List<com.melhive.zenith.intelligence.ToolCall> = emptyList(),
+    )
 
     private suspend fun stream(conversationId: Long, provider: IntelligenceProvider, request: GenerationRequest, source: String): StreamResult {
         val id = conversations.addMessage(conversationId, "assistant", "", status = "streaming", source = source)
@@ -285,6 +351,7 @@ class AssistantOrchestrator(
         var lastFlush = 0L
         var error: GenerationEvent.Error? = null
         var first = true
+        val calls = mutableListOf<com.melhive.zenith.intelligence.ToolCall>()
         try {
             provider.generate(request).collect { e ->
                 when (e) {
@@ -298,6 +365,7 @@ class AssistantOrchestrator(
                     is GenerationEvent.Error -> error = e
                     is GenerationEvent.Usage -> _lastUsage.value = "${provider.label}: ${e.inputTokens ?: "?"} input / ${e.outputTokens ?: "?"} output tokens"
                     is GenerationEvent.Done -> Unit
+                    is GenerationEvent.ToolCalls -> calls += e.calls
                 }
             }
         } catch (e: CancellationException) {
@@ -305,15 +373,19 @@ class AssistantOrchestrator(
             throw e
         }
         val err = error
-        return if (err != null && sb.isBlank()) {
+        return if (err != null && sb.isBlank() && calls.isEmpty()) {
             conversations.updateMessage(id, err.message, "error")
             StreamResult(id, err.message, false, err.retryable)
         } else {
             if (err != null) sb.append("\n\n[Interrupted: ${err.message}]")
             conversations.updateMessage(id, sb.toString(), "complete")
-            StreamResult(id, sb.toString(), true)
+            StreamResult(id, sb.toString(), true, calls = calls.toList())
         }
     }
 
-    companion object { const val MAX_ROUNDS = 3 }
+    companion object {
+        const val MAX_ROUNDS = 3
+        /** Native tool calling: enough steps for multi-step requests, bounded for safety and cost. */
+        const val MAX_NATIVE_STEPS = 8
+    }
 }

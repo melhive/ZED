@@ -34,3 +34,30 @@ class PersonaTest {
         assertFalse("Rommel" in reply, reply)
     }
 }
+
+class NativeToolSchemaTest {
+    private val cat = com.melhive.zenith.core.tools.ToolCatalog.DEFAULT
+    private val S = com.melhive.zenith.core.tools.NativeToolSchema
+
+    @Test fun namesRoundTrip() {
+        for (t in cat.all) {
+            val wire = S.wireName(t.name)
+            assertTrue(Regex("^[a-zA-Z0-9_-]{1,64}$").matches(wire), wire)
+            assertEquals(t.name, S.toolName(wire))
+        }
+    }
+
+    @Test fun schemaTypesAndRequired() {
+        val alarm = S.jsonSchema(cat.find("alarm.set")!!).toString()
+        assertTrue("\"hour\":{\"type\":\"integer\"" in alarm, alarm)
+        assertTrue("\"required\":[\"hour\",\"minute\"]" in alarm, alarm)
+        val setting = S.geminiSchema(cat.find("settings.set")!!).toString()
+        assertTrue("\"type\":\"OBJECT\"" in setting)
+        assertTrue("\"enum\":[" in setting)
+    }
+
+    @Test fun argsBecomeStrings() {
+        val json = kotlinx.serialization.json.Json.parseToJsonElement("""{"hour":7,"minute":30,"flag":true,"label":"wake","skip":null}""") as kotlinx.serialization.json.JsonObject
+        assertEquals(mapOf("hour" to "7", "minute" to "30", "flag" to "true", "label" to "wake"), S.argsToStrings(json))
+    }
+}

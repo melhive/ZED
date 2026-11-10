@@ -2,7 +2,9 @@ package com.melhive.zenith.intelligence
 
 import com.melhive.zenith.core.intelligence.ChatTurn
 import com.melhive.zenith.core.intelligence.Role
+import com.melhive.zenith.core.tools.ToolSpec
 import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.json.JsonObject
 
 data class GenerationRequest(
     val system: String,
@@ -14,13 +16,34 @@ data class GenerationRequest(
     val sessionKey: String? = null,
     /** Per-turn context prepended to the newest user message (on-device models only). */
     val volatileContext: String? = null,
+    /** Tools offered through the provider's native function calling (empty = none). */
+    val tools: List<ToolSpec> = emptyList(),
+    /** Tool calls and results earlier in this same turn, replayed in the provider's own format. */
+    val exchanges: List<ToolExchange> = emptyList(),
 )
+
+/** A function call requested by a model. [args] are untrusted until validated. */
+data class ToolCall(
+    val id: String,
+    val name: String,
+    val args: Map<String, String>,
+    val rawArgs: JsonObject,
+    /** The provider's original call part, echoed back verbatim when required (Gemini thought signatures). */
+    val raw: JsonObject? = null,
+)
+
+data class ToolCallResult(val callId: String, val name: String, val content: String, val ok: Boolean)
+
+/** One model step that asked for tools, and what those tools returned. */
+data class ToolExchange(val assistantText: String, val calls: List<ToolCall>, val results: List<ToolCallResult>)
 
 sealed interface GenerationEvent {
     data class Delta(val text: String) : GenerationEvent
     data class Usage(val inputTokens: Int?, val outputTokens: Int?) : GenerationEvent
     data class Done(val stopReason: String?) : GenerationEvent
     data class Error(val message: String, val retryable: Boolean = false) : GenerationEvent
+    /** The model asked to run these tools (complete calls). */
+    data class ToolCalls(val calls: List<ToolCall>) : GenerationEvent
 }
 
 data class ProviderStatus(val ready: Boolean, val detail: String)
@@ -34,6 +57,8 @@ interface IntelligenceProvider {
     val id: String
     val label: String
     val supportsWebSearch: Boolean get() = false
+    /** True when [GenerationRequest.tools] are passed as native function declarations. */
+    val supportsNativeTools: Boolean get() = false
     suspend fun status(): ProviderStatus
     fun generate(request: GenerationRequest): Flow<GenerationEvent>
 }
