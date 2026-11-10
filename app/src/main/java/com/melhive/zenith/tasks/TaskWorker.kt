@@ -97,6 +97,13 @@ class TaskWorker(appContext: Context, params: WorkerParameters) : CoroutineWorke
             engine.log(task.id, "Found ${entries.size} items; ${plan.moves.size} can be sorted, ${plan.skipped.size} left in place")
             if (plan.moves.isEmpty()) return succeed(task, "Nothing to organize — no files with recognized types at the top level.")
             val json = TaskJson.encodeToString(plan.moves.map { PlannedMove(it.fileName, it.targetFolder) })
+            if (com.melhive.zenith.core.security.ConfirmMode.parse(container.settings.current().confirmMode) == com.melhive.zenith.core.security.ConfirmMode.NEVER) {
+                // "Just do it": no plan approval step.
+                engine.transition(task.id, TaskStatus.AWAITING_CONFIRMATION) { it.copy(planJson = json, planSummary = plan.summary()) }
+                engine.log(task.id, "Plan approved automatically (Ask before actions: Never)")
+                engine.confirm(task.id)
+                return Result.success()
+            }
             engine.transition(task.id, TaskStatus.AWAITING_CONFIRMATION) {
                 it.copy(planJson = json, planSummary = plan.summary() + if (plan.skipped.isNotEmpty()) "\n• ${plan.skipped.size} unrecognized files stay where they are" else "",
                     progressCurrent = 0, progressTotal = plan.moves.size.toLong(), progressLabel = "Awaiting your confirmation")

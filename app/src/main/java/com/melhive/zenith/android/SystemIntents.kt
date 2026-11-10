@@ -22,9 +22,8 @@ class SystemIntents(private val context: Context) {
 
     private fun launch(intent: Intent, what: String): Result {
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        if (intent.resolveActivity(context.packageManager) == null) {
-            return Result.Unavailable("No app on this device handles $what")
-        }
+        // No resolveActivity() pre-check: with Android 11+ package visibility it can wrongly report "no app";
+        // starting the activity and catching ActivityNotFoundException is reliable.
         return try {
             context.startActivity(intent); Result.Launched
         } catch (e: ActivityNotFoundException) {

@@ -45,7 +45,8 @@ class AndroidCapabilityChecker(private val context: Context, private val c: AppC
         Capability.NETWORK -> DeviceInfo.snapshot(context).online
         Capability.ONLINE_AI -> this.c.providers.research() != null
         Capability.CLOCK_APP -> intents.canSetAlarms()
-        Capability.CALENDAR_APP -> intents.canInsertEvents()
+        // Events are written directly with calendar access; the editor fallback is tried at run time.
+        Capability.CALENDAR_APP -> true
         Capability.CONTACTS -> PhoneControl(context).hasContactsPermission()
         Capability.NOTIFICATION_ACCESS -> com.melhive.zenith.android.ZenithNotificationListener.hasAccess(context)
         Capability.DND_ACCESS -> PhoneControl(context).hasDndAccess()
@@ -81,7 +82,7 @@ object DefaultConfirmationText : ConfirmationText {
         "docs.index" -> "Index text documents in “${args.stringOrNull("path") ?: "granted folder"}” for local search?"
         "alarm.set" -> "Set an alarm for %02d:%02d%s?".format(args.int("hour"), args.int("minute"), args.stringOrNull("label")?.let { " ($it)" } ?: "")
         "timer.set" -> "Start a ${args.int("seconds")}-second timer?"
-        "calendar.create" -> "Open your calendar with event “${args.string("title")}” at ${args.dateTime("start").pretty()}?"
+        "calendar.create" -> "Add “${args.string("title")}” to your calendar at ${args.dateTime("start").pretty()}?"
         "reminder.create" -> "Remind you “${args.string("text")}” at ${args.dateTime("at").pretty()}?"
         "reminder.cancel" -> "Cancel reminder #${args.int("id")}?"
         "todo.add" -> "Add “${args.string("title")}” to your task list?"
@@ -91,7 +92,7 @@ object DefaultConfirmationText : ConfirmationText {
         "settings.set" -> "Change setting ${args.string("key")} to “${args.string("value")}”?"
         "workflow.run" -> "Run workflow “${args.string("name")}”?"
         "phone.call" -> "Call ${args.string("who")}?"
-        "sms.compose" -> "Write a text to ${args.string("to")}: “${args.string("message")}”? You'll press send yourself."
+        "sms.compose" -> "Text ${args.string("to")}: “${args.string("message")}”?"
         "dnd.set" -> if (args.bool("on")) "Turn on Do Not Disturb?" else "Turn off Do Not Disturb?"
         "home.secure" -> "${args.string("action").replaceFirstChar { it.uppercase() }} ${args.string("target")}?"
         "home.control" -> "${args.string("action").replace('_', ' ').replaceFirstChar { it.uppercase() }} ${args.string("target")}?"
@@ -119,7 +120,11 @@ fun registerExecutors(tm: ToolManager, c: AppContainer, context: Context) {
     tm.register("sms.compose") { a, _ ->
         when (val t = phone.resolve(a.string("to"))) {
             is PhoneControl.Target.Problem -> fail(t.message)
-            is PhoneControl.Target.Number -> if (phone.composeSms(t.number, a.string("message"))) ok("Message to ${t.label} is ready — press send in your messaging app.") else fail("No messaging app is available.")
+            is PhoneControl.Target.Number -> when {
+                phone.sendSms(t.number, a.string("message")) -> ok("Sent to ${t.label}: “${a.string("message")}”")
+                phone.composeSms(t.number, a.string("message")) -> ok("Message to ${t.label} is ready — press send. (Allow “Send texts” to send directly.)")
+                else -> fail("No messaging app is available.")
+            }
         }
     }
     tm.register("app.open") { a, _ -> phone.openApp(a.string("name")).let { if (it.startsWith("Opened")) ok(it) else fail(it) } }
@@ -280,9 +285,18 @@ fun registerExecutors(tm: ToolManager, c: AppContainer, context: Context) {
         val start = a.dateTime("start")
         val end = a.dateTimeOrNull("end")
         if (end != null && !end.isAfter(start)) return@register fail("The event must end after it starts.")
+        val endTime = end ?: start.plusHours(1)
+        val writer = com.melhive.zenith.agents.CalendarWriter(context)
+        val saved = if (writer.granted()) runCatching { writer.insert(a.string("title"), start, endTime, a.stringOrNull("location"), a.stringOrNull("description")) }.getOrNull() else null
+        if (saved != null) {
+            val timeFmt = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
+            return@register ok("Added “${a.string("title")}” to your ${saved.second.name} calendar: ${start.format(DateTimeFormatter.ofPattern("EEEE, MMMM d"))}, " +
+                "${start.format(timeFmt)}–${endTime.format(timeFmt)}" + (a.stringOrNull("location")?.let { " at $it" } ?: "") + ". I'll remind you 10 minutes before.")
+        }
+        // No calendar access yet: fall back to the calendar app's editor.
         when (val r = intents.createEvent(a.string("title"), start, end, a.stringOrNull("location"), a.stringOrNull("description"))) {
-            SystemIntents.Result.Launched -> ok("Opened your calendar with “${a.string("title")}” on ${start.pretty()}. Save it there to confirm.")
-            is SystemIntents.Result.Unavailable -> fail(r.reason)
+            SystemIntents.Result.Launched -> ok("Opened your calendar with “${a.string("title")}” on ${start.pretty()} — tap Save there. To add events directly next time, allow calendar access (Settings → Allow everything).")
+            is SystemIntents.Result.Unavailable -> fail(if (writer.granted()) "I couldn't find a calendar to write to. Add a Google account calendar on this phone." else "Allow calendar access (Settings → Allow everything) so I can add events directly.")
         }
     }
 

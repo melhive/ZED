@@ -39,6 +39,13 @@ object ZenithLaunch {
     fun pending(context: Context, route: String, requestCode: Int): PendingIntent =
         PendingIntent.getActivity(context, requestCode, intent(context, route), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
+    /** The floating assistant overlay (orb + HUD over the current app). */
+    fun overlayIntent(context: Context): Intent =
+        Intent(context, AssistOverlayActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+
+    fun overlayPending(context: Context, requestCode: Int): PendingIntent =
+        PendingIntent.getActivity(context, requestCode, overlayIntent(context), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+
     /** True when ZENITH is the phone's default digital assistant (Android 10+). */
     fun isDefaultAssistant(context: Context): Boolean =
         Build.VERSION.SDK_INT >= 29 && runCatching { context.getSystemService(RoleManager::class.java).isRoleHeld(RoleManager.ROLE_ASSISTANT) }.getOrDefault(false)
@@ -83,8 +90,9 @@ object ZenithLaunch {
 class AssistActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        runCatching { startActivity(ZenithLaunch.intent(this, ZenithLaunch.ROUTE_LIVE)) }
+        runCatching { startActivity(ZenithLaunch.overlayIntent(this)) }
         finish()
+        @Suppress("DEPRECATION") overridePendingTransition(0, 0)
     }
 }
 
@@ -103,8 +111,8 @@ class LiveTileService : TileService() {
     override fun onClick() {
         super.onClick()
         runCatching {
-            if (Build.VERSION.SDK_INT >= 34) startActivityAndCollapse(ZenithLaunch.pending(this, ZenithLaunch.ROUTE_LIVE, 701))
-            else @Suppress("DEPRECATION") startActivityAndCollapse(ZenithLaunch.intent(this, ZenithLaunch.ROUTE_LIVE))
+            if (Build.VERSION.SDK_INT >= 34) startActivityAndCollapse(ZenithLaunch.overlayPending(this, 701))
+            else @Suppress("DEPRECATION") startActivityAndCollapse(ZenithLaunch.overlayIntent(this))
         }.onFailure { com.melhive.zenith.android.CrashReporter.recordNonFatal("tile", it) }
     }
 }
@@ -145,7 +153,7 @@ class ZenithWidgetProvider : AppWidgetProvider() {
                 val views = RemoteViews(context.packageName, R.layout.widget_zenith).apply {
                     setTextViewText(R.id.widget_subtitle, subtitle ?: context.getString(R.string.widget_hint))
                     setOnClickPendingIntent(R.id.widget_root, ZenithLaunch.pending(context, ZenithLaunch.ROUTE_LIVE, 710))
-                    setOnClickPendingIntent(R.id.widget_talk, ZenithLaunch.pending(context, ZenithLaunch.ROUTE_LIVE, 711))
+                    setOnClickPendingIntent(R.id.widget_talk, ZenithLaunch.overlayPending(context, 711))
                     setOnClickPendingIntent(R.id.widget_type, ZenithLaunch.pending(context, ZenithLaunch.ROUTE_CHAT, 712))
                 }
                 manager.updateAppWidget(id, views)

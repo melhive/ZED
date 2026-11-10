@@ -91,6 +91,16 @@ class PhoneControl(private val context: Context) {
         else "No phone app is available."
     }
 
+    /** Sends right away when SMS permission is granted; returns false to fall back to the messaging app. */
+    fun sendSms(number: String, message: String): Boolean {
+        if (!granted(Manifest.permission.SEND_SMS)) return false
+        return runCatching {
+            val sms = if (Build.VERSION.SDK_INT >= 31) context.getSystemService(android.telephony.SmsManager::class.java) else @Suppress("DEPRECATION") android.telephony.SmsManager.getDefault()
+            val parts = sms.divideMessage(message)
+            if (parts.size > 1) sms.sendMultipartTextMessage(number, null, parts, null, null) else sms.sendTextMessage(number, null, message, null, null)
+        }.isSuccess
+    }
+
     fun composeSms(number: String, message: String): Boolean =
         start(Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:" + Uri.encode(number))).putExtra("sms_body", message))
 

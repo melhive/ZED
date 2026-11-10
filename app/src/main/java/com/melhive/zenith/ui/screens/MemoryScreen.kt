@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.padding
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.melhive.zenith.ui.components.EmptyState
 import com.melhive.zenith.ui.components.ZenithCard
@@ -37,10 +38,19 @@ import com.melhive.zenith.ui.theme.ZenithColors
 import kotlinx.coroutines.launch
 
 @Composable
-fun MemoryScreen(onBack: () -> Unit) {
+fun MemoryScreen(onBack: () -> Unit, initialTab: Int = 0) {
     val c = rememberContainer()
     val scope = rememberCoroutineScope()
-    var tab by remember { mutableIntStateOf(0) }
+    var tab by remember { mutableIntStateOf(initialTab) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var scheduleRefresh by remember { mutableIntStateOf(0) }
+    val calendarPermission = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()) { scheduleRefresh++ }
+    val upcoming by androidx.compose.runtime.produceState<List<Pair<java.time.LocalDate, List<String>>>?>(null, tab, scheduleRefresh) {
+        value = if (tab != 4) null else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val cal = com.melhive.zenith.agents.CalendarReader(context)
+            if (!cal.granted()) emptyList() else (0L until 14L).map { java.time.LocalDate.now().plusDays(it) }.map { d -> d to runCatching { cal.events(d) }.getOrDefault(emptyList()) }.filter { it.second.isNotEmpty() }
+        }
+    }
     val facts by c.memory.facts.collectAsStateWithLifecycle(initialValue = emptyList())
     val todos by c.todos.todos.collectAsStateWithLifecycle(initialValue = emptyList())
     val reminders by c.db.reminders().observeAll().collectAsStateWithLifecycle(initialValue = emptyList())
@@ -53,12 +63,37 @@ fun MemoryScreen(onBack: () -> Unit) {
     }) {
         item {
             SecondaryScrollableTabRow(selectedTabIndex = tab, containerColor = ZenithColors.Background, edgePadding = 0.dp) {
-                listOf("Facts", "Task list", "Reminders", "Knowledge").forEachIndexed { i, label ->
+                listOf("Facts", "Task list", "Reminders", "Knowledge", "Schedule").forEachIndexed { i, label ->
                     Tab(selected = tab == i, onClick = { tab = i }, text = { Text(label) })
                 }
             }
         }
         when (tab) {
+            4 -> {
+                item { Text("Your calendar for the next 14 days, plus ZENITH reminders. Say “schedule lunch with Ana tomorrow at noon” to add one.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted) }
+                if (!com.melhive.zenith.agents.CalendarReader(context).granted()) item {
+                    ZenithCard(accent = ZenithColors.Amber) {
+                        Text("Allow calendar access to see and add events here.", style = MaterialTheme.typography.bodyMedium)
+                        TextButton(onClick = { calendarPermission.launch(arrayOf(android.Manifest.permission.READ_CALENDAR, android.Manifest.permission.WRITE_CALENDAR)) }) { Text("Allow calendar") }
+                    }
+                }
+                val list = upcoming
+                if (list != null && list.isEmpty() && com.melhive.zenith.agents.CalendarReader(context).granted()) item { EmptyState("Nothing scheduled", "No calendar events in the next 14 days.") }
+                list?.forEach { (day, events) ->
+                    item(key = "day-$day") {
+                        ZenithCard {
+                            Text(when (day) { java.time.LocalDate.now() -> "Today"; java.time.LocalDate.now().plusDays(1) -> "Tomorrow"; else -> day.format(java.time.format.DateTimeFormatter.ofPattern("EEEE, MMMM d")) },
+                                style = MaterialTheme.typography.titleSmall, color = ZenithColors.Cyan)
+                            events.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp)) }
+                        }
+                    }
+                }
+                val pending = reminders.filter { it.status == "scheduled" && it.triggerAt > System.currentTimeMillis() }
+                if (pending.isNotEmpty()) {
+                    item { Text("ZENITH reminders", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp)) }
+                    items(pending, key = { "r-" + it.id }) { r -> ZenithCard { Text(r.text); Text(formatTime(r.triggerAt), style = MaterialTheme.typography.labelSmall, color = ZenithColors.Muted) } }
+                }
+            }
             0 -> {
                 item { Text("ZENITH only remembers what you explicitly ask it to (“remember that…”), or what you approve when an AI model requests it.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted) }
                 if (facts.isEmpty()) item { EmptyState("No memories", "Say “remember that my sister's name is Ana”.") }

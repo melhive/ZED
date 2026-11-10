@@ -31,6 +31,14 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.14", "2026-11-11", "Just do it — and a floating assistant", listOf(
+            "ZENITH no longer asks “OK?” before acting: everything you say runs immediately (Settings → Ask before actions to change it).",
+            "Calendar events are added directly to your calendar with a 10-minute reminder — and ZENITH tells you exactly what it saved.",
+            "New Schedule page (More → Schedule) with your next 14 days of events and reminders.",
+            "Texts send right away once “Send texts” is allowed; “organize my downloads” no longer waits for approval.",
+            "One-tap “Allow everything” for permissions, so nothing pops up mid-command.",
+            "The assistant gesture, “Hey Zenith” and the Quick Settings tile now open a floating orb with a Jarvis-style HUD over the app you're in — not the whole app.",
+        )),
         Release("0.1.13", "2026-11-10", "A real assistant: control your phone, routines and real-time voice", listOf(
             "Real-time voice with Gemini Live: talk naturally, get instant spoken replies and interrupt any time (Voice settings, needs a Gemini key).",
             "Phone control by voice or chat: call (always confirmed) and text contacts, open apps, play and pause music, volume, flashlight, Do Not Disturb, settings panels, navigation, camera and phone status.",

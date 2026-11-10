@@ -167,3 +167,51 @@ class BriefingComposer(private val context: Context, private val c: AppContainer
         return parts.joinToString("\n\n")
     }
 }
+
+/** Adds events straight into the phone's calendar (no editor, no Save button). */
+class CalendarWriter(private val context: Context) {
+    fun granted() = ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CALENDAR) == PackageManager.PERMISSION_GRANTED &&
+        ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
+
+    data class Target(val id: Long, val name: String)
+
+    /** The primary writable calendar: the phone's own primary flag first, then a Google account, then any visible one. */
+    fun target(): Target? {
+        if (!granted()) return null
+        val c = context.contentResolver.query(
+            CalendarContract.Calendars.CONTENT_URI,
+            arrayOf(CalendarContract.Calendars._ID, CalendarContract.Calendars.CALENDAR_DISPLAY_NAME, CalendarContract.Calendars.IS_PRIMARY, CalendarContract.Calendars.ACCOUNT_TYPE),
+            "${CalendarContract.Calendars.VISIBLE} = 1 AND ${CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL} >= ${CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR}",
+            null, null,
+        ) ?: return null
+        val all = mutableListOf<Triple<Target, Boolean, String>>()
+        c.use { while (it.moveToNext()) all += Triple(Target(it.getLong(0), it.getString(1) ?: "Calendar"), it.getInt(2) == 1, it.getString(3).orEmpty()) }
+        return (all.firstOrNull { it.second } ?: all.firstOrNull { it.third == "com.google" } ?: all.firstOrNull())?.first
+    }
+
+    /** Inserts the event and a 10-minute reminder; returns the new event id. */
+    fun insert(title: String, start: java.time.LocalDateTime, end: java.time.LocalDateTime, location: String?, description: String?): Pair<Long, Target>? {
+        val cal = target() ?: return null
+        val zone = ZoneId.systemDefault()
+        val values = android.content.ContentValues().apply {
+            put(CalendarContract.Events.CALENDAR_ID, cal.id)
+            put(CalendarContract.Events.TITLE, title)
+            put(CalendarContract.Events.DTSTART, start.atZone(zone).toInstant().toEpochMilli())
+            put(CalendarContract.Events.DTEND, end.atZone(zone).toInstant().toEpochMilli())
+            put(CalendarContract.Events.EVENT_TIMEZONE, zone.id)
+            if (!location.isNullOrBlank()) put(CalendarContract.Events.EVENT_LOCATION, location)
+            if (!description.isNullOrBlank()) put(CalendarContract.Events.DESCRIPTION, description)
+            put(CalendarContract.Events.HAS_ALARM, 1)
+        }
+        val uri = context.contentResolver.insert(CalendarContract.Events.CONTENT_URI, values) ?: return null
+        val id = android.content.ContentUris.parseId(uri)
+        runCatching {
+            context.contentResolver.insert(CalendarContract.Reminders.CONTENT_URI, android.content.ContentValues().apply {
+                put(CalendarContract.Reminders.EVENT_ID, id)
+                put(CalendarContract.Reminders.MINUTES, 10)
+                put(CalendarContract.Reminders.METHOD, CalendarContract.Reminders.METHOD_ALERT)
+            })
+        }
+        return id to cal
+    }
+}

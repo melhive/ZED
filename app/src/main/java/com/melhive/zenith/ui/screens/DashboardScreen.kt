@@ -195,6 +195,8 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
             colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ZenithColors.Cyan, unfocusedBorderColor = ZenithColors.Outline),
         )
 
+        AllowEverythingCard()
+
         (update as? UpdateState.Available)?.let { u ->
             ZenithCard(accent = ZenithColors.Green, onClick = { uriHandler.openUri(u.info.apkUrl) }) {
                 SectionTitle("Update available")

@@ -64,6 +64,7 @@ fun MoreScreen(onNavigate: (String) -> Unit) {
         Entry(Routes.MODELS, Icons.Outlined.Psychology, "Model Manager", "On-device models and online providers"),
         Entry(Routes.FILES, Icons.Outlined.Folder, "Files", "Granted folders, browse and organize"),
         Entry(Routes.SKILLS, Icons.Outlined.AutoAwesome, "Skills", "Capabilities ZENITH can use"),
+        Entry(Routes.SCHEDULE, Icons.Outlined.Memory, "Schedule", "Your calendar events and reminders"),
         Entry(Routes.WHATS_NEW, Icons.Outlined.NewReleases, "What's new", "This version's features and every previous version"),
         Entry(Routes.ROUTINES, Icons.Outlined.AutoAwesome, "Routines & briefing", "Good morning, Good night, Focus, Driving and your daily briefing"),
         Entry(Routes.VOICE, Icons.Outlined.RecordVoiceOver, "Voice", "Natural offline voices, speed and pitch"),
@@ -160,7 +161,14 @@ fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
         item {
             ZenithCard {
                 SectionTitle("Safety")
-                SwitchRow("Confirm every change", "Ask before any modifying action, even from native commands (deletes always ask)", settings.confirmAllChanges) { scope.launch { c.settings.setConfirmAllChanges(it) } }
+                Text("Ask before actions", style = MaterialTheme.typography.titleSmall)
+                val mode = com.melhive.zenith.core.security.ConfirmMode.parse(settings.confirmMode)
+                WrapRow {
+                    com.melhive.zenith.core.security.ConfirmMode.entries.forEach { m ->
+                        androidx.compose.material3.FilterChip(selected = m == mode, onClick = { scope.launch { c.settings.setConfirmMode(m.name) } }, label = { Text(m.label) })
+                    }
+                }
+                Text(mode.description, style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
             }
         }
         item {
@@ -429,5 +437,35 @@ private fun SmartHomeCard(savedUrl: String) {
             if (hasToken) TextButton(onClick = { c.secrets.remove(com.melhive.zenith.security.SecretStore.HOME_ASSISTANT_TOKEN); status = "Disconnected." }) { Text("Disconnect") }
         }
         status?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = ZenithColors.Cyan) }
+    }
+}
+
+/** One tap to grant every permission ZENITH can use, so nothing interrupts a command later. */
+@Composable
+fun AllowEverythingCard(alwaysShow: Boolean = false) {
+    val context = LocalContext.current
+    var refresh by remember { mutableIntStateOf(0) }
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycle) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e -> if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) refresh++ }
+        lifecycle.lifecycle.addObserver(obs)
+        onDispose { lifecycle.lifecycle.removeObserver(obs) }
+    }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { refresh++ }
+    val missing = remember(refresh) { PermissionCatalog.missing(context) }
+    val notif = remember(refresh) { com.melhive.zenith.android.ZenithNotificationListener.hasAccess(context) }
+    val dnd = remember(refresh) { com.melhive.zenith.android.PhoneControl(context).hasDndAccess() }
+    val overlay = remember(refresh) { Settings.canDrawOverlays(context) }
+    if (!alwaysShow && missing.isEmpty() && notif && dnd && overlay) return
+    ZenithCard(accent = if (missing.isEmpty()) ZenithColors.Green else ZenithColors.Amber) {
+        SectionTitle("Allow everything")
+        Text("Grant ZENITH's permissions once so commands run instantly — no pop-ups when you ask for something.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
+        if (missing.isNotEmpty()) Button(onClick = { launcher.launch(missing) }, modifier = Modifier.padding(top = 6.dp)) { Text("Allow all permissions (${missing.size})") }
+        else Text("✓ All permissions allowed", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Green)
+        WrapRow {
+            if (!notif) TextButton(onClick = { com.melhive.zenith.android.ZenithNotificationListener.openSettings(context) }) { Text("Notification access") }
+            if (!dnd) TextButton(onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) } }) { Text("Do Not Disturb access") }
+            if (!overlay) TextButton(onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + context.packageName))) } }) { Text("Show over other apps") }
+        }
     }
 }

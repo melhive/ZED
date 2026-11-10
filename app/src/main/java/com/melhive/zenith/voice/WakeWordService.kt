@@ -153,7 +153,8 @@ class WakeWordService : Service() {
         val style = ZenithSounds.Style.parse(c.settings.current().liveSound)
         val foreground = ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
         if (foreground || Settings.canDrawOverlays(this)) {
-            val opened = runCatching { startActivity(ZenithLaunch.intent(this, ZenithLaunch.ROUTE_LIVE)) }.isSuccess
+            // The floating orb over whatever is on screen (not the full app).
+            val opened = runCatching { startActivity(ZenithLaunch.overlayIntent(this)) }.isSuccess
             if (opened) {
                 // LIVE takes the microphone; wait until it is closed again.
                 delay(1500)

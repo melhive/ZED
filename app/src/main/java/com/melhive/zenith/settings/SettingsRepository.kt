@@ -66,6 +66,8 @@ data class AppSettings(
     val homeAssistantUrl: String = "",
     /** "Hey Zenith" wake word listening (foreground service). */
     val wakeWordEnabled: Boolean = false,
+    /** Ask before actions: NEVER (default, just do it), RISKY or ALWAYS — see ConfirmMode. */
+    val confirmMode: String = "NEVER",
     /** 0 = fewer false alarms, 1 = normal, 2 = hears it more easily. */
     val wakeSensitivity: Int = 1,
     val confirmAllChanges: Boolean = false,
@@ -109,6 +111,7 @@ class SettingsRepository(private val context: Context) {
         val hideBeep = booleanPreferencesKey("hide_recognizer_beep")
         val haUrl = stringPreferencesKey("home_assistant_url")
         val wakeWord = booleanPreferencesKey("wake_word")
+        val confirmMode = stringPreferencesKey("confirm_mode")
         val wakeSensitivity = androidx.datastore.preferences.core.intPreferencesKey("wake_sensitivity")
         val confirmAll = booleanPreferencesKey("confirm_all")
         val useKnowledge = booleanPreferencesKey("use_knowledge")
@@ -150,6 +153,8 @@ class SettingsRepository(private val context: Context) {
             hideRecognizerBeep = p[K.hideBeep] ?: true,
             homeAssistantUrl = p[K.haUrl] ?: "",
             wakeWordEnabled = p[K.wakeWord] ?: false,
+            // Users who had "confirm every change" on keep being asked.
+            confirmMode = p[K.confirmMode] ?: if (p[K.confirmAll] == true) "ALWAYS" else "NEVER",
             wakeSensitivity = p[K.wakeSensitivity] ?: 1,
             confirmAllChanges = p[K.confirmAll] ?: defaults.confirmAllChanges,
             useKnowledge = p[K.useKnowledge] ?: defaults.useKnowledge,
@@ -187,6 +192,7 @@ class SettingsRepository(private val context: Context) {
     suspend fun setLastSeenVersion(v: String) = context.dataStore.edit { it[K.lastSeenVersion] = v }
     suspend fun setLiveSound(v: String) = context.dataStore.edit { it[K.liveSound] = v }
     suspend fun setHideRecognizerBeep(v: Boolean) = context.dataStore.edit { it[K.hideBeep] = v }
+    suspend fun setConfirmMode(mode: String) = context.dataStore.edit { it[K.confirmMode] = mode }
     suspend fun setWakeWordEnabled(v: Boolean) = context.dataStore.edit { it[K.wakeWord] = v }
     suspend fun setWakeSensitivity(v: Int) = context.dataStore.edit { it[K.wakeSensitivity] = v.coerceIn(0, 2) }
     suspend fun setHomeAssistantUrl(v: String) = context.dataStore.edit { it[K.haUrl] = v.trim().trimEnd('/') }

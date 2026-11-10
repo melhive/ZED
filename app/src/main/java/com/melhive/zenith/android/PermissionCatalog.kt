@@ -33,14 +33,25 @@ object PermissionCatalog {
         "Optional. Lets ZENITH place a call after you confirm it. Without it, ZENITH opens the dialer and you tap call.",
     )
     val CALENDAR = PermissionInfo(
-        Manifest.permission.READ_CALENDAR, "Calendar",
-        "Lets the morning briefing and “what's on today” read your events. Nothing is changed.",
+        Manifest.permission.READ_CALENDAR, "Calendar (read)",
+        "Lets the briefing, Schedule and “what's on today” read your events.",
+    )
+    val CALENDAR_WRITE = PermissionInfo(
+        Manifest.permission.WRITE_CALENDAR, "Calendar (add events)",
+        "Lets “schedule a meeting tomorrow at 3” add the event directly, without opening the calendar app.",
+    )
+    val SMS = PermissionInfo(
+        Manifest.permission.SEND_SMS, "Send texts",
+        "Lets “text Ana I'm late” send right away. Without it, ZENITH opens your messaging app for you to press send.",
     )
     val LOCATION = PermissionInfo(
         Manifest.permission.ACCESS_COARSE_LOCATION, "Approximate location",
         "Optional. Used only for the weather in your briefing (city-level). You can type a city in Settings instead.",
     )
-    val ALL = listOf(MICROPHONE, NOTIFICATIONS, CONTACTS, CALL_PHONE, CALENDAR, LOCATION)
+    val ALL = listOf(MICROPHONE, NOTIFICATIONS, CONTACTS, CALL_PHONE, CALENDAR, CALENDAR_WRITE, SMS, LOCATION)
+
+    /** Everything not yet granted, for the one-tap "Allow everything" request. */
+    fun missing(context: Context): Array<String> = ALL.filter { applicable(it) && !isGranted(context, it) }.map { it.permission }.toTypedArray()
 
     fun applicable(p: PermissionInfo) = Build.VERSION.SDK_INT >= p.minSdk
 

@@ -80,11 +80,13 @@ class PhoneControlTest {
         val cat = ToolCatalog.DEFAULT
         val model = ToolRequest("x", origin = ToolRequest.Origin.ONLINE_MODEL)
         val native = ToolRequest("x", origin = ToolRequest.Origin.NATIVE)
-        assertFalse(ConfirmationPolicy.requiresConfirmation(cat.find("flashlight.set")!!, model))
-        assertTrue(ConfirmationPolicy.requiresConfirmation(cat.find("flashlight.set")!!, model, confirmAllChanges = true))
-        assertTrue(ConfirmationPolicy.requiresConfirmation(cat.find("phone.call")!!, native))
-        assertTrue(ConfirmationPolicy.requiresConfirmation(cat.find("sms.compose")!!, model))
-        assertFalse(ConfirmationPolicy.requiresConfirmation(cat.find("notifications.recent")!!, model))
+        val M = com.melhive.zenith.core.security.ConfirmMode
+        assertFalse(ConfirmationPolicy.requiresConfirmation(cat.find("flashlight.set")!!, model, M.RISKY))
+        assertTrue(ConfirmationPolicy.requiresConfirmation(cat.find("flashlight.set")!!, model, M.ALWAYS))
+        assertTrue(ConfirmationPolicy.requiresConfirmation(cat.find("phone.call")!!, native, M.RISKY))
+        assertFalse(ConfirmationPolicy.requiresConfirmation(cat.find("phone.call")!!, native, M.NEVER))
+        assertFalse(ConfirmationPolicy.requiresConfirmation(cat.find("sms.compose")!!, model, M.RISKY))
+        assertFalse(ConfirmationPolicy.requiresConfirmation(cat.find("notifications.recent")!!, model, M.ALWAYS))
         // Every tool belongs to a skill.
         for (t in cat.all) assertTrue(SkillRegistry.DEFAULT.skillForTool(t.name) != null, "no skill for ${t.name}")
     }

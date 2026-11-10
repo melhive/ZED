@@ -51,12 +51,19 @@ class SecurityTest {
         val del = catalog.find("file.delete")!!
         val create = catalog.find("file.create")!!
         val read = catalog.find("file.read")!!
-        assertTrue(ConfirmationPolicy.requiresConfirmation(del, ToolRequest("file.delete", origin = Origin.NATIVE)))
-        assertFalse(ConfirmationPolicy.requiresConfirmation(create, ToolRequest("file.create", origin = Origin.NATIVE)))
-        assertTrue(ConfirmationPolicy.requiresConfirmation(create, ToolRequest("file.create", origin = Origin.ONLINE_MODEL)))
-        assertTrue(ConfirmationPolicy.requiresConfirmation(create, ToolRequest("file.create", origin = Origin.LOCAL_MODEL)))
-        assertTrue(ConfirmationPolicy.requiresConfirmation(create, ToolRequest("file.create", origin = Origin.NATIVE), confirmAllChanges = true))
-        assertFalse(ConfirmationPolicy.requiresConfirmation(read, ToolRequest("file.read", origin = Origin.ONLINE_MODEL)))
+        val M = com.melhive.zenith.core.security.ConfirmMode
+        val native = ToolRequest("x", origin = Origin.NATIVE)
+        val model = ToolRequest("x", origin = Origin.ONLINE_MODEL)
+        // NEVER: nothing asks (the user's choice), whoever requested it.
+        assertFalse(ConfirmationPolicy.requiresConfirmation(del, model, M.NEVER))
+        assertFalse(ConfirmationPolicy.requiresConfirmation(create, model, M.NEVER))
+        // RISKY: only destructive tools.
+        assertTrue(ConfirmationPolicy.requiresConfirmation(del, native, M.RISKY))
+        assertFalse(ConfirmationPolicy.requiresConfirmation(create, model, M.RISKY))
+        // ALWAYS: every change, never reads.
+        assertTrue(ConfirmationPolicy.requiresConfirmation(create, native, M.ALWAYS))
+        assertFalse(ConfirmationPolicy.requiresConfirmation(read, model, M.ALWAYS))
+        assertEquals(M.NEVER, M.parse(null))
     }
 
     @Test fun toolCallExtraction() {

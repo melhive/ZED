@@ -94,7 +94,7 @@ class ToolManager(
             audit.record(spec.name, origin, request.args, "denied", "no executor")
         }
 
-        if (ConfirmationPolicy.requiresConfirmation(spec, request, s.confirmAllChanges)) {
+        if (ConfirmationPolicy.requiresConfirmation(spec, request, com.melhive.zenith.core.security.ConfirmMode.parse(s.confirmMode))) {
             val approved = broker.confirm(
                 title = spec.title,
                 message = confirmationText.describe(spec, args) + if (fromModel) "\n\nRequested by the AI model." else "",
