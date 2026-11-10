@@ -4,6 +4,7 @@ import com.melhive.zenith.core.tools.Capability.CALENDAR_APP
 import com.melhive.zenith.core.tools.Capability.CALENDAR_READ
 import com.melhive.zenith.core.tools.Capability.CONTACTS
 import com.melhive.zenith.core.tools.Capability.DND_ACCESS
+import com.melhive.zenith.core.tools.Capability.HOME_ASSISTANT
 import com.melhive.zenith.core.tools.Capability.NOTIFICATION_ACCESS
 import com.melhive.zenith.core.tools.Capability.CLOCK_APP
 import com.melhive.zenith.core.tools.Capability.NETWORK
@@ -187,6 +188,19 @@ class ToolCatalog(specs: List<ToolSpec>) {
                 ToolSpec("routine.run", "Run routine", "Runs one of the user's routines (e.g. Good night, Focus) by name.", listOf(
                     p("name", STRING, "Routine name"),
                 ), MODIFY),
+                // ---- Smart home (Home Assistant) ----
+                ToolSpec("home.status", "Smart home status", "Reports the state of smart-home devices (lights, switches, sensors, climate, locks), optionally filtered by name or room.", listOf(
+                    p("target", STRING, "Device or room name; omit for an overview", required = false),
+                ), READ_ONLY, setOf(HOME_ASSISTANT, NETWORK)),
+                ToolSpec("home.control", "Smart home control", "Turns lights, switches, fans and media on/off or sets brightness or temperature. Plural targets (\"living room lights\") control every match.", listOf(
+                    p("target", STRING, "Device or room name, e.g. bedroom lamp, living room lights"),
+                    p("action", ENUM, "What to do", enumValues = listOf("turn_on", "turn_off", "toggle", "brightness", "temperature")),
+                    p("value", INT, "Brightness percent or temperature", required = false, min = 0, max = 100),
+                ), MODIFY, setOf(HOME_ASSISTANT, NETWORK), lowRisk = true),
+                ToolSpec("home.secure", "Locks and doors", "Locks/unlocks locks, opens/closes doors, gates and covers, arms/disarms alarms. Always confirmed.", listOf(
+                    p("target", STRING, "Device name, e.g. front door, garage"),
+                    p("action", ENUM, "What to do", enumValues = listOf("lock", "unlock", "open", "close", "arm", "disarm")),
+                ), MODIFY, setOf(HOME_ASSISTANT, NETWORK), alwaysConfirm = true),
                 ToolSpec("device.status", "Phone status", "Reports battery, charging, network, storage, volume and Do Not Disturb.", emptyList(), READ_ONLY),
 
                 ToolSpec("web.research", "Research online", "Researches a question online using the configured online AI provider's web search.", listOf(

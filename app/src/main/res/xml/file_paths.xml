@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Photos taken for "What am I looking at?" (app cache only). -->
+    <cache-path name="camera" path="camera/" />
+</paths>

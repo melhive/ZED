@@ -64,6 +64,13 @@ class AppContainer(private val context: Context) {
     val workflows by lazy { WorkflowEngine(db, taskEngine).also { it.briefing = com.melhive.zenith.agents.BriefingComposer(context, this) } }
     val routines by lazy { com.melhive.zenith.agents.RoutineEngine(context, this) }
 
+    /** Home Assistant client when an address and token are configured, else null. */
+    suspend fun homeAssistant(): com.melhive.zenith.android.HomeAssistant? {
+        val url = settings.current().homeAssistantUrl.ifBlank { return null }
+        val token = secrets.get(SecretStore.HOME_ASSISTANT_TOKEN) ?: return null
+        return com.melhive.zenith.android.HomeAssistant(url, token)
+    }
+
     /** A request LIVE should send as soon as it opens (from a notification or shortcut). */
     val livePrompt = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
 

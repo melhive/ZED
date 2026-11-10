@@ -82,14 +82,16 @@ class AssistantOrchestrator(
     val lastUsage: StateFlow<String?> = _lastUsage.asStateFlow()
 
     private var currentJob: Job? = null
+    /** Photo attached to the request being answered (sent with every step of this turn). */
+    @Volatile private var currentImage: com.melhive.zenith.intelligence.ImageInput? = null
 
     /** Returns a routine name when the message is one of the user's routine phrases ("good night"). */
     var routineMatcher: (suspend (String) -> String?)? = null
 
-    fun submit(conversationId: Long, text: String, attachmentName: String? = null, attachmentText: String? = null, voice: Boolean = false, onReply: (AssistantReply) -> Unit = {}): Job {
+    fun submit(conversationId: Long, text: String, attachmentName: String? = null, attachmentText: String? = null, voice: Boolean = false, image: com.melhive.zenith.intelligence.ImageInput? = null, onReply: (AssistantReply) -> Unit = {}): Job {
         currentJob?.cancel()
         val job = appScope.launch {
-            val reply = respond(conversationId, text, attachmentName, attachmentText, voice)
+            val reply = respond(conversationId, text, attachmentName, attachmentText, voice, image)
             onReply(reply)
         }
         currentJob = job
@@ -120,15 +122,22 @@ class AssistantOrchestrator(
         _activity.value = AssistantActivity(p, detail, conv)
     }
 
-    suspend fun respond(conversationId: Long, text: String, attachmentName: String? = null, attachmentText: String? = null, voice: Boolean = false): AssistantReply {
+    suspend fun respond(conversationId: Long, text: String, attachmentName: String? = null, attachmentText: String? = null, voice: Boolean = false, image: com.melhive.zenith.intelligence.ImageInput? = null): AssistantReply {
         val trimmed = text.trim()
         val userContent = if (attachmentText != null) "$trimmed\n\n[Attached file: $attachmentName]\n$attachmentText" else trimmed
-        conversations.addMessage(conversationId, "user", userContent, attachmentName = attachmentName)
+        conversations.addMessage(conversationId, "user", userContent, attachmentName = attachmentName ?: if (image != null) "📷 Photo" else null)
+        currentImage = image
         setPhase(AssistantPhase.THINKING, conv = conversationId)
         _streamingText.value = ""
         return try {
             val provider = providers.active()
-            val reply = if (attachmentText == null) handleNative(conversationId, trimmed, modelAvailable = provider != null) else null
+            if (image != null && (provider == null || provider.id == "local")) {
+                val msg = "Looking at photos needs an online AI (Gemini, OpenAI or Claude). Add a key in Model Manager and set the mode to Auto or Online."
+                conversations.addMessage(conversationId, "assistant", msg, source = "system")
+                setPhase(AssistantPhase.COMPLETED, null, conversationId)
+                return AssistantReply(msg, false, "system")
+            }
+            val reply = if (attachmentText == null && image == null) handleNative(conversationId, trimmed, modelAvailable = provider != null) else null
             val final = reply ?: if (provider != null) handleWithModel(conversationId, provider, voice, trimmed) else nativeConversation(conversationId, trimmed)
             setPhase(if (final.ok) AssistantPhase.COMPLETED else AssistantPhase.ERROR, if (final.ok) null else final.text, conversationId)
             final
@@ -253,6 +262,7 @@ class AssistantOrchestrator(
                 maxOutputTokens = when { isLocal && voice -> 384; isLocal -> 1024; voice -> 1024; else -> 4096 },
                 sessionKey = "conversation-$conversationId",
                 volatileContext = if (isLocal) PromptBuilder.volatileContext(now, knowledgeSnippets) else null,
+                images = if (isLocal) emptyList() else listOfNotNull(currentImage),
             )
             val loading = isLocal && providers.localRuntime.state.value !is LocalModelRuntime.State.Ready
             setPhase(AssistantPhase.THINKING, if (loading) "Loading on-device model (first reply takes longer)…" else provider.label, conversationId)
@@ -317,6 +327,7 @@ class AssistantOrchestrator(
             val request = GenerationRequest(
                 system = system, turns = history, maxOutputTokens = if (voice) 1024 else 4096,
                 sessionKey = "conversation-$conversationId", tools = toolSpecs, exchanges = exchanges.toList(),
+                images = listOfNotNull(currentImage),
             )
             setPhase(AssistantPhase.THINKING, if (step == 1) provider.label else "Step $step…", conversationId)
             var result = stream(conversationId, provider, request, sourceTag)

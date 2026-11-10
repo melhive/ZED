@@ -141,6 +141,7 @@ fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
             PersonalityCard(settings.persona, settings.userTitle, userName) { persona, title -> scope.launch { c.settings.setPersona(persona); c.settings.setUserTitle(title) } }
         }
         item { AssistantShortcutsCard() }
+        item { SmartHomeCard(settings.homeAssistantUrl) }
         item {
             ZenithCard {
                 SectionTitle("Voice")
@@ -393,5 +394,40 @@ private fun AssistantShortcutsCard() {
         }
         Text("Widget: long-press your home screen → Widgets → ZENITH.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
         note?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = ZenithColors.Cyan) }
+    }
+}
+
+@Composable
+private fun SmartHomeCard(savedUrl: String) {
+    val c = rememberContainer()
+    val scope = rememberCoroutineScope()
+    val configured by c.secrets.configured.collectAsStateWithLifecycle()
+    val hasToken = com.melhive.zenith.security.SecretStore.HOME_ASSISTANT_TOKEN in configured
+    var url by remember(savedUrl) { mutableStateOf(savedUrl) }
+    var token by remember { mutableStateOf("") }
+    var status by remember { mutableStateOf<String?>(null) }
+    ZenithCard(accent = if (savedUrl.isNotBlank() && hasToken) ZenithColors.Green else ZenithColors.Muted) {
+        SectionTitle("Smart home (Home Assistant)")
+        Text("Control lights, switches, climate, locks and covers by voice. In Home Assistant open your profile → Security → Long-lived access tokens → Create token.",
+            style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
+        androidx.compose.material3.OutlinedTextField(value = url, onValueChange = { url = it.trim() }, singleLine = true,
+            label = { Text("Address, e.g. http://homeassistant.local:8123") }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp))
+        androidx.compose.material3.OutlinedTextField(value = token, onValueChange = { token = it.trim() }, singleLine = true,
+            label = { Text(if (hasToken) "Token saved — paste to replace" else "Long-lived access token") },
+            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+        if (url.startsWith("http://") && !Regex("^http://(localhost|127\\.|10\\.|192\\.168\\.|172\\.(1[6-9]|2\\d|3[01])\\.|[^/]*\\.local\\b)").containsMatchIn(url))
+            Text("This address isn't on your home network and doesn't use https:// — your token would travel unencrypted.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Amber)
+        WrapRow {
+            Button(onClick = {
+                scope.launch {
+                    c.settings.setHomeAssistantUrl(url)
+                    if (token.isNotBlank()) { c.secrets.put(com.melhive.zenith.security.SecretStore.HOME_ASSISTANT_TOKEN, token); token = "" }
+                    status = "Testing…"
+                    status = runCatching { c.homeAssistant()?.ping() ?: "Add the address and token first." }.fold({ "Connected: $it" }, { "Couldn't connect: ${it.message}" })
+                }
+            }) { Text("Save & test") }
+            if (hasToken) TextButton(onClick = { c.secrets.remove(com.melhive.zenith.security.SecretStore.HOME_ASSISTANT_TOKEN); status = "Disconnected." }) { Text("Disconnect") }
+        }
+        status?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = ZenithColors.Cyan) }
     }
 }

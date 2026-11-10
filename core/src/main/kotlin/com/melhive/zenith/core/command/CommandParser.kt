@@ -200,12 +200,32 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         },
 
         // Phone and device control.
-        Rule(rx("(?:turn|switch) (on|off) (?:the |my )?(?:flash ?light|torch)|(?:turn|switch) (?:the |my )?(?:flash ?light|torch) (on|off)|(?:flash ?light|torch) (on|off)|(?:light|lights) (on)")) { m ->
+        Rule(rx("(?:turn|switch) (on|off) (?:the |my )?(?:flash ?light|torch)|(?:turn|switch) (?:the |my )?(?:flash ?light|torch) (on|off)|(?:flash ?light|torch) (on|off)")) { m ->
             tool("flashlight.set", "on" to onOff(m))
         },
         Rule(rx("(?:turn|switch) (on|off) (?:do not disturb|dnd)|(?:turn|switch) (?:do not disturb|dnd) (on|off)|(enable|disable) (?:do not disturb|dnd)|(?:do not disturb|dnd) (on|off)")) { m ->
             tool("dnd.set", "on" to onOff(m))
         },
+        // Smart home (after flashlight and Do Not Disturb).
+        Rule(rx("(?:turn|switch) (on|off) (?:the |my |all )?(.+)|(?:turn|switch) (?:the |my |all )?(.+?) (on|off)")) { m ->
+            val on = m.groupValues[1].ifEmpty { m.groupValues[4] }.equals("on", true)
+            val target = m.groupValues[2].ifEmpty { m.groupValues[3] }
+            if (Regex("^(?:wi-?fi|bluetooth|internet|data|airplane mode|location|nfc)$", RegexOption.IGNORE_CASE).matches(target)) null
+            else tool("home.control", "target" to target, "action" to if (on) "turn_on" else "turn_off")
+        },
+        Rule(rx("(?:set|dim|change) (?:the )?(thermostat|temperature|ac|aircon|air conditioner|heating)(?: to)? (\\d{1,2})(?: ?°| degrees)?(?: ?c)?")) { m ->
+            tool("home.control", "target" to m.groupValues[1], "action" to "temperature", "value" to m.groupValues[2])
+        },
+        Rule(rx("(?:set|dim|change) (?:the )?(.+? (?:light|lights|lamp|lamps))(?: to)? (\\d{1,3})(?: ?%| percent)?")) { m ->
+            tool("home.control", "target" to m.groupValues[1], "action" to "brightness", "value" to m.groupValues[2])
+        },
+        Rule(rx("(lock|unlock|open|close) (?:the )?(front door|back door|door|garage(?: door)?|gate|blinds|curtains|shutters|.+? (?:door|lock|gate|garage|blinds|curtains|cover))")) { m ->
+            tool("home.secure", "target" to m.groupValues[2], "action" to m.groupValues[1].lowercase())
+        },
+        Rule(rx("(?:is|are) (?:the )?(.+?) (?:on|off|open|closed|locked|unlocked)|(?:what(?:'s| is) the )?(?:status of|state of) (?:the )?(.+)|(?:what(?:'s| is) the )?(?:temperature|humidity) (?:in|inside) (?:the )?(.+)")) { m ->
+            tool("home.status", "target" to m.groupValues.drop(1).first { it.isNotEmpty() })
+        },
+
         Rule(rx("(?:pause|stop)(?: the)?(?: music| song| playback| audio| podcast| video)?")) { tool("media.control", "action" to "pause") },
         Rule(rx("(?:resume|continue|unpause)(?: the)?(?: music| song| playback| podcast)?|play(?: the)? (?:music|song)")) { tool("media.control", "action" to "play") },
         Rule(rx("(?:next|skip)(?: the)?(?: song| track)?|skip (?:this )?(?:song|track)|play (?:the )?next(?: song| track)?")) { tool("media.control", "action" to "next") },

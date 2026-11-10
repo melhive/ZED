@@ -27,6 +27,7 @@ enum class Capability(val label: String) {
     NOTIFICATION_ACCESS("Notification access"),
     DND_ACCESS("Do Not Disturb access"),
     CALENDAR_READ("Calendar read permission"),
+    HOME_ASSISTANT("A connected Home Assistant"),
 }
 
 enum class ParamType { STRING, TEXT, INT, BOOLEAN, ENUM, DATETIME, PATH, FILE_NAME }

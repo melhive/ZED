@@ -62,6 +62,8 @@ data class AppSettings(
     val liveSound: String = "arc",
     /** Mute the speech recognizer's own start beep while LIVE listens. */
     val hideRecognizerBeep: Boolean = true,
+    /** Home Assistant base URL, e.g. http://homeassistant.local:8123 */
+    val homeAssistantUrl: String = "",
     val confirmAllChanges: Boolean = false,
     val useKnowledge: Boolean = true,
     val autoIndex: Boolean = false,
@@ -101,6 +103,7 @@ class SettingsRepository(private val context: Context) {
         val lastSeenVersion = stringPreferencesKey("last_seen_version")
         val liveSound = stringPreferencesKey("live_sound")
         val hideBeep = booleanPreferencesKey("hide_recognizer_beep")
+        val haUrl = stringPreferencesKey("home_assistant_url")
         val confirmAll = booleanPreferencesKey("confirm_all")
         val useKnowledge = booleanPreferencesKey("use_knowledge")
         val autoIndex = booleanPreferencesKey("auto_index")
@@ -139,6 +142,7 @@ class SettingsRepository(private val context: Context) {
             lastSeenVersion = p[K.lastSeenVersion],
             liveSound = p[K.liveSound] ?: defaults.liveSound,
             hideRecognizerBeep = p[K.hideBeep] ?: true,
+            homeAssistantUrl = p[K.haUrl] ?: "",
             confirmAllChanges = p[K.confirmAll] ?: defaults.confirmAllChanges,
             useKnowledge = p[K.useKnowledge] ?: defaults.useKnowledge,
             autoIndex = p[K.autoIndex] ?: defaults.autoIndex,
@@ -175,6 +179,7 @@ class SettingsRepository(private val context: Context) {
     suspend fun setLastSeenVersion(v: String) = context.dataStore.edit { it[K.lastSeenVersion] = v }
     suspend fun setLiveSound(v: String) = context.dataStore.edit { it[K.liveSound] = v }
     suspend fun setHideRecognizerBeep(v: Boolean) = context.dataStore.edit { it[K.hideBeep] = v }
+    suspend fun setHomeAssistantUrl(v: String) = context.dataStore.edit { it[K.haUrl] = v.trim().trimEnd('/') }
     suspend fun setConfirmAllChanges(v: Boolean) = context.dataStore.edit { it[K.confirmAll] = v }
     suspend fun setUseKnowledge(v: Boolean) = context.dataStore.edit { it[K.useKnowledge] = v }
     suspend fun setAutoIndex(v: Boolean) = context.dataStore.edit { it[K.autoIndex] = v }

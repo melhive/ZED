@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.History
@@ -95,6 +96,12 @@ fun ChatScreen(initialConversationId: Long?, onOpenLive: () -> Unit, onOpenModel
     val listState = rememberLazyListState()
 
     val attachLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(vm::attach) }
+    val photo by vm.photo.collectAsStateWithLifecycle()
+    val chatContext = androidx.compose.ui.platform.LocalContext.current
+    var captureUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    val takePhoto = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok -> if (ok) captureUri?.let(vm::attachPhoto) }
+    val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> uri?.let(vm::attachPhoto) }
+    var photoMenu by remember { mutableStateOf(false) }
     val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) vm.toggleVoiceInput() else vm.notice.value = "Microphone permission denied. Voice input is unavailable."
     }
@@ -156,6 +163,10 @@ fun ChatScreen(initialConversationId: Long?, onOpenLive: () -> Unit, onOpenModel
                 IconButton(onClick = { vm.notice.value = null }) { Icon(Icons.Outlined.Close, "Dismiss") }
             }
         }
+        if (photo != null) Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp)) {
+            Text("📷 Photo attached — ask about it", style = MaterialTheme.typography.labelMedium, color = ZenithColors.Teal, modifier = Modifier.weight(1f))
+            IconButton(onClick = { vm.photo.value = null }) { Icon(Icons.Outlined.Close, "Remove photo") }
+        }
         attachment?.let { a ->
             Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 StatusPill("📎 ${a.name} (${a.text.length} chars)", ZenithColors.Teal)
@@ -165,6 +176,19 @@ fun ChatScreen(initialConversationId: Long?, onOpenLive: () -> Unit, onOpenModel
 
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.Bottom) {
             IconButton(onClick = { attachLauncher.launch(arrayOf("text/*", "application/json", "application/xml")) }) { Icon(Icons.Outlined.AttachFile, "Attach document") }
+            androidx.compose.foundation.layout.Box {
+                IconButton(onClick = { photoMenu = true }) { Icon(Icons.Outlined.PhotoCamera, "Add a photo") }
+                androidx.compose.material3.DropdownMenu(expanded = photoMenu, onDismissRequest = { photoMenu = false }) {
+                    androidx.compose.material3.DropdownMenuItem(text = { Text("Take a photo") }, onClick = {
+                        photoMenu = false
+                        runCatching { com.melhive.zenith.intelligence.ImageInput.newCaptureUri(chatContext) }.onSuccess { captureUri = it; takePhoto.launch(it) }
+                    })
+                    androidx.compose.material3.DropdownMenuItem(text = { Text("Choose from gallery") }, onClick = {
+                        photoMenu = false
+                        pickPhoto.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    })
+                }
+            }
             OutlinedTextField(
                 value = if (listening) partial.ifEmpty { "Listening…" } else input,
                 onValueChange = { if (!listening) input = it },
@@ -178,7 +202,7 @@ fun ChatScreen(initialConversationId: Long?, onOpenLive: () -> Unit, onOpenModel
                 if (PermissionCatalog.isGranted(context, PermissionCatalog.MICROPHONE)) vm.toggleVoiceInput()
                 else micPermission.launch(Manifest.permission.RECORD_AUDIO)
             }) { Icon(Icons.Outlined.Mic, "Voice input", tint = if (listening) ZenithColors.Red else ZenithColors.Muted) }
-            IconButton(enabled = !busy && (input.isNotBlank() || attachment != null), onClick = { vm.send(input); input = "" }) {
+            IconButton(enabled = !busy && (input.isNotBlank() || attachment != null || photo != null), onClick = { vm.send(input); input = "" }) {
                 Icon(Icons.AutoMirrored.Outlined.Send, "Send", tint = ZenithColors.Cyan)
             }
         }

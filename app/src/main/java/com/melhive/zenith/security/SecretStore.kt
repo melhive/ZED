@@ -43,6 +43,7 @@ class SecretStore(context: Context, private val cipher: KeystoreCipher = Keystor
     private fun configuredKeys(): Set<String> = prefs.all.keys.toSet()
 
     companion object {
+        const val HOME_ASSISTANT_TOKEN = "home_assistant_token"
         fun apiKeyName(kind: OnlineProviderKind) = "api_key_${kind.name.lowercase()}"
         const val HF_TOKEN = "huggingface_token"
     }

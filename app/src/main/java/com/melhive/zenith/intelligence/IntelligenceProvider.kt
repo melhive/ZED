@@ -20,6 +20,8 @@ data class GenerationRequest(
     val tools: List<ToolSpec> = emptyList(),
     /** Tool calls and results earlier in this same turn, replayed in the provider's own format. */
     val exchanges: List<ToolExchange> = emptyList(),
+    /** Photos attached to the newest user message (vision-capable online models). */
+    val images: List<ImageInput> = emptyList(),
 )
 
 /** A function call requested by a model. [args] are untrusted until validated. */

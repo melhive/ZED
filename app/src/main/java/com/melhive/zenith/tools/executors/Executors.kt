@@ -49,6 +49,7 @@ class AndroidCapabilityChecker(private val context: Context, private val c: AppC
         Capability.CONTACTS -> PhoneControl(context).hasContactsPermission()
         Capability.NOTIFICATION_ACCESS -> com.melhive.zenith.android.ZenithNotificationListener.hasAccess(context)
         Capability.DND_ACCESS -> PhoneControl(context).hasDndAccess()
+        Capability.HOME_ASSISTANT -> this.c.homeAssistant() != null
         Capability.CALENDAR_READ -> androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_CALENDAR) == android.content.pm.PackageManager.PERMISSION_GRANTED
     }
 
@@ -64,6 +65,7 @@ class AndroidCapabilityChecker(private val context: Context, private val c: AppC
         Capability.NOTIFICATION_ACCESS -> "notification access (turn it on in More → Permissions & Diagnostics → What did I miss)"
         Capability.DND_ACCESS -> "Do Not Disturb access (allow it in More → Permissions & Diagnostics)"
         Capability.CALENDAR_READ -> "calendar permission (allow it in More → Permissions & Diagnostics)"
+        Capability.HOME_ASSISTANT -> "Home Assistant connected in Settings → Smart home (address and long-lived token)"
     }
 }
 
@@ -91,6 +93,8 @@ object DefaultConfirmationText : ConfirmationText {
         "phone.call" -> "Call ${args.string("who")}?"
         "sms.compose" -> "Write a text to ${args.string("to")}: “${args.string("message")}”? You'll press send yourself."
         "dnd.set" -> if (args.bool("on")) "Turn on Do Not Disturb?" else "Turn off Do Not Disturb?"
+        "home.secure" -> "${args.string("action").replaceFirstChar { it.uppercase() }} ${args.string("target")}?"
+        "home.control" -> "${args.string("action").replace('_', ' ').replaceFirstChar { it.uppercase() }} ${args.string("target")}?"
         else -> "Allow ${spec.title}?"
     }
 }
@@ -134,6 +138,64 @@ fun registerExecutors(tm: ToolManager, c: AppContainer, context: Context) {
         val items = ZenithNotificationListener.recent(context, a.stringOrNull("app"), hours)
         if (items.isEmpty()) ok("No notifications in the last $hours hours" + (a.stringOrNull("app")?.let { " from $it" } ?: "") + ".")
         else ok("${items.size} notification(s) in the last $hours hours (newest first):\n" + ZenithNotificationListener.describe(items))
+    }
+
+    // ---- Smart home ----
+    tm.register("home.status") { a, _ ->
+        val ha = c.homeAssistant() ?: return@register fail("Home Assistant isn't connected.")
+        val all = ha.states()
+        val target = a.stringOrNull("target")
+        val list = if (target == null) all.filter { it.domain in setOf("light", "switch", "climate", "lock", "cover", "fan") }
+            else com.melhive.zenith.android.HomeAssistant.match(all, target, secure = false) + com.melhive.zenith.android.HomeAssistant.match(all, target, secure = true) +
+                all.filter { it.domain == "sensor" && it.name.contains(target, ignoreCase = true) }
+        if (list.isEmpty()) fail("No smart-home device matches “${target ?: "anything"}”.")
+        else ok(list.distinctBy { it.id }.take(30).joinToString("\n") { "• " + com.melhive.zenith.android.HomeAssistant.describe(it) })
+    }
+    tm.register("home.control") { a, _ ->
+        val ha = c.homeAssistant() ?: return@register fail("Home Assistant isn't connected.")
+        val target = a.string("target")
+        val matches = com.melhive.zenith.android.HomeAssistant.match(ha.states(), target, secure = false)
+        val plural = Regex("(lights|lamps|switches|fans)$|^all ", RegexOption.IGNORE_CASE).containsMatchIn(target.trim())
+        if (matches.isEmpty()) return@register fail("I couldn't find “$target” in Home Assistant.")
+        if (!plural && matches.size > 1) return@register fail("Several devices match “$target”: ${matches.take(6).joinToString { it.name }}. Which one?")
+        val action = a.string("action")
+        val value = a.intOrNull("value")?.toInt()
+        for ((domain, group) in matches.groupBy { it.domain }) {
+            val ids = group.map { it.id }
+            when (action) {
+                "brightness" -> ha.call("light", "turn_on", ids, mapOf("brightness_pct" to (value ?: 50)))
+                "temperature" -> ha.call("climate", "set_temperature", ids, mapOf("temperature" to (value ?: 22)))
+                "toggle" -> ha.call(if (domain in setOf("scene", "script")) domain else "homeassistant", "toggle", ids)
+                else -> {
+                    val svc = if (domain in setOf("scene", "script")) "turn_on" else action
+                    ha.call(if (domain == "media_player" || domain == "climate" || domain == "scene" || domain == "script") domain else "homeassistant", svc, ids)
+                }
+            }
+        }
+        val names = matches.joinToString { it.name }
+        ok(when (action) {
+            "brightness" -> "Set $names to ${value ?: 50}% brightness."
+            "temperature" -> "Set $names to ${value ?: 22}°."
+            "turn_on" -> "Turned on $names."
+            "turn_off" -> "Turned off $names."
+            else -> "Toggled $names."
+        })
+    }
+    tm.register("home.secure") { a, _ ->
+        val ha = c.homeAssistant() ?: return@register fail("Home Assistant isn't connected.")
+        val target = a.string("target")
+        val matches = com.melhive.zenith.android.HomeAssistant.match(ha.states(), target, secure = true)
+        if (matches.isEmpty()) return@register fail("I couldn't find a lock, door or cover called “$target”.")
+        if (matches.size > 1) return@register fail("Several devices match “$target”: ${matches.take(6).joinToString { it.name }}. Which one?")
+        val e = matches.first()
+        val action = a.string("action")
+        val (domain, svc) = when (e.domain) {
+            "lock" -> "lock" to (if (action in setOf("unlock", "open")) "unlock" else "lock")
+            "cover" -> "cover" to (if (action in setOf("open", "unlock")) "open_cover" else "close_cover")
+            else -> "alarm_control_panel" to (if (action in setOf("disarm", "unlock", "open")) "alarm_disarm" else "alarm_arm_away")
+        }
+        ha.call(domain, svc, listOf(e.id))
+        ok("${e.name}: ${svc.replace("alarm_", "").replace("_cover", "").replace('_', ' ')} requested.")
     }
 
     // ---- Briefing, weather, agenda, routines ----

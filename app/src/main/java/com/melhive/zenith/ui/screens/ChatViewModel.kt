@@ -49,6 +49,15 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     val lastUsage = c.orchestrator.lastUsage
 
     val attachment = MutableStateFlow<Attachment?>(null)
+    /** Photo to send with the next message ("what's in this picture?"). */
+    val photo = MutableStateFlow<com.melhive.zenith.intelligence.ImageInput?>(null)
+
+    fun attachPhoto(uri: android.net.Uri) {
+        viewModelScope.launch {
+            runCatching { com.melhive.zenith.intelligence.ImageInput.fromUri(getApplication(), uri) }
+                .onSuccess { photo.value = it }.onFailure { notice.value = "Couldn't use that photo: ${it.message}" }
+        }
+    }
     val listening = MutableStateFlow(false)
     val voicePartial = MutableStateFlow("")
     val notice = MutableStateFlow<String?>(null)
@@ -84,9 +93,12 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     fun send(text: String, viaVoice: Boolean = false) {
         val id = _conversationId.value ?: return
         val att = attachment.value
-        if (text.isBlank() && att == null) return
+        val img = photo.value
+        if (text.isBlank() && att == null && img == null) return
         attachment.value = null
-        c.orchestrator.submit(id, text.ifBlank { "Please review the attached file." }, att?.name, att?.text, voice = viaVoice) { reply ->
+        photo.value = null
+        val prompt = text.ifBlank { if (img != null) "What do you see in this photo?" else "Please review the attached file." }
+        c.orchestrator.submit(id, prompt, att?.name, att?.text, voice = viaVoice, image = img) { reply ->
             viewModelScope.launch {
                 val s = c.settings.current()
                 if (viaVoice && s.voiceResponses && reply.text.isNotBlank()) {

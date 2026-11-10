@@ -88,4 +88,19 @@ class PhoneControlTest {
         // Every tool belongs to a skill.
         for (t in cat.all) assertTrue(SkillRegistry.DEFAULT.skillForTool(t.name) != null, "no skill for ${t.name}")
     }
+
+    @Test fun smartHome() {
+        assertEquals("home.control" to mapOf("target" to "living room lights", "action" to "turn_off"), tool("turn off the living room lights"))
+        assertEquals("home.control" to mapOf("target" to "bedroom fan", "action" to "turn_on"), tool("switch the bedroom fan on"))
+        assertEquals("home.control" to mapOf("target" to "kitchen lights", "action" to "brightness", "value" to "30"), tool("dim the kitchen lights to 30%"))
+        assertEquals("home.control" to mapOf("target" to "thermostat", "action" to "temperature", "value" to "22"), tool("set the thermostat to 22 degrees"))
+        assertEquals("home.secure" to mapOf("target" to "front door", "action" to "lock"), tool("lock the front door"))
+        assertEquals("home.secure" to mapOf("target" to "garage", "action" to "open"), tool("open the garage"))
+        assertEquals("home.status" to mapOf("target" to "front door"), tool("is the front door locked"))
+        // Phone features keep their own commands.
+        assertEquals("flashlight.set", tool("turn on the flashlight").first)
+        assertEquals("dnd.set", tool("turn off do not disturb").first)
+        assertEquals("camera.open", tool("open the camera").first)
+        assertIs<ParsedCommand.NotACommand>(parser.parse("turn on wifi"))
+    }
 }

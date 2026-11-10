@@ -161,6 +161,7 @@ dependencies {
     implementation(libs.litertlm.android)
     implementation(files(sherpaAar))
     implementation(libs.commons.compress)
+    implementation(libs.androidx.exifinterface)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)

@@ -60,10 +60,17 @@ class OpenAiProvider(
             put(if (isOfficial) "max_completion_tokens" else "max_tokens", request.maxOutputTokens)
             putJsonArray("messages") {
                 addJsonObject { put("role", "system"); put("content", request.system) }
-                for (t in normalizeTurns(request.turns)) addJsonObject {
+                val turns = normalizeTurns(request.turns)
+                val lastUser = turns.indexOfLast { it.role == Role.USER }
+                turns.forEachIndexed { i, t -> addJsonObject {
                     put("role", if (t.role == Role.ASSISTANT) "assistant" else "user")
-                    put("content", t.content)
-                }
+                    if (i == lastUser && request.images.isNotEmpty()) putJsonArray("content") {
+                        addJsonObject { put("type", "text"); put("text", t.content) }
+                        for (img in request.images) addJsonObject {
+                            put("type", "image_url"); putJsonObject("image_url") { put("url", "data:${img.mimeType};base64,${img.base64}") }
+                        }
+                    } else put("content", t.content)
+                } }
                 for (ex in request.exchanges) {
                     addJsonObject {
                         put("role", "assistant")
@@ -196,10 +203,18 @@ class AnthropicProvider(
                 }
             }
             putJsonArray("messages") {
-                for (t in normalizeTurns(request.turns)) addJsonObject {
+                val turns = normalizeTurns(request.turns)
+                val lastUser = turns.indexOfLast { it.role == Role.USER }
+                turns.forEachIndexed { i, t -> addJsonObject {
                     put("role", if (t.role == Role.ASSISTANT) "assistant" else "user")
-                    put("content", t.content)
-                }
+                    if (i == lastUser && request.images.isNotEmpty()) putJsonArray("content") {
+                        for (img in request.images) addJsonObject {
+                            put("type", "image")
+                            putJsonObject("source") { put("type", "base64"); put("media_type", img.mimeType); put("data", img.base64) }
+                        }
+                        addJsonObject { put("type", "text"); put("text", t.content) }
+                    } else put("content", t.content)
+                } }
                 for (ex in request.exchanges) {
                     addJsonObject {
                         put("role", "assistant")
@@ -295,10 +310,17 @@ class GeminiProvider(
         val body = buildJsonObject {
             putJsonObject("systemInstruction") { putJsonArray("parts") { addJsonObject { put("text", request.system) } } }
             putJsonArray("contents") {
-                for (t in normalizeTurns(request.turns)) addJsonObject {
+                val turns = normalizeTurns(request.turns)
+                val lastUser = turns.indexOfLast { it.role == Role.USER }
+                turns.forEachIndexed { i, t -> addJsonObject {
                     put("role", if (t.role == Role.ASSISTANT) "model" else "user")
-                    putJsonArray("parts") { addJsonObject { put("text", t.content) } }
-                }
+                    putJsonArray("parts") {
+                        addJsonObject { put("text", t.content) }
+                        if (i == lastUser) for (img in request.images) addJsonObject {
+                            putJsonObject("inlineData") { put("mimeType", img.mimeType); put("data", img.base64) }
+                        }
+                    }
+                } }
                 for (ex in request.exchanges) {
                     addJsonObject {
                         put("role", "model")

@@ -348,13 +348,23 @@ class LiveSessionController(
         else listen()
     }
 
-    private fun submit(text: String) {
+    /** "What am I looking at?": sends a photo with a question. */
+    fun submitImage(image: com.melhive.zenith.intelligence.ImageInput, prompt: String) {
+        if (!_state.value.active) return
+        rt?.let { it.sendImage(image); it.sendText(prompt); return }
+        listenJob?.cancel(); stt?.cancel(); monitor?.stop()
+        tts?.stop(); pendingUtterances.clear()
+        if (!replyFinished) { requestJob?.cancel(); orchestrator.cancelCurrent() }
+        submit("📷 $prompt", image)
+    }
+
+    private fun submit(text: String, image: com.melhive.zenith.intelligence.ImageInput? = null) {
         val conv = conversationId ?: return
         _state.update { it.copy(transcript = it.transcript + LiveTurn(true, text)) }
         setOrb(OrbState.THINKING)
         streamText = ""; spokenChars = 0; replyFinished = false
         requestJob = scope?.launch {
-            val reply = try { orchestrator.respond(conv, text, voice = true) } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            val reply = try { orchestrator.respond(conv, text.removePrefix("📷 "), voice = true, image = image) } catch (e: kotlinx.coroutines.CancellationException) { throw e }
             onReply(reply)
         }
     }

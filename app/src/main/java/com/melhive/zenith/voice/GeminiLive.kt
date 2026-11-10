@@ -350,6 +350,12 @@ class GeminiLiveSession(
         ws?.send(buildJsonObject { putJsonObject("realtimeInput") { put("text", text) } }.toString())
     }
 
+    /** Shows the model a photo (as a video frame) in the live session. */
+    fun sendImage(image: com.melhive.zenith.intelligence.ImageInput) {
+        if (!setupDone) return
+        ws?.send(buildJsonObject { putJsonObject("realtimeInput") { putJsonObject("video") { put("data", image.base64); put("mimeType", image.mimeType) } } }.toString())
+    }
+
     fun close() {
         if (closed) return
         closed = true

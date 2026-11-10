@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Home Assistant usually runs on plain HTTP inside the home network (e.g. http://homeassistant.local:8123).
+     AI providers are restricted to HTTPS in code; only localhost may use HTTP there. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

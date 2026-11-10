@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.MicOff
 import androidx.compose.material.icons.outlined.StopCircle
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.automirrored.outlined.VolumeOff
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material3.FilledTonalIconButton
@@ -62,6 +63,7 @@ import com.melhive.zenith.ui.components.ZenithOrb
 import com.melhive.zenith.ui.navigation.rememberContainer
 import com.melhive.zenith.ui.theme.ZenithColors
 import com.melhive.zenith.voice.OrbState
+import kotlinx.coroutines.launch
 
 @Composable
 fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit) {
@@ -77,6 +79,15 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit) {
     // Fallback: the phone's own voice-typing popup (works even when background recognition fails).
     val systemVoice = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let { live.submitText(it) }
+    }
+    val liveScope = androidx.compose.runtime.rememberCoroutineScope()
+    var liveCapture by remember { mutableStateOf<android.net.Uri?>(null) }
+    val liveCamera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        val uri = liveCapture
+        if (ok && uri != null) liveScope.launch {
+            runCatching { com.melhive.zenith.intelligence.ImageInput.fromUri(context, uri) }
+                .onSuccess { live.submitImage(it, "What am I looking at?") }
+        }
     }
     var typing by remember { mutableStateOf(false) }
     var typed by remember { mutableStateOf("") }
@@ -160,6 +171,11 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit) {
                 }
                 FilledTonalIconButton(onClick = live::toggleSpeaker, modifier = Modifier.size(56.dp)) {
                     Icon(if (state.speakerOn) Icons.AutoMirrored.Outlined.VolumeUp else Icons.AutoMirrored.Outlined.VolumeOff, if (state.speakerOn) "Mute voice replies" else "Enable voice replies")
+                }
+                FilledTonalIconButton(onClick = {
+                    runCatching { com.melhive.zenith.intelligence.ImageInput.newCaptureUri(context) }.onSuccess { liveCapture = it; liveCamera.launch(it) }
+                }, modifier = Modifier.size(56.dp)) {
+                    Icon(Icons.Outlined.PhotoCamera, "What am I looking at? Take a photo")
                 }
                 FilledTonalIconButton(onClick = live::cancelRequest, modifier = Modifier.size(56.dp)) {
                     Icon(Icons.Outlined.StopCircle, "Cancel current request")
