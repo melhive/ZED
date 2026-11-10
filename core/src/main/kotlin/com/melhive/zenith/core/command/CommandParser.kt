@@ -66,6 +66,10 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
     private fun tool(name: String, vararg args: Pair<String, String?>): ParsedCommand =
         ParsedCommand.Tool(ToolRequest(name, args.filter { !it.second.isNullOrBlank() }.associate { it.first to clean(it.second!!) }, ToolRequest.Origin.NATIVE))
 
+    /** First non-empty group of an on/off match as "true"/"false". */
+    private fun onOff(m: MatchResult): String =
+        if (m.groupValues.drop(1).first { it.isNotEmpty() }.lowercase() in setOf("on", "enable")) "true" else "false"
+
     private fun clean(s: String): String = s.trim().removeSurrounding("\"").removeSurrounding("'").removeSurrounding("“", "”").trim()
 
     private val timeKeywords = Regex("\\b(in|at|on|tomorrow|today|tonight)\\b", RegexOption.IGNORE_CASE)
@@ -186,6 +190,51 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         Rule(rx("(?:run |start |give me |show )?(?:my |the )?(?:morning|daily) (?:briefing|brief|summary)|brief me")) { tool("workflow.run", "name" to "morning briefing") },
         Rule(rx("(?:run|start|execute) (?:the )?workflow (.+)|(?:run|start|execute) (?:the |my )?(.+?) workflow")) { m -> tool("workflow.run", "name" to m.groupValues[1].ifEmpty { m.groupValues[2] }) },
 
+        // Routines and weather.
+        Rule(rx("(?:run|start|activate|begin|do) (?:my |the )?(.+?) routine")) { m -> tool("routine.run", "name" to m.groupValues[1]) },
+        Rule(rx("(?:what(?:'s| is) the |how(?:'s| is) the |check the |today's )?weather(?: like)?(?: (?:today|now|outside))?(?: (?:in|at|for) (.+?))?(?: (?:today|now))?|(?:is it|will it) (?:going to )?rain(?: today)?(?: in (.+))?")) { m ->
+            tool("weather.get", "place" to m.groupValues[1].ifEmpty { m.groupValues[2] })
+        },
+        Rule(rx("what(?:'s| is) (?:on )?(?:my )?(?:calendar|agenda|schedule)(?: for)? (today|tomorrow)|what(?:'s| is) on (today|tomorrow)|(?:my )?(?:agenda|schedule|calendar) (?:for )?(today|tomorrow)|what do i have (today|tomorrow)")) { m ->
+            tool("calendar.today", "date" to m.groupValues.drop(1).first { it.isNotEmpty() }.lowercase())
+        },
+
+        // Phone and device control.
+        Rule(rx("(?:turn|switch) (on|off) (?:the |my )?(?:flash ?light|torch)|(?:turn|switch) (?:the |my )?(?:flash ?light|torch) (on|off)|(?:flash ?light|torch) (on|off)|(?:light|lights) (on)")) { m ->
+            tool("flashlight.set", "on" to onOff(m))
+        },
+        Rule(rx("(?:turn|switch) (on|off) (?:do not disturb|dnd)|(?:turn|switch) (?:do not disturb|dnd) (on|off)|(enable|disable) (?:do not disturb|dnd)|(?:do not disturb|dnd) (on|off)")) { m ->
+            tool("dnd.set", "on" to onOff(m))
+        },
+        Rule(rx("(?:pause|stop)(?: the)?(?: music| song| playback| audio| podcast| video)?")) { tool("media.control", "action" to "pause") },
+        Rule(rx("(?:resume|continue|unpause)(?: the)?(?: music| song| playback| podcast)?|play(?: the)? (?:music|song)")) { tool("media.control", "action" to "play") },
+        Rule(rx("(?:next|skip)(?: the)?(?: song| track)?|skip (?:this )?(?:song|track)|play (?:the )?next(?: song| track)?")) { tool("media.control", "action" to "next") },
+        Rule(rx("(?:previous|last) (?:song|track)|play (?:the )?previous(?: song| track)?|go back a (?:song|track)")) { tool("media.control", "action" to "previous") },
+        Rule(rx("play (.+?)(?: on (?:spotify|youtube music|youtube|my phone))?")) { m -> tool("music.play", "query" to m.groupValues[1]) },
+        Rule(rx("(?:turn|crank) (?:the )?(?:volume|sound|it) (up|down)|volume (up|down)|(?:turn it|make it) (louder|quieter|softer)")) { m ->
+            val dir = listOf(m.groupValues[1], m.groupValues[2], m.groupValues[3]).first { it.isNotEmpty() }.lowercase()
+            tool("volume.set", "action" to if (dir == "up" || dir == "louder") "up" else "down")
+        },
+        Rule(rx("(?:set|change|put) (?:the )?(media |ring(?:er)? |alarm |notification )?volume (?:to |at )?(\\d{1,3})(?: ?%| percent)?")) { m ->
+            val stream = m.groupValues[1].trim().lowercase().removeSuffix("er").takeIf { it.isNotEmpty() }
+            tool("volume.set", "action" to "set", "level" to m.groupValues[2], "stream" to stream)
+        },
+        Rule(rx("(mute|unmute)(?: the)?(?: phone| sound| volume| media| music)?")) { m -> tool("volume.set", "action" to m.groupValues[1].lowercase()) },
+        Rule(rx("what did i miss|(?:any|do i have any) (?:new )?notifications|(?:read|check|show)(?: me)? (?:my )?notifications|(?:what are|summari[sz]e) my notifications")) { tool("notifications.recent") },
+        Rule(rx("(?:how much |what(?:'s| is) (?:my |the )?)?battery(?: level| status| left| percentage)?(?: left)?|phone status|device status|how(?:'s| is) my phone(?: doing)?")) { tool("device.status") },
+        Rule(rx("(?:open |show )?(?:the |my )?(wi-?fi|bluetooth|internet|nfc|location|battery|display|airplane mode|notification|app)s? settings")) { m ->
+            val panel = m.groupValues[1].lowercase().replace("-", "").replace(" mode", "").let { if (it == "notification") "notifications" else if (it == "app") "apps" else it }
+            tool("settings.panel", "panel" to panel)
+        },
+        Rule(rx("(?:take|snap) a (?:photo|picture|selfie|pic)|open (?:the )?camera|(record|take) a video")) { m -> tool("camera.open", "mode" to if (m.groupValues[1].isNotEmpty()) "video" else "photo") },
+        Rule(rx("(?:navigate|directions|take me|drive me|route me) (?:to )?(.+)|how do i get to (.+)")) { m -> tool("maps.navigate", "destination" to m.groupValues[1].ifEmpty { m.groupValues[2] }) },
+        Rule(rx("(?:call|phone|ring|dial) (.+?)(?: (?:on|using) (?:speaker|speakerphone))?")) { m ->
+            val who = m.groupValues[1]
+            if (who.lowercase().startsWith("me ") || who.equals("me", true)) null else tool("phone.call", "who" to who)
+        },
+        Rule(rx("(?:send (?:a )?(?:text|message|sms) to|text|message|sms) (.+?)(?:,|:| saying| that says| to say| that) (.+)")) { m -> tool("sms.compose", "to" to m.groupValues[1], "message" to m.groupValues[2]) },
+        Rule(rx("(?:google|search google for|look up on google) (.+)|(?:open|go to) ((?:https?://)?[\\w-]+(?:\\.[\\w-]+)+(?:/\\S*)?)")) { m -> tool("web.open", "query" to m.groupValues[1].ifEmpty { m.groupValues[2] }) },
+
         // Files and folders.
         Rule(rx("(?:organi[sz]e|sort|tidy(?: up)?|clean up) (.*)")) { m -> tool("files.organize", "path" to normalizeFolderWords(m.groupValues[1])) },
         Rule(rx("(?:create|make|new) (?:a |an )?(?:new )?(?:folder|directory) (?:called |named )?(.+)")) { m -> tool("folder.create", "path" to m.groupValues[1]) },
@@ -199,6 +248,7 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         Rule(rx("move (.+?) (?:to|into) (?:the )?(?:folder )?(.+)")) { m -> tool("file.move", "source" to m.groupValues[1], "destination" to m.groupValues[2]) },
         Rule(rx("copy (.+?) (?:to|into) (?:the )?(?:folder )?(.+)")) { m -> tool("file.copy", "source" to m.groupValues[1], "destination" to m.groupValues[2]) },
         Rule(rx("rename (.+?) (?:to|as) (.+)")) { m -> tool("file.rename", "path" to m.groupValues[1], "new_name" to m.groupValues[2]) },
+        Rule(rx("(?:open|launch|start) (?:the )?(?:app )?(.+?)(?: app)?")) { m -> tool("app.open", "name" to m.groupValues[1]) },
         Rule(rx("(?:delete|remove|erase|trash) (?:the )?(?:file |folder |document )?(.+)")) { m -> tool("file.delete", "path" to m.groupValues[1]) },
     )
 

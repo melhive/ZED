@@ -15,7 +15,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        requestedRoute.value = intent?.getStringExtra(EXTRA_ROUTE)
+        requestedRoute.value = route(intent)
         setContent {
             ZenithTheme {
                 ZenithRoot(requestedRoute = requestedRoute.value, onRouteConsumed = { requestedRoute.value = null })
@@ -26,7 +26,17 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        requestedRoute.value = intent.getStringExtra(EXTRA_ROUTE)
+        requestedRoute.value = route(intent)
+    }
+
+    /** "live:<prompt>" opens LIVE and sends the prompt (e.g. the briefing notification). */
+    private fun route(intent: Intent?): String? {
+        val r = intent?.getStringExtra(EXTRA_ROUTE) ?: return null
+        if (r.startsWith("live:")) {
+            (application as ZenithApp).container.livePrompt.value = r.removePrefix("live:")
+            return "live"
+        }
+        return r
     }
 
     companion object { const val EXTRA_ROUTE = "route" }

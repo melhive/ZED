@@ -27,6 +27,7 @@ class ZenithApp : Application() {
             runCatching { container.conversations.recoverInterrupted() }
             runCatching { container.taskEngine.recover() }
             runCatching { container.reminderScheduler.rescheduleAll() }
+            runCatching { container.routines.scheduleAll() }
             runCatching { container.audit.prune() }
             // Keep the home-screen widget's next reminder and task count current.
             launch {

@@ -5,6 +5,8 @@ import com.melhive.zenith.AppContainer
 import com.melhive.zenith.android.DeviceInfo
 import com.melhive.zenith.android.Notifications
 import com.melhive.zenith.android.PermissionCatalog
+import com.melhive.zenith.android.PhoneControl
+import com.melhive.zenith.android.ZenithNotificationListener
 import com.melhive.zenith.android.SystemIntents
 import com.melhive.zenith.core.tools.Capability
 import com.melhive.zenith.core.tools.ToolRequest
@@ -44,6 +46,10 @@ class AndroidCapabilityChecker(private val context: Context, private val c: AppC
         Capability.ONLINE_AI -> this.c.providers.research() != null
         Capability.CLOCK_APP -> intents.canSetAlarms()
         Capability.CALENDAR_APP -> intents.canInsertEvents()
+        Capability.CONTACTS -> PhoneControl(context).hasContactsPermission()
+        Capability.NOTIFICATION_ACCESS -> com.melhive.zenith.android.ZenithNotificationListener.hasAccess(context)
+        Capability.DND_ACCESS -> PhoneControl(context).hasDndAccess()
+        Capability.CALENDAR_READ -> androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_CALENDAR) == android.content.pm.PackageManager.PERMISSION_GRANTED
     }
 
     override fun explain(c: Capability): String = when (c) {
@@ -54,6 +60,10 @@ class AndroidCapabilityChecker(private val context: Context, private val c: AppC
         Capability.ONLINE_AI -> "an online AI provider with web search (Gemini, OpenAI or Claude) configured in Model Manager"
         Capability.CLOCK_APP -> "a clock app that accepts alarm requests"
         Capability.CALENDAR_APP -> "a calendar app"
+        Capability.CONTACTS -> "contacts permission (allow it in More → Permissions & Diagnostics)"
+        Capability.NOTIFICATION_ACCESS -> "notification access (turn it on in More → Permissions & Diagnostics → What did I miss)"
+        Capability.DND_ACCESS -> "Do Not Disturb access (allow it in More → Permissions & Diagnostics)"
+        Capability.CALENDAR_READ -> "calendar permission (allow it in More → Permissions & Diagnostics)"
     }
 }
 
@@ -78,6 +88,9 @@ object DefaultConfirmationText : ConfirmationText {
         "memory.forget" -> "Forget all memories matching “${args.string("query")}”?"
         "settings.set" -> "Change setting ${args.string("key")} to “${args.string("value")}”?"
         "workflow.run" -> "Run workflow “${args.string("name")}”?"
+        "phone.call" -> "Call ${args.string("who")}?"
+        "sms.compose" -> "Write a text to ${args.string("to")}: “${args.string("message")}”? You'll press send yourself."
+        "dnd.set" -> if (args.bool("on")) "Turn on Do Not Disturb?" else "Turn off Do Not Disturb?"
         else -> "Allow ${spec.title}?"
     }
 }
@@ -85,6 +98,59 @@ object DefaultConfirmationText : ConfirmationText {
 /** Wires every tool in the catalog to its Android implementation. */
 fun registerExecutors(tm: ToolManager, c: AppContainer, context: Context) {
     val intents = SystemIntents(context)
+
+    // ---- Phone and device control ----
+    val phone = PhoneControl(context)
+    tm.register("contacts.find") { a, _ ->
+        val found = phone.findContacts(a.string("name"))
+        if (found.isEmpty()) ok("No contacts match “${a.string("name")}”.")
+        else ok("Contacts matching “${a.string("name")}”:\n" + found.joinToString("\n") { "• ${it.name} — ${it.number}${if (it.type.isNotBlank()) " (${it.type})" else ""}" })
+    }
+    tm.register("phone.call") { a, _ ->
+        when (val t = phone.resolve(a.string("who"))) {
+            is PhoneControl.Target.Problem -> fail(t.message)
+            is PhoneControl.Target.Number -> ok("${phone.call(t.number)} ${t.label}")
+        }
+    }
+    tm.register("sms.compose") { a, _ ->
+        when (val t = phone.resolve(a.string("to"))) {
+            is PhoneControl.Target.Problem -> fail(t.message)
+            is PhoneControl.Target.Number -> if (phone.composeSms(t.number, a.string("message"))) ok("Message to ${t.label} is ready — press send in your messaging app.") else fail("No messaging app is available.")
+        }
+    }
+    tm.register("app.open") { a, _ -> phone.openApp(a.string("name")).let { if (it.startsWith("Opened")) ok(it) else fail(it) } }
+    tm.register("media.control") { a, _ -> ok(phone.media(a.string("action"))) }
+    tm.register("music.play") { a, _ -> phone.playMusic(a.string("query")).let { if (it.startsWith("No ")) fail(it) else ok(it) } }
+    tm.register("volume.set") { a, _ -> ok(phone.volume(a.string("action"), a.intOrNull("level")?.toInt(), a.stringOrNull("stream"))) }
+    tm.register("flashlight.set") { a, _ -> phone.flashlight(a.bool("on")).let { if (it.startsWith("This phone")) fail(it) else ok(it) } }
+    tm.register("dnd.set") { a, _ -> phone.dnd(a.bool("on")).let { if (it.startsWith("I need")) fail(it) else ok(it) } }
+    tm.register("settings.panel") { a, _ -> phone.settingsPanel(a.string("panel")).let { if (it.startsWith("Couldn't")) fail(it) else ok(it) } }
+    tm.register("maps.navigate") { a, _ -> phone.navigate(a.string("destination"), a.stringOrNull("mode")).let { if (it.startsWith("No ")) fail(it) else ok(it) } }
+    tm.register("web.open") { a, _ -> phone.openWeb(a.string("query")).let { if (it.startsWith("No ")) fail(it) else ok(it) } }
+    tm.register("camera.open") { a, _ -> phone.camera(a.stringOrNull("mode")).let { if (it.startsWith("No ")) fail(it) else ok(it) } }
+    tm.register("device.status") { _, _ -> ok(phone.status()) }
+    tm.register("notifications.recent") { a, _ ->
+        val hours = a.intOrNull("hours")?.toInt() ?: 12
+        val items = ZenithNotificationListener.recent(context, a.stringOrNull("app"), hours)
+        if (items.isEmpty()) ok("No notifications in the last $hours hours" + (a.stringOrNull("app")?.let { " from $it" } ?: "") + ".")
+        else ok("${items.size} notification(s) in the last $hours hours (newest first):\n" + ZenithNotificationListener.describe(items))
+    }
+
+    // ---- Briefing, weather, agenda, routines ----
+    tm.register("weather.get") { a, _ ->
+        com.melhive.zenith.agents.WeatherService(context).report(a.stringOrNull("place"), c.settings.current().weatherCity)
+            .fold({ ok(it) }, { fail(it.message ?: "Weather is unavailable right now.") })
+    }
+    tm.register("calendar.today") { a, _ ->
+        val cal = com.melhive.zenith.agents.CalendarReader(context)
+        val day = cal.parseDay(a.stringOrNull("date")) ?: return@register fail("I don't understand the date “${a.stringOrNull("date")}”.")
+        ok(cal.describe(day))
+    }
+    tm.register("routine.run") { a, _ ->
+        val r = c.routines.find(a.string("name")) ?: return@register fail("No routine called “${a.string("name")}”. Your routines: " + c.routines.all().joinToString { it.name })
+        val (good, text) = c.routines.run(r)
+        ToolResult(good, text)
+    }
 
     tm.register("time.now") { _, _ ->
         val now = java.time.ZonedDateTime.now()

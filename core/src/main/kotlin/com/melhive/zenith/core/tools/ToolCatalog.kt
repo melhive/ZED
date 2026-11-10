@@ -1,6 +1,10 @@
 package com.melhive.zenith.core.tools
 
 import com.melhive.zenith.core.tools.Capability.CALENDAR_APP
+import com.melhive.zenith.core.tools.Capability.CALENDAR_READ
+import com.melhive.zenith.core.tools.Capability.CONTACTS
+import com.melhive.zenith.core.tools.Capability.DND_ACCESS
+import com.melhive.zenith.core.tools.Capability.NOTIFICATION_ACCESS
 import com.melhive.zenith.core.tools.Capability.CLOCK_APP
 import com.melhive.zenith.core.tools.Capability.NETWORK
 import com.melhive.zenith.core.tools.Capability.NOTIFICATIONS
@@ -126,6 +130,65 @@ class ToolCatalog(specs: List<ToolSpec>) {
                 ToolSpec("workflow.run", "Run workflow", "Runs a predefined workflow by name.", listOf(
                     p("name", STRING, "Workflow name"),
                 ), MODIFY),
+                // ---- Phone and device control ----
+                ToolSpec("contacts.find", "Find contact", "Looks up phone numbers in the user's contacts by name.", listOf(
+                    p("name", STRING, "Contact name or part of it"),
+                ), READ_ONLY, setOf(CONTACTS)),
+                ToolSpec("phone.call", "Call", "Calls a contact by name or a phone number. The user always confirms first.", listOf(
+                    p("who", STRING, "Contact name or phone number"),
+                ), MODIFY, alwaysConfirm = true),
+                ToolSpec("sms.compose", "Text message", "Opens the messaging app with a text to a contact or number, ready for the user to send.", listOf(
+                    p("to", STRING, "Contact name or phone number"),
+                    p("message", TEXT, "Message text"),
+                ), MODIFY),
+                ToolSpec("app.open", "Open app", "Opens an installed app by name.", listOf(
+                    p("name", STRING, "App name, e.g. Spotify, Camera, Settings"),
+                ), MODIFY, lowRisk = true),
+                ToolSpec("media.control", "Media control", "Controls whatever is playing (music, podcasts, video).", listOf(
+                    p("action", ENUM, "What to do", enumValues = listOf("play", "pause", "toggle", "next", "previous", "stop")),
+                ), MODIFY, lowRisk = true),
+                ToolSpec("music.play", "Play music", "Asks the music app to play a song, artist, album or playlist.", listOf(
+                    p("query", STRING, "What to play"),
+                ), MODIFY, lowRisk = true),
+                ToolSpec("volume.set", "Volume", "Changes the phone volume.", listOf(
+                    p("action", ENUM, "Change", enumValues = listOf("set", "up", "down", "mute", "unmute")),
+                    p("level", INT, "Level in percent for 'set'", required = false, min = 0, max = 100),
+                    p("stream", ENUM, "Which volume", required = false, enumValues = listOf("media", "ring", "alarm", "notification")),
+                ), MODIFY, lowRisk = true),
+                ToolSpec("flashlight.set", "Flashlight", "Turns the flashlight on or off.", listOf(
+                    p("on", BOOLEAN, "true to turn on"),
+                ), MODIFY, lowRisk = true),
+                ToolSpec("dnd.set", "Do Not Disturb", "Turns Do Not Disturb on or off.", listOf(
+                    p("on", BOOLEAN, "true to turn on"),
+                ), MODIFY, setOf(DND_ACCESS)),
+                ToolSpec("settings.panel", "Open phone setting", "Opens a phone settings screen or quick panel for the user.", listOf(
+                    p("panel", ENUM, "Which settings", enumValues = listOf("wifi", "bluetooth", "internet", "volume", "nfc", "location", "battery", "display", "airplane", "notifications", "apps")),
+                ), MODIFY, lowRisk = true),
+                ToolSpec("maps.navigate", "Navigate", "Starts navigation or shows directions in the maps app.", listOf(
+                    p("destination", STRING, "Place or address"),
+                    p("mode", ENUM, "Travel mode", required = false, enumValues = listOf("driving", "walking", "transit", "bicycling")),
+                ), MODIFY, lowRisk = true),
+                ToolSpec("web.open", "Open web", "Opens a web address or a web search in the browser.", listOf(
+                    p("query", STRING, "URL or search terms"),
+                ), MODIFY, lowRisk = true),
+                ToolSpec("camera.open", "Camera", "Opens the camera app.", listOf(
+                    p("mode", ENUM, "Photo or video", required = false, enumValues = listOf("photo", "video")),
+                ), MODIFY, lowRisk = true),
+                ToolSpec("notifications.recent", "Recent notifications", "Lists the user's recent notifications (what they missed), newest first.", listOf(
+                    p("app", STRING, "Only from this app", required = false),
+                    p("hours", INT, "How far back, in hours (default 12)", required = false, min = 1, max = 72),
+                ), READ_ONLY, setOf(NOTIFICATION_ACCESS)),
+                ToolSpec("weather.get", "Weather", "Current weather and today's forecast for a place (default: the user's city or location).", listOf(
+                    p("place", STRING, "City or place; omit for the user's location", required = false),
+                ), READ_ONLY, setOf(NETWORK)),
+                ToolSpec("calendar.today", "Calendar events", "Lists the user's calendar events for a day.", listOf(
+                    p("date", STRING, "today, tomorrow, or a date like 2026-11-12 (default today)", required = false),
+                ), READ_ONLY, setOf(CALENDAR_READ)),
+                ToolSpec("routine.run", "Run routine", "Runs one of the user's routines (e.g. Good night, Focus) by name.", listOf(
+                    p("name", STRING, "Routine name"),
+                ), MODIFY),
+                ToolSpec("device.status", "Phone status", "Reports battery, charging, network, storage, volume and Do Not Disturb.", emptyList(), READ_ONLY),
+
                 ToolSpec("web.research", "Research online", "Researches a question online using the configured online AI provider's web search.", listOf(
                     p("query", STRING, "Research question"),
                 ), READ_ONLY, setOf(NETWORK, ONLINE_AI)),

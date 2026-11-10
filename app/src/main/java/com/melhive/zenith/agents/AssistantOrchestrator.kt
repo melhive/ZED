@@ -83,6 +83,9 @@ class AssistantOrchestrator(
 
     private var currentJob: Job? = null
 
+    /** Returns a routine name when the message is one of the user's routine phrases ("good night"). */
+    var routineMatcher: (suspend (String) -> String?)? = null
+
     fun submit(conversationId: Long, text: String, attachmentName: String? = null, attachmentText: String? = null, voice: Boolean = false, onReply: (AssistantReply) -> Unit = {}): Job {
         currentJob?.cancel()
         val job = appScope.launch {
@@ -147,6 +150,11 @@ class AssistantOrchestrator(
      * details) go to the model instead of fixed replies.
      */
     private suspend fun handleNative(conversationId: Long, text: String, modelAvailable: Boolean): AssistantReply? {
+        runCatching { routineMatcher?.invoke(text.trim().trimEnd('.', '!', '?')) }.getOrNull()?.let { name ->
+            val outcome = runTool(conversationId, ToolRequest("routine.run", mapOf("name" to name), ToolRequest.Origin.NATIVE))
+            conversations.addMessage(conversationId, "assistant", outcome.message, source = "native", toolName = "routine.run", status = if (outcome.isSuccess()) "complete" else "error")
+            return AssistantReply(outcome.message, outcome.isSuccess(), "native")
+        }
         val cmd = parser.parse(text)
         if (modelAvailable && (cmd is ParsedCommand.Help || cmd is ParsedCommand.Clarify)) return null
         return when (cmd) {

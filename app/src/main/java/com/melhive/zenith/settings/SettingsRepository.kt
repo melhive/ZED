@@ -50,6 +50,16 @@ data class AppSettings(
     val liveEngine: String = "standard",
     val liveModel: String = "",
     val liveVoice: String = "Charon",
+    /** City for weather when location isn't allowed. */
+    val weatherCity: String = "",
+    val briefingEnabled: Boolean = false,
+    val briefingTime: String = "07:00",
+    /** User routines as JSON (null = presets). */
+    val routinesJson: String? = null,
+    /** Last version whose "What's new" the user has seen. */
+    val lastSeenVersion: String? = null,
+    /** LIVE start/stop sound: arc, pulse, chime or off. */
+    val liveSound: String = "arc",
     val confirmAllChanges: Boolean = false,
     val useKnowledge: Boolean = true,
     val autoIndex: Boolean = false,
@@ -82,10 +92,17 @@ class SettingsRepository(private val context: Context) {
         val liveEngine = stringPreferencesKey("live_engine")
         val liveModel = stringPreferencesKey("live_model")
         val liveVoice = stringPreferencesKey("live_voice")
+        val weatherCity = stringPreferencesKey("weather_city")
+        val briefingEnabled = booleanPreferencesKey("briefing_enabled")
+        val briefingTime = stringPreferencesKey("briefing_time")
+        val routines = stringPreferencesKey("routines_json")
+        val lastSeenVersion = stringPreferencesKey("last_seen_version")
+        val liveSound = stringPreferencesKey("live_sound")
         val confirmAll = booleanPreferencesKey("confirm_all")
         val useKnowledge = booleanPreferencesKey("use_knowledge")
         val autoIndex = booleanPreferencesKey("auto_index")
         val skills = stringSetPreferencesKey("enabled_skills")
+        val knownSkills = stringSetPreferencesKey("known_skills")
         val bargeIn = booleanPreferencesKey("barge_in")
         val glow = booleanPreferencesKey("glow")
         val onboarding = booleanPreferencesKey("onboarding_done")
@@ -112,10 +129,17 @@ class SettingsRepository(private val context: Context) {
             liveEngine = p[K.liveEngine] ?: defaults.liveEngine,
             liveModel = p[K.liveModel] ?: defaults.liveModel,
             liveVoice = p[K.liveVoice] ?: defaults.liveVoice,
+            weatherCity = p[K.weatherCity] ?: "",
+            briefingEnabled = p[K.briefingEnabled] ?: false,
+            briefingTime = p[K.briefingTime] ?: defaults.briefingTime,
+            routinesJson = p[K.routines],
+            lastSeenVersion = p[K.lastSeenVersion],
+            liveSound = p[K.liveSound] ?: defaults.liveSound,
             confirmAllChanges = p[K.confirmAll] ?: defaults.confirmAllChanges,
             useKnowledge = p[K.useKnowledge] ?: defaults.useKnowledge,
             autoIndex = p[K.autoIndex] ?: defaults.autoIndex,
-            enabledSkills = p[K.skills] ?: defaults.enabledSkills,
+            // Skills added in later versions start enabled; skills the user turned off stay off.
+            enabledSkills = (p[K.skills] ?: defaults.enabledSkills) + (defaults.enabledSkills - (p[K.knownSkills] ?: LEGACY_SKILLS)),
             bargeIn = p[K.bargeIn] ?: defaults.bargeIn,
             glow = p[K.glow] ?: defaults.glow,
             onboardingDone = p[K.onboarding] ?: false,
@@ -141,6 +165,11 @@ class SettingsRepository(private val context: Context) {
     suspend fun setLiveEngine(engine: String) = context.dataStore.edit { it[K.liveEngine] = engine }
     suspend fun setLiveModel(model: String) = context.dataStore.edit { it[K.liveModel] = model.trim() }
     suspend fun setLiveVoice(voice: String) = context.dataStore.edit { it[K.liveVoice] = voice }
+    suspend fun setWeatherCity(city: String) = context.dataStore.edit { it[K.weatherCity] = city.trim().take(80) }
+    suspend fun setBriefing(enabled: Boolean, time: String) = context.dataStore.edit { it[K.briefingEnabled] = enabled; it[K.briefingTime] = time }
+    suspend fun setRoutinesJson(json: String) = context.dataStore.edit { it[K.routines] = json }
+    suspend fun setLastSeenVersion(v: String) = context.dataStore.edit { it[K.lastSeenVersion] = v }
+    suspend fun setLiveSound(v: String) = context.dataStore.edit { it[K.liveSound] = v }
     suspend fun setConfirmAllChanges(v: Boolean) = context.dataStore.edit { it[K.confirmAll] = v }
     suspend fun setUseKnowledge(v: Boolean) = context.dataStore.edit { it[K.useKnowledge] = v }
     suspend fun setAutoIndex(v: Boolean) = context.dataStore.edit { it[K.autoIndex] = v }
@@ -150,7 +179,17 @@ class SettingsRepository(private val context: Context) {
     suspend fun setCheckUpdates(v: Boolean) = context.dataStore.edit { it[K.checkUpdates] = v }
     suspend fun setOnboardingDone() = context.dataStore.edit { it[K.onboarding] = true }
     suspend fun setSkillEnabled(id: String, enabled: Boolean) = context.dataStore.edit { p ->
-        val current = p[K.skills] ?: AppSettings().enabledSkills
+        val all = AppSettings().enabledSkills
+        val current = (p[K.skills] ?: all) + (all - (p[K.knownSkills] ?: LEGACY_SKILLS))
         p[K.skills] = if (enabled) current + id else current - id
+        p[K.knownSkills] = all
+    }
+
+    companion object {
+        /** Skills that existed before skill-set versioning (v0.1.12). */
+        private val LEGACY_SKILLS = setOf(
+            "core.time", "files.manage", "files.organize", "knowledge.local", "clock.alarms", "calendar.events", "reminders",
+            "tasks.list", "memory.personal", "history.search", "app.settings", "automation.workflows", "research.online",
+        )
     }
 }

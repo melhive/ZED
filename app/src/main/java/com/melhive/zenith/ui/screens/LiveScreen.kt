@@ -89,6 +89,16 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit) {
     LaunchedEffect(Unit) {
         if (PermissionCatalog.isGranted(context, PermissionCatalog.MICROPHONE)) live.start() else permission.launch(Manifest.permission.RECORD_AUDIO)
     }
+    // A request handed over by a notification or shortcut ("brief me") is sent once LIVE is ready.
+    val pendingPrompt by c.livePrompt.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingPrompt, state.active, state.orb) {
+        val p = pendingPrompt
+        if (p != null && state.active && state.orb in setOf(OrbState.LISTENING, OrbState.IDLE)) {
+            kotlinx.coroutines.delay(400)
+            c.livePrompt.value = null
+            live.submitText(p)
+        }
+    }
     // Leaving the screen ends the voice session (the mic is never used in the background). Tasks continue.
     DisposableEffect(Unit) { onDispose { live.end() } }
 

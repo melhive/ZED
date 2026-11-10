@@ -61,7 +61,11 @@ class AppContainer(private val context: Context) {
 
     val taskEngine by lazy { TaskEngine(context, db.tasks()) }
     val confirmations = ConfirmationBroker()
-    val workflows by lazy { WorkflowEngine(db, taskEngine) }
+    val workflows by lazy { WorkflowEngine(db, taskEngine).also { it.briefing = com.melhive.zenith.agents.BriefingComposer(context, this) } }
+    val routines by lazy { com.melhive.zenith.agents.RoutineEngine(context, this) }
+
+    /** A request LIVE should send as soon as it opens (from a notification or shortcut). */
+    val livePrompt = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
 
     val toolManager: ToolManager by lazy {
         ToolManager(catalog, skills, settings, AndroidCapabilityChecker(context, this), confirmations, audit, DefaultConfirmationText).also { tm ->
@@ -71,7 +75,9 @@ class AppContainer(private val context: Context) {
     }
 
     val orchestrator by lazy {
-        AssistantOrchestrator(appScope, conversations, memory, knowledge, providers, toolManager, skills, settings)
+        AssistantOrchestrator(appScope, conversations, memory, knowledge, providers, toolManager, skills, settings).also { o ->
+            o.routineMatcher = { text -> routines.matchPhrase(text)?.name }
+        }
     }
 
     val live by lazy {

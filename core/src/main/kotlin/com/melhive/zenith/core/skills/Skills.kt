@@ -52,6 +52,13 @@ class SkillRegistry(val catalog: ToolCatalog, skills: List<SkillDescriptor>) {
             SkillDescriptor("history.search", "Conversation History", "Searches your past conversations.", listOf("history.search")),
             SkillDescriptor("app.settings", "Settings Control", "Changes ZENITH settings by voice or chat.", listOf("settings.set")),
             SkillDescriptor("automation.workflows", "Workflows", "Runs predefined multi-step workflows.", listOf("workflow.run")),
+            SkillDescriptor("phone.comms", "Calls & Messages", "Finds contacts, places calls (always confirmed) and prepares text messages.", listOf("contacts.find", "phone.call", "sms.compose")),
+            SkillDescriptor("device.control", "Phone Control", "Flashlight, volume, Do Not Disturb, settings panels, camera and phone status.",
+                listOf("flashlight.set", "volume.set", "dnd.set", "settings.panel", "camera.open", "device.status")),
+            SkillDescriptor("apps.media", "Apps, Media & Maps", "Opens apps, controls and plays music, navigates and opens web pages.", listOf("app.open", "media.control", "music.play", "maps.navigate", "web.open")),
+            SkillDescriptor("notifications.digest", "What Did I Miss", "Reads your recent notifications when you ask (needs notification access).", listOf("notifications.recent")),
+            SkillDescriptor("daily.briefing", "Briefing, Weather & Agenda", "Weather, today's calendar and your daily briefing.", listOf("weather.get", "calendar.today")),
+            SkillDescriptor("automation.routines", "Routines", "Runs your routines (Good morning, Good night, Focus, Driving…).", listOf("routine.run")),
             SkillDescriptor("research.online", "Online Research", "Researches questions using your online AI provider's web search.", listOf("web.research"), requiresOnline = true),
         )
 

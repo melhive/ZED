@@ -11,10 +11,14 @@ import com.melhive.zenith.core.tools.ToolSpec
  * - MODIFY requested by a native command the user typed: no, unless the user
  *   enabled "confirm every change".
  * - READ_ONLY: never.
+ * - Tools marked [ToolSpec.alwaysConfirm]: always. Tools marked [ToolSpec.lowRisk]
+ *   (harmless, reversible device controls): only with "confirm every change".
  */
 object ConfirmationPolicy {
     fun requiresConfirmation(spec: ToolSpec, request: ToolRequest, confirmAllChanges: Boolean = false): Boolean =
-        when (spec.risk) {
+        if (spec.alwaysConfirm) true
+        else if (spec.lowRisk && spec.risk == RiskLevel.MODIFY) confirmAllChanges
+        else when (spec.risk) {
             RiskLevel.DESTRUCTIVE -> true
             RiskLevel.READ_ONLY -> false
             RiskLevel.MODIFY -> confirmAllChanges ||

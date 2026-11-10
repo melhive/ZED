@@ -63,6 +63,7 @@ fun MoreScreen(onNavigate: (String) -> Unit) {
         Entry(Routes.MODELS, Icons.Outlined.Psychology, "Model Manager", "On-device models and online providers"),
         Entry(Routes.FILES, Icons.Outlined.Folder, "Files", "Granted folders, browse and organize"),
         Entry(Routes.SKILLS, Icons.Outlined.AutoAwesome, "Skills", "Capabilities ZENITH can use"),
+        Entry(Routes.ROUTINES, Icons.Outlined.AutoAwesome, "Routines & briefing", "Good morning, Good night, Focus, Driving and your daily briefing"),
         Entry(Routes.VOICE, Icons.Outlined.RecordVoiceOver, "Voice", "Natural offline voices, speed and pitch"),
         Entry(Routes.SETTINGS, Icons.Outlined.Settings, "Settings", "Voice, safety and behaviour"),
         Entry(Routes.DIAGNOSTICS, Icons.Outlined.Security, "Permissions & Diagnostics", "Permissions, voice engines, audit log"),
@@ -255,6 +256,28 @@ fun DiagnosticsScreen(onBack: () -> Unit) {
                     Button(onClick = { launcher.launch(p.permission) }) { Text("Request") }
                     TextButton(onClick = { context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))) }) { Text("App settings") }
                 }
+            }
+        }
+        item {
+            val listener = remember(refresh) { com.melhive.zenith.android.ZenithNotificationListener.hasAccess(context) }
+            ZenithCard(accent = if (listener) ZenithColors.Green else ZenithColors.Muted) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("What did I miss (notification access)", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    StatusPill(if (listener) "Allowed" else "Optional", if (listener) ZenithColors.Green else ZenithColors.Muted)
+                }
+                Text("Lets ZENITH read your recent notifications when you ask “what did I miss?”. Nothing is read unless you ask, and nothing is saved.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
+                if (!listener) TextButton(onClick = { com.melhive.zenith.android.ZenithNotificationListener.openSettings(context) }) { Text("Allow notification access") }
+            }
+        }
+        item {
+            val dnd = remember(refresh) { com.melhive.zenith.android.PhoneControl(context).hasDndAccess() }
+            ZenithCard(accent = if (dnd) ZenithColors.Green else ZenithColors.Muted) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Do Not Disturb control", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    StatusPill(if (dnd) "Allowed" else "Optional", if (dnd) ZenithColors.Green else ZenithColors.Muted)
+                }
+                Text("Lets ZENITH turn Do Not Disturb on or off for you and in routines like Good night.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
+                if (!dnd) TextButton(onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) } }) { Text("Allow Do Not Disturb access") }
             }
         }
         item {

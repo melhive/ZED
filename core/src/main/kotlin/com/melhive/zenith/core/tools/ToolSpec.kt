@@ -23,6 +23,10 @@ enum class Capability(val label: String) {
     ONLINE_AI("A configured online AI provider"),
     CLOCK_APP("A clock app that handles alarm intents"),
     CALENDAR_APP("A calendar app that handles insert intents"),
+    CONTACTS("Contacts permission"),
+    NOTIFICATION_ACCESS("Notification access"),
+    DND_ACCESS("Do Not Disturb access"),
+    CALENDAR_READ("Calendar read permission"),
 }
 
 enum class ParamType { STRING, TEXT, INT, BOOLEAN, ENUM, DATETIME, PATH, FILE_NAME }
@@ -47,6 +51,10 @@ data class ToolSpec(
     val capabilities: Set<Capability> = emptySet(),
     /** True when the tool starts a background task instead of returning immediately. */
     val background: Boolean = false,
+    /** Harmless and instantly reversible (flashlight, media keys, volume): AI requests run without asking. */
+    val lowRisk: Boolean = false,
+    /** Always ask, even for commands the user typed or said (e.g. placing a phone call). */
+    val alwaysConfirm: Boolean = false,
 ) {
     init {
         require(NAME_REGEX.matches(name)) { "Invalid tool name: $name" }

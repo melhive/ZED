@@ -13,6 +13,8 @@ data class Workflow(val id: String, val name: String, val description: String, v
 
 class WorkflowEngine(private val db: ZenithDatabase, private val taskEngine: TaskEngine) {
     lateinit var toolManager: ToolManager
+    /** Full briefing (weather, calendar, notifications); falls back to the basic one when unset. */
+    var briefing: BriefingComposer? = null
 
     val workflows = listOf(
         Workflow("morning_briefing", "Morning briefing", "Date and time, open tasks, today's reminders and background task status.", listOf("morning briefing", "daily briefing", "briefing", "good morning")),
@@ -33,6 +35,7 @@ class WorkflowEngine(private val db: ZenithDatabase, private val taskEngine: Tas
         val w = find(name) ?: return ToolResult(false, "Unknown workflow “$name”. Available: " + workflows.joinToString { it.name })
         return when (w.id) {
             "morning_briefing" -> {
+                briefing?.let { return ToolResult(true, it.compose()) }
                 val parts = mutableListOf<String>()
                 parts += "Good morning. It is " + step("time.now").message + "."
                 parts += step("todo.list").message

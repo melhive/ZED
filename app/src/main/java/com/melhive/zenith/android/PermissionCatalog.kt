@@ -24,7 +24,23 @@ object PermissionCatalog {
         Manifest.permission.POST_NOTIFICATIONS, "Notifications",
         "Lets ZENITH tell you when background tasks finish or fail, and deliver reminders.", minSdk = 33,
     )
-    val ALL = listOf(MICROPHONE, NOTIFICATIONS)
+    val CONTACTS = PermissionInfo(
+        Manifest.permission.READ_CONTACTS, "Contacts",
+        "Lets ZENITH find a number when you say “call Mom” or “text Ana”. Contacts never leave the phone unless an online AI needs the matching name.",
+    )
+    val CALL_PHONE = PermissionInfo(
+        Manifest.permission.CALL_PHONE, "Phone calls",
+        "Optional. Lets ZENITH place a call after you confirm it. Without it, ZENITH opens the dialer and you tap call.",
+    )
+    val CALENDAR = PermissionInfo(
+        Manifest.permission.READ_CALENDAR, "Calendar",
+        "Lets the morning briefing and “what's on today” read your events. Nothing is changed.",
+    )
+    val LOCATION = PermissionInfo(
+        Manifest.permission.ACCESS_COARSE_LOCATION, "Approximate location",
+        "Optional. Used only for the weather in your briefing (city-level). You can type a city in Settings instead.",
+    )
+    val ALL = listOf(MICROPHONE, NOTIFICATIONS, CONTACTS, CALL_PHONE, CALENDAR, LOCATION)
 
     fun applicable(p: PermissionInfo) = Build.VERSION.SDK_INT >= p.minSdk
 
