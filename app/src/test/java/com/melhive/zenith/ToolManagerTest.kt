@@ -66,7 +66,15 @@ class ToolManagerTest {
         assertEquals(listOf("invalid", "invalid"), audit.map { it.outcome })
     }
 
+    @Test fun neverModeRunsEverythingImmediately() = runBlocking<Unit> {
+        settings.setConfirmMode("NEVER")
+        assertIs<ToolOutcome.Executed>(tm.execute(ToolRequest("file.delete", mapOf("path" to "a.txt"), ToolRequest.Origin.ONLINE_MODEL)))
+        assertIs<ToolOutcome.Executed>(tm.execute(ToolRequest("memory.remember", mapOf("fact" to "x"), ToolRequest.Origin.LOCAL_MODEL)))
+        assertTrue(broker.requests.value.isEmpty())
+    }
+
     @Test fun destructiveActionRequiresConfirmation() = runBlocking<Unit> {
+        settings.setConfirmMode("RISKY")
         val pending = async { tm.execute(ToolRequest("file.delete", mapOf("path" to "a.txt"), ToolRequest.Origin.NATIVE)) }
         val req = broker.requests.filter { it.isNotEmpty() }.first().single()
         assertTrue(req.destructive)
@@ -80,8 +88,8 @@ class ToolManagerTest {
         assertEquals(listOf("file.delete"), executed)
     }
 
-    @Test fun modelRequestedChangesNeedConfirmationButNativeDoNot() = runBlocking<Unit> {
-        assertIs<ToolOutcome.Executed>(tm.execute(ToolRequest("file.create", mapOf("path" to "n.txt"), ToolRequest.Origin.NATIVE)))
+    @Test fun alwaysModeAsksForChangesButNotReads() = runBlocking<Unit> {
+        settings.setConfirmMode("ALWAYS")
         val fromModel = async { tm.execute(ToolRequest("memory.remember", mapOf("fact" to "x"), ToolRequest.Origin.LOCAL_MODEL)) }
         val req = broker.requests.filter { it.isNotEmpty() }.first().single()
         assertTrue(req.message.contains("Requested by the AI model"))
