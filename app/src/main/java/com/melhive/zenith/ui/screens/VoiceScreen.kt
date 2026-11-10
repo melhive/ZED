@@ -83,9 +83,13 @@ fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
     val sample = "Hello${name?.let { ", $it" } ?: ""}. I'm ZENITH. It's 7:30, and you have 3 things on your list today."
     fun choose(id: String) = safely {
         c.settings.setVoiceId(id)
-        if (!c.voice.preview(sample)) message = "That voice could not be loaded."
+        message = "Preparing the voice… the first time takes a few seconds."
+        message = if (c.voice.preview(sample)) null else "That voice could not be loaded. The phone voice is used instead."
     }
-    fun previewNow() = safely { if (!c.voice.preview(sample)) message = "Speech is unavailable on this phone." }
+    fun previewNow() = safely {
+        message = "Preparing the voice…"
+        message = if (c.voice.preview(sample)) null else "Speech is unavailable on this phone."
+    }
 
     ListScreen("Voice", onBack = onBack, subtitle = "Choose how ZENITH sounds. Every voice runs on your phone, offline.") {
         item {

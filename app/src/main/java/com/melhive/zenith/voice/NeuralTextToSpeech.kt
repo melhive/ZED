@@ -92,6 +92,9 @@ class NeuralTextToSpeech(
     @Volatile var loadMillis: Long = 0
         private set
 
+    /** Called after each rendered sentence with render time ÷ audio length (below 1 = faster than real time). */
+    @Volatile var onRealTimeFactor: ((Float) -> Unit)? = null
+
     private class Request(val id: String, val sentences: List<String>, val gen: Int)
     private class Chunk(val id: String, val pcm: ShortArray, val first: Boolean, val last: Boolean, val gen: Int)
 
@@ -191,7 +194,11 @@ class NeuralTextToSpeech(
         r.sentences.forEachIndexed { i, sentence ->
             if (r.gen != generation.get() || r.id !in pending) return
             val samples = try {
-                generate(engine, sentence, r.gen)
+                val t0 = System.currentTimeMillis()
+                generate(engine, sentence, r.gen).also { out ->
+                    val audioMs = out.size * 1000L / maxOf(1, sampleRate)
+                    if (audioMs > 300) onRealTimeFactor?.invoke((System.currentTimeMillis() - t0).toFloat() / audioMs)
+                }
             } catch (e: Throwable) {
                 com.melhive.zenith.android.CrashReporter.recordNonFatal("neural tts", e)
                 finish(r.id, TtsEvent.Error(r.id, "Speech synthesis failed: ${e.message ?: e.javaClass.simpleName}"))
@@ -217,7 +224,7 @@ class NeuralTextToSpeech(
                 text = SupertonicText.clean(sentence)
                 if (text.isBlank()) return FloatArray(0)
                 config.speed = rate * 1.05f // Supertonic's natural pace is 1.05
-                config.numSteps = 6
+                config.numSteps = 5 // measured on an 8×A55 phone: ~2 s per sentence, clear speech
                 config.extra = mapOf("lang" to VoiceCatalog.supertonicLanguage(languageTag))
             }
         }

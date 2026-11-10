@@ -77,9 +77,11 @@ class VoiceManager(
             is VoiceSelection.Neural -> if (packs.isInstalled(selection.pack)) {
                 _status.value = Status(Phase.LOADING, selection.voice.name, "Loading ${selection.pack.name}…")
                 lateinit var isolated: IsolatedNeuralTts
-                isolated = IsolatedNeuralTts(context, selection.pack, selection.voice, packs.dir(selection.pack), Locale.getDefault().toLanguageTag()) { reason ->
-                    scope.launch { fallBack(isolated, reason) }
-                }
+                isolated = IsolatedNeuralTts(
+                    context, selection.pack, selection.voice, packs.dir(selection.pack), Locale.getDefault().toLanguageTag(),
+                    onCrash = { reason -> scope.launch { fallBack(isolated, reason) } },
+                    onSpeed = { rtf -> onSpeed(isolated, rtf) },
+                )
                 isolated
             } else {
                 _status.value = Status(Phase.FALLBACK, "System voice", "${selection.pack.name} is not downloaded; using the system voice")
@@ -124,6 +126,16 @@ class VoiceManager(
             return fallback.awaitReady()
         }
         return false
+    }
+
+    /** Tells the user when this phone renders the voice slower than it speaks (pauses between sentences). */
+    private fun onSpeed(e: IsolatedNeuralTts, rtf: Float) {
+        if (engine !== e || _status.value.phase != Phase.READY) return
+        val detail = when {
+            rtf > 1.05f -> "This phone renders this voice slower than it speaks (${"%.1f".format(rtf)}×), so expect pauses between sentences. Supertonic voices are faster."
+            else -> "Offline neural voice · ready in ${e.loadMillis} ms · renders ${"%.1f".format(1f / rtf)}× faster than real time"
+        }
+        _status.value = _status.value.copy(detail = detail)
     }
 
     /** Replaces a failed or crashed neural voice with the phone voice so ZENITH keeps talking. */

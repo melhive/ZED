@@ -83,13 +83,15 @@ Failed tests: none.
 - Conversation: more human persona prompt, lean prompt for casual chat, broader native small talk with follow-ups and fun features.
 - Still needed from the device: the exact LIVE error (Diagnostics → Problem reports → Share report) if it persists.
 
-## Natural offline voices (v0.1.10)
+## Natural offline voices (v0.1.10–v0.1.11)
 
 - **Voice screen** (More → Voice, or Settings → Voice): current voice with Preview/Stop, speaking speed 0.5–2× and pitch 0.7–1.3× with presets (each change plays a short sample), downloadable voice packs, phone voices list.
 - **Voice packs** (downloaded as background tasks, resumable, SHA-256 verified): Supertonic 3 — 10 voices, very fast, 31 languages, reads numbers itself (129 MB); Kokoro v1.0 — 28 American/British English voices, most expressive (132 MB). Downloading the first pack switches ZENITH to its recommended voice.
 - **Engine:** sherpa-onnx 2.0.1 (static ONNX Runtime AAR, fetched and checksum-verified at build time, arm64 only). One shared `VoiceManager` serves Chat and LIVE and falls back to the phone voice if a neural voice cannot load.
 - **Kokoro text pipeline:** `SpeechNormalizer` + `EnglishPhonemizer` (core, unit-tested; checked against the real lexicon) because sherpa-onnx 2.0's Kokoro frontend drops digits and unknown words.
-- **Needs device validation:** neural synthesis speed and memory per pack, AudioTrack playback/barge-in with neural voices, pitch via PlaybackParams, pack download + extraction (~260 MB free space needed during install).
+- **v0.1.11 crash fix:** previewing a neural voice closed the app. Cause: sherpa-onnx's JNI looks up the generation callback by the exact signature `invoke([F)Ljava/lang/Integer;`, which Kotlin lambdas lack; it continued with a pending `NoSuchMethodError` and ART aborted the process (reproduced against the real library: `NoSuchMethodError … invoke([F)Ljava/lang/Integer;`). Synthesis now runs without a callback, in a separate `:voice` process (a native crash there cannot close the app; ZENITH falls back to the phone voice and records a problem report), and every voice thread/action catches and records errors.
+- **Verified with the real engine** (sherpa-onnx 2.0.1 Linux arm64 build, same C++ code as the AAR, driven through the app's exact Kotlin config/phonemizer code on this phone's 8× Cortex-A55 CPU): Supertonic 3 — load 1.7 s, renders ~2× faster than real time (≈2 s per sentence at 5 steps), 10 voices produce clear audio, speed setting changes duration as expected. Kokoro — load 1.6 s + 4.5 s for the dictionary, renders ~1.4× *slower* than real time on this CPU (pauses between sentences on budget phones; the app measures and says so). 4 threads is fastest; 6–8 are slower on A55 cores.
+- **Still needs the phone:** AudioTrack playback, barge-in and pitch with neural voices, the `:voice` process messaging, pack download + extraction (~260 MB free space needed during install).
 
 ## Model integration status
 

@@ -112,7 +112,7 @@ object VoiceCatalog {
         name = "Kokoro",
         kind = VoiceEngineKind.KOKORO,
         tagline = "Most expressive · 28 English voices",
-        description = "Very lifelike American and British English voices. Needs a recent phone: each sentence takes a moment longer to start than with Supertonic.",
+        description = "Very lifelike American and British English voices. Needs a fast phone: on budget phones it renders slower than it speaks, so there are pauses between sentences. ZENITH measures this and tells you.",
         archiveUrl = "$BASE/kokoro-int8-multi-lang-v1_0.tar.bz2",
         archiveRoot = "kokoro-int8-multi-lang-v1_0",
         sizeBytes = 132_353_410L,

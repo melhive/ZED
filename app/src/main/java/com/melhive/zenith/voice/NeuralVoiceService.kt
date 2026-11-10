@@ -78,6 +78,7 @@ class NeuralVoiceService : Service() {
                     if (pack == null || voice == null) { reply(MSG_READY, Bundle().apply { putBoolean(K_OK, false); putString(K_MESSAGE, "Unknown voice") }); return }
                     val e = NeuralTextToSpeech(pack, voice, File(data.getString(K_DIR).orEmpty()), data.getString(K_LANG).orEmpty())
                     e.setRate(data.getFloat(K_RATE, 1f)); e.setPitch(data.getFloat(K_PITCH, 1f))
+                    e.onRealTimeFactor = { rtf -> reply(MSG_STATS, Bundle().apply { putFloat(K_RTF, rtf) }) }
                     engine = e
                     scope.launch { e.events.collect { ev -> forward(ev) } }
                     scope.launch {
@@ -115,11 +116,11 @@ class NeuralVoiceService : Service() {
 
     companion object {
         const val MSG_LOAD = 1; const val MSG_SPEAK = 2; const val MSG_STOP = 3; const val MSG_RATE = 4; const val MSG_PITCH = 5
-        const val MSG_READY = 10; const val MSG_EVENT = 11
+        const val MSG_READY = 10; const val MSG_EVENT = 11; const val MSG_STATS = 12
         const val EV_STARTED = 1; const val EV_WORD = 2; const val EV_DONE = 3; const val EV_STOPPED = 4; const val EV_ERROR = 5
         const val K_PACK = "pack"; const val K_SID = "sid"; const val K_DIR = "dir"; const val K_LANG = "lang"; const val K_RATE = "rate"
         const val K_PITCH = "pitch"; const val K_ID = "id"; const val K_TEXT = "text"; const val K_FLUSH = "flush"; const val K_OK = "ok"
-        const val K_MILLIS = "millis"; const val K_MESSAGE = "message"; const val K_TYPE = "type"
+        const val K_MILLIS = "millis"; const val K_MESSAGE = "message"; const val K_TYPE = "type"; const val K_RTF = "rtf"
     }
 }
 
@@ -136,7 +137,11 @@ class IsolatedNeuralTts(
     private val dir: File,
     private val languageTag: String,
     private val onCrash: (String) -> Unit,
+    /** Smoothed render time ÷ audio length, reported while speaking. */
+    private val onSpeed: (Float) -> Unit = {},
 ) : TextToSpeechEngine {
+    @Volatile var realTimeFactor: Float? = null
+        private set
     private val _events = MutableSharedFlow<TtsEvent>(extraBufferCapacity = 128, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     override val events: SharedFlow<TtsEvent> = _events.asSharedFlow()
     private val ready = CompletableDeferred<Boolean>()
@@ -199,6 +204,12 @@ class IsolatedNeuralTts(
                 loadMillis = d.getLong(NeuralVoiceService.K_MILLIS)
                 loadError = d.getString(NeuralVoiceService.K_MESSAGE)
                 ready.complete(d.getBoolean(NeuralVoiceService.K_OK))
+            }
+            NeuralVoiceService.MSG_STATS -> {
+                val r = d.getFloat(NeuralVoiceService.K_RTF)
+                val smoothed = realTimeFactor?.let { it * 0.6f + r * 0.4f } ?: r
+                realTimeFactor = smoothed
+                onSpeed(smoothed)
             }
             NeuralVoiceService.MSG_EVENT -> {
                 val id = d.getString(NeuralVoiceService.K_ID).orEmpty()
