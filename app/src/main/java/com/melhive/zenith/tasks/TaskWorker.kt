@@ -170,7 +170,8 @@ class TaskWorker(appContext: Context, params: WorkerParameters) : CoroutineWorke
         if (com.melhive.zenith.core.voice.VoiceSelection.parse(s.voiceId) !is com.melhive.zenith.core.voice.VoiceSelection.Neural) {
             pack.voices.firstOrNull { it.featured }?.let { container.settings.setVoiceId(it.id) }
         }
-        return succeed(task, "${pack.name} voices installed and verified (SHA-256). Choose a voice in Settings → Voice.")
+        return succeed(task, if (pack.voices.isEmpty()) "${pack.name} installed and verified (SHA-256)."
+            else "${pack.name} voices installed and verified (SHA-256). Choose a voice in Settings → Voice.")
     }
 
     private fun foregroundInfo(task: TaskEntity, done: Long, total: Long, phase: String): ForegroundInfo {

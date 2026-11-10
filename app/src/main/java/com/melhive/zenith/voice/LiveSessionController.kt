@@ -115,6 +115,7 @@ class LiveSessionController(
         }
         val s = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         scope = s
+        WakeWordService.paused.value = true // LIVE takes the microphone
         stt = sttFactory()
         tts = ttsFactory()
         monitor = BargeInMonitor(s)
@@ -206,6 +207,7 @@ class LiveSessionController(
     fun end() {
         if (_state.value.active) ZenithSounds.play(context, soundStyle, start = false)
         BeepSuppressor.restore(context)
+        WakeWordService.paused.value = false
         rt?.close(); rt = null
         listenJob?.cancel()
         requestJob?.cancel()

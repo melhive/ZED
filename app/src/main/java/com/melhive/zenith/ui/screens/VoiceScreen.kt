@@ -132,6 +132,51 @@ fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
             )
         }
         item {
+            val wakeInstalled = com.melhive.zenith.core.voice.VoiceCatalog.WAKE_WORD.id in installed
+            LaunchedEffect(wakeInstalled, settings.wakeWordEnabled) {
+                if (wakeInstalled && settings.wakeWordEnabled) com.melhive.zenith.voice.WakeWordService.start(context)
+            }
+            val wakeTask = tasks.firstOrNull { it.type == TaskTypes.VOICE_DOWNLOAD && it.input()["pack"] == com.melhive.zenith.core.voice.VoiceCatalog.WAKE_WORD.id && !it.statusEnum().terminal }
+            ZenithCard(accent = if (settings.wakeWordEnabled && wakeInstalled) ZenithColors.Green else ZenithColors.Violet) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("“Hey Zenith”", style = MaterialTheme.typography.titleMedium)
+                        Text("Say “Hey Zenith” any time to start talking. Listening happens entirely on the phone — only for the wake word — while a notification is shown. Uses some battery.",
+                            style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
+                    }
+                    androidx.compose.material3.Switch(checked = settings.wakeWordEnabled, onCheckedChange = { on ->
+                        safely {
+                            c.settings.setWakeWordEnabled(on)
+                            if (!on) { com.melhive.zenith.voice.WakeWordService.stop(context); return@safely }
+                            if (!wakeInstalled && wakeTask == null) {
+                                c.taskEngine.create(TaskTypes.VOICE_DOWNLOAD, "Download wake word model", mapOf("pack" to com.melhive.zenith.core.voice.VoiceCatalog.WAKE_WORD.id))
+                                message = "Downloading the wake word model (18 MB)… “Hey Zenith” starts when it's ready."
+                            } else com.melhive.zenith.voice.WakeWordService.start(context)
+                        }
+                    })
+                }
+                if (wakeTask != null) RealProgress(wakeTask.progressCurrent, wakeTask.progressTotal, Modifier.padding(top = 6.dp))
+                if (settings.wakeWordEnabled) {
+                    Text("Sensitivity", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 6.dp))
+                    WrapRow {
+                        listOf(0 to "Fewer false alarms", 1 to "Normal", 2 to "Hears it easily").forEach { (v, l) ->
+                            FilterChip(selected = settings.wakeSensitivity == v, onClick = { safely {
+                                c.settings.setWakeSensitivity(v)
+                                com.melhive.zenith.voice.WakeWordService.stop(context); com.melhive.zenith.voice.WakeWordService.start(context)
+                            } }, label = { Text(l) })
+                        }
+                    }
+                    if (!android.provider.Settings.canDrawOverlays(context)) {
+                        Text("To open LIVE when another app is on screen, allow ZENITH to display over other apps. Without it, ZENITH answers hands-free and shows the reply as a notification.",
+                            style = MaterialTheme.typography.bodySmall, color = ZenithColors.Amber, modifier = Modifier.padding(top = 4.dp))
+                        TextButton(onClick = {
+                            runCatching { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:" + context.packageName))) }
+                        }) { Text("Allow display over other apps") }
+                    }
+                }
+            }
+        }
+        item {
             ZenithCard {
                 SectionTitle("LIVE sounds")
                 Text("The sound when ZENITH LIVE opens and closes. Tap one to hear it.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)

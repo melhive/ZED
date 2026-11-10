@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.mutableStateOf
+import kotlinx.coroutines.launch
 import com.melhive.zenith.ui.navigation.ZenithRoot
 import com.melhive.zenith.ui.theme.ZenithTheme
 
@@ -19,6 +20,19 @@ class MainActivity : ComponentActivity() {
         setContent {
             ZenithTheme {
                 ZenithRoot(requestedRoute = requestedRoute.value, onRouteConsumed = { requestedRoute.value = null })
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // The wake word service may only start while ZENITH is on screen (Android 14 microphone rules).
+        val c = (application as ZenithApp).container
+        c.appScope.launch {
+            val s = c.settings.current()
+            if (s.wakeWordEnabled && c.voicePacks.isInstalled(com.melhive.zenith.core.voice.VoiceCatalog.WAKE_WORD) &&
+                com.melhive.zenith.android.PermissionCatalog.isGranted(this@MainActivity, com.melhive.zenith.android.PermissionCatalog.MICROPHONE)) {
+                com.melhive.zenith.voice.WakeWordService.start(this@MainActivity)
             }
         }
     }

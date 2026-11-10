@@ -83,6 +83,22 @@ Failed tests: none.
 - Conversation: more human persona prompt, lean prompt for casual chat, broader native small talk with follow-ups and fun features.
 - Still needed from the device: the exact LIVE error (Diagnostics → Problem reports → Share report) if it persists.
 
+## Assistant release (v0.1.12 + v0.1.13)
+
+| Area | What | Verification |
+|---|---|---|
+| Entry points | ACTION_ASSIST/VOICE_COMMAND activity (default assistant), Quick Settings tile, home widget | CI build; needs device |
+| Personalities | Companion, Butler, Professional, Playful + user title | Core tests |
+| Native tool calling | Gemini/OpenAI/Claude function calling, up to 8 chained steps, parallel calls, Gemini thought signatures echoed | Mock-server tests per provider |
+| Gemini Live | WebSocket BidiGenerateContent, 16 kHz mic / 24 kHz playback, transcripts, tool calls, resumption, half duplex on speaker | Protocol from official docs; needs a key + device |
+| Phone control | contacts, calls (always confirmed), SMS compose, apps, media keys, music search, volume, flashlight, DND, settings panels, maps, web, camera, status | 40+ parser tests; needs device |
+| What did I miss | NotificationListenerService, in-memory only | Needs device |
+| Briefing & routines | Open-Meteo weather, calendar read, briefing notification, routines with voice/time/Bluetooth triggers | Core tests (scheduling, presets, JSON); needs device |
+| Vision | Photo (camera/gallery) to Gemini/OpenAI/Claude; LIVE camera; Gemini Live video frame | CI build |
+| Home Assistant | REST client, entity matching, low-risk control vs always-confirmed locks/covers | Parser tests; needs an HA instance |
+| Wake word | sherpa-onnx KWS (GigaSpeech zipformer), foreground microphone service, opens LIVE or answers hands-free | Verified with the real engine against synthesized speech (see below) |
+| UX | What's new history + post-update dialog + update notification; Arc/Pulse/Chime LIVE sounds; recognizer beep muted with crash-safe restore; sliding transitions | CI build |
+
 ## Natural offline voices (v0.1.10–v0.1.11)
 
 - **Voice screen** (More → Voice, or Settings → Voice): current voice with Preview/Stop, speaking speed 0.5–2× and pitch 0.7–1.3× with presets (each change plays a short sample), downloadable voice packs, phone voices list.

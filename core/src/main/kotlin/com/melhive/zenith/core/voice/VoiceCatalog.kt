@@ -154,7 +154,29 @@ object VoiceCatalog {
 
     val packs: List<VoicePack> = listOf(SUPERTONIC, KOKORO)
 
-    fun pack(id: String): VoicePack? = packs.firstOrNull { it.id == id }
+    /**
+     * "Hey Zenith" keyword-spotting model (sherpa-onnx streaming zipformer, GigaSpeech English).
+     * The "-mobile" variant crashes in ONNX Runtime (encoder reshape) with sherpa-onnx 2.0.1; this one was verified.
+     */
+    val WAKE_WORD = VoicePack(
+        id = "kws-gigaspeech",
+        name = "Wake word model",
+        kind = VoiceEngineKind.SYSTEM,
+        tagline = "Hey Zenith",
+        description = "Small on-device model that listens only for “Hey Zenith”.",
+        archiveUrl = "https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01.tar.bz2",
+        archiveRoot = "sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01",
+        sizeBytes = 17_626_723L,
+        sha256 = "f170013b4716e41b62b9bfd809687c207cef798ef9bc6534d524e17af9b6561a",
+        keepFiles = setOf(
+            "encoder-epoch-12-avg-2-chunk-16-left-64.int8.onnx", "decoder-epoch-12-avg-2-chunk-16-left-64.int8.onnx",
+            "joiner-epoch-12-avg-2-chunk-16-left-64.int8.onnx", "tokens.txt",
+        ),
+        license = "Apache-2.0 (k2-fsa)",
+        voices = emptyList(),
+    )
+
+    fun pack(id: String): VoicePack? = packs.firstOrNull { it.id == id } ?: WAKE_WORD.takeIf { it.id == id }
 
     fun voice(id: String): NeuralVoice? {
         val packId = id.substringBefore(':', "")

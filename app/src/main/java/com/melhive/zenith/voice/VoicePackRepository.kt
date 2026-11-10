@@ -38,7 +38,7 @@ class VoicePackRepository(context: Context) {
     /** Bytes needed during install: the archive plus its extracted files. */
     fun requiredBytes(pack: VoicePack): Long = pack.sizeBytes * 2 + 50L * 1024 * 1024
 
-    private fun scan(): Set<String> = VoiceCatalog.packs.filter { File(File(root, it.id), MARKER).exists() }.map { it.id }.toSet()
+    private fun scan(): Set<String> = (VoiceCatalog.packs + VoiceCatalog.WAKE_WORD).filter { File(File(root, it.id), MARKER).exists() }.map { it.id }.toSet()
 
     suspend fun install(pack: VoicePack, onProgress: suspend (done: Long, total: Long, phase: String) -> Unit) = withContext(Dispatchers.IO) {
         if (isInstalled(pack)) return@withContext
