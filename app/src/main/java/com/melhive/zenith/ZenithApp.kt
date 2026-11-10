@@ -26,12 +26,14 @@ class ZenithApp : Application() {
         }
     }
 
-    /** Releases the on-device model (multi-GB) when Android is short on memory. */
+    /** Releases the on-device model (multi-GB) and the neural voice when Android is short on memory. */
     @Suppress("DEPRECATION")
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         if (level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND || level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) {
             container.appScope.launch { runCatching { container.localRuntime.unload() } }
+            // Neural voices hold 100–300 MB; release them only while ZENITH is in the background.
+            if (level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) runCatching { if (!container.voice.isSpeaking()) container.voice.unload() }
         }
     }
 }

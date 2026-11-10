@@ -28,6 +28,8 @@ object TaskTypes {
     const val ORGANIZE = "organize"
     const val INDEX = "index"
     const val MODEL_DOWNLOAD = "model_download"
+    const val VOICE_DOWNLOAD = "voice_download"
+    val DOWNLOADS = setOf(MODEL_DOWNLOAD, VOICE_DOWNLOAD)
 }
 
 @Serializable
@@ -80,8 +82,8 @@ class TaskEngine(private val context: Context, private val dao: TaskDao) {
 
     private suspend fun enqueue(task: TaskEntity) {
         val constraints = Constraints.Builder()
-            .apply { if (task.type == TaskTypes.MODEL_DOWNLOAD) setRequiredNetworkType(NetworkType.CONNECTED) }
-            .setRequiresStorageNotLow(task.type == TaskTypes.MODEL_DOWNLOAD)
+            .apply { if (task.type in TaskTypes.DOWNLOADS) setRequiredNetworkType(NetworkType.CONNECTED) }
+            .setRequiresStorageNotLow(task.type in TaskTypes.DOWNLOADS)
             .build()
         val request = OneTimeWorkRequestBuilder<TaskWorker>()
             .setInputData(workDataOf(TaskWorker.KEY_TASK_ID to task.id))

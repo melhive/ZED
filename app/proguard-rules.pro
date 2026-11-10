@@ -9,3 +9,10 @@
 -dontwarn org.bouncycastle.**
 -dontwarn org.conscrypt.**
 -dontwarn org.openjsse.**
+# sherpa-onnx: native code reads config fields and calls back by name over JNI.
+-keep class com.k2fsa.sherpa.onnx.** { *; }
+# commons-compress optional codecs (zstd, brotli, xz) are not used.
+-dontwarn org.apache.commons.compress.**
+-dontwarn com.github.luben.zstd.**
+-dontwarn org.brotli.dec.**
+-dontwarn org.tukaani.xz.**

@@ -52,6 +52,7 @@ class TaskWorker(appContext: Context, params: WorkerParameters) : CoroutineWorke
                 TaskTypes.ORGANIZE -> organize(task)
                 TaskTypes.INDEX -> index(task)
                 TaskTypes.MODEL_DOWNLOAD -> download(task)
+                TaskTypes.VOICE_DOWNLOAD -> downloadVoice(task)
                 else -> fail(task, "Unknown task type ${task.type}")
             }
         } catch (e: CancellationException) {
@@ -147,6 +148,29 @@ class TaskWorker(appContext: Context, params: WorkerParameters) : CoroutineWorke
         // First model installed becomes the active one so conversation works right away.
         if (container.settings.current().activeLocalModelId == null) container.settings.setActiveLocalModel(model.id)
         return succeed(task, "${model.name} installed and verified (SHA-256). It is ready to use.")
+    }
+
+    private suspend fun downloadVoice(task: TaskEntity): Result {
+        val pack = com.melhive.zenith.core.voice.VoiceCatalog.pack(task.input()["pack"].orEmpty()) ?: return fail(task, "Unknown voice pack")
+        val repo = container.voicePacks
+        val free = DeviceInfo.snapshot(applicationContext).freeStorageBytes
+        if (free < repo.requiredBytes(pack)) return fail(task, "Not enough free storage: ${DeviceInfo.formatBytes(repo.requiredBytes(pack))} needed, ${DeviceInfo.formatBytes(free)} free")
+        engine.transition(task.id, TaskStatus.RUNNING) ?: return Result.success()
+        runCatching { setForeground(foregroundInfo(task, 0, pack.sizeBytes, "Starting")) }
+            .onFailure { engine.log(task.id, "Running without foreground notification: ${it.message}", "warn") }
+        engine.log(task.id, "Downloading ${pack.name} voices (${DeviceInfo.formatBytes(pack.sizeBytes)}) from ${pack.archiveUrl}")
+        var lastPhase = ""
+        repo.install(pack) { done, total, phase ->
+            if (phase != lastPhase) { engine.log(task.id, phase); lastPhase = phase }
+            engine.setProgress(task.id, done, total, phase)
+            runCatching { setForeground(foregroundInfo(task, done, total, phase)) }
+        }
+        // Using the system voice? Switch to the pack's first recommended voice so the download pays off right away.
+        val s = container.settings.current()
+        if (com.melhive.zenith.core.voice.VoiceSelection.parse(s.voiceId) !is com.melhive.zenith.core.voice.VoiceSelection.Neural) {
+            pack.voices.firstOrNull { it.featured }?.let { container.settings.setVoiceId(it.id) }
+        }
+        return succeed(task, "${pack.name} voices installed and verified (SHA-256). Choose a voice in Settings → Voice.")
     }
 
     private fun foregroundInfo(task: TaskEntity, done: Long, total: Long, phase: String): ForegroundInfo {

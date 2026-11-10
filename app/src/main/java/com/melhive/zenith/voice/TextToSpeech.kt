@@ -24,6 +24,11 @@ sealed interface TtsEvent {
 
 data class VoiceInfo(val engine: String, val language: String, val offlineVoiceAvailable: Boolean, val voiceName: String?)
 
+/** An installed Android text-to-speech voice. */
+data class SystemVoice(val name: String, val languageTag: String, val displayLanguage: String, val quality: Int, val needsNetwork: Boolean) {
+    val highQuality: Boolean get() = quality >= android.speech.tts.Voice.QUALITY_HIGH
+}
+
 /** Replaceable text-to-speech engine. */
 interface TextToSpeechEngine {
     val events: SharedFlow<TtsEvent>
@@ -32,6 +37,8 @@ interface TextToSpeechEngine {
     fun speak(text: String, flush: Boolean): String?
     fun stop()
     fun setRate(rate: Float)
+    /** Voice pitch, 1.0 = natural. */
+    fun setPitch(pitch: Float) {}
     fun isSpeaking(): Boolean
     fun info(): VoiceInfo?
     fun release()
@@ -41,7 +48,7 @@ interface TextToSpeechEngine {
  * Android TextToSpeech. Prefers an installed voice that does not require a
  * network connection, so speech works offline when a voice pack is present.
  */
-class AndroidTextToSpeech(context: Context) : TextToSpeechEngine {
+class AndroidTextToSpeech(context: Context, private val voiceName: String? = null) : TextToSpeechEngine {
     private val _events = MutableSharedFlow<TtsEvent>(extraBufferCapacity = 64, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     override val events: SharedFlow<TtsEvent> = _events.asSharedFlow()
     private val ready = CompletableDeferred<Boolean>()
@@ -64,12 +71,18 @@ class AndroidTextToSpeech(context: Context) : TextToSpeechEngine {
             AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()
         )
         val locale = Locale.getDefault()
+        val chosen = voiceName?.let { name -> runCatching { t.voices?.firstOrNull { it.name == name } }.getOrNull() }
+        if (chosen != null) { t.voice = chosen; attachListener(t); return }
         val offline = runCatching {
             t.voices?.filter { !it.isNetworkConnectionRequired && it.locale.language == locale.language }
                 ?.sortedWith(compareByDescending<android.speech.tts.Voice> { it.locale == locale }.thenByDescending { it.quality })
                 ?.firstOrNull()
         }.getOrNull()
         if (offline != null) t.voice = offline else t.language = locale
+        attachListener(t)
+    }
+
+    private fun attachListener(t: TextToSpeech) {
         t.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String) { _events.tryEmit(TtsEvent.Started(utteranceId)) }
             override fun onDone(utteranceId: String) { _events.tryEmit(TtsEvent.Done(utteranceId)) }
@@ -94,6 +107,15 @@ class AndroidTextToSpeech(context: Context) : TextToSpeechEngine {
 
     override fun stop() { tts?.stop() }
     override fun setRate(rate: Float) { tts?.setSpeechRate(rate) }
+    override fun setPitch(pitch: Float) { tts?.setPitch(pitch.coerceIn(0.5f, 2f)) }
+
+    /** Installed voices, offline ones first, then by quality. */
+    fun voices(): List<SystemVoice> = runCatching {
+        tts?.voices.orEmpty()
+            .filter { !it.features.orEmpty().contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED) }
+            .map { SystemVoice(it.name, it.locale.toLanguageTag(), it.locale.displayName, it.quality, it.isNetworkConnectionRequired) }
+            .sortedWith(compareBy<SystemVoice> { it.needsNetwork }.thenByDescending { it.quality }.thenBy { it.displayLanguage }.thenBy { it.name })
+    }.getOrDefault(emptyList())
     override fun isSpeaking(): Boolean = tts?.isSpeaking == true
 
     override fun info(): VoiceInfo? {

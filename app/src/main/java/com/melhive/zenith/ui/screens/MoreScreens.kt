@@ -15,11 +15,11 @@ import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Psychology
+import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -63,6 +63,7 @@ fun MoreScreen(onNavigate: (String) -> Unit) {
         Entry(Routes.MODELS, Icons.Outlined.Psychology, "Model Manager", "On-device models and online providers"),
         Entry(Routes.FILES, Icons.Outlined.Folder, "Files", "Granted folders, browse and organize"),
         Entry(Routes.SKILLS, Icons.Outlined.AutoAwesome, "Skills", "Capabilities ZENITH can use"),
+        Entry(Routes.VOICE, Icons.Outlined.RecordVoiceOver, "Voice", "Natural offline voices, speed and pitch"),
         Entry(Routes.SETTINGS, Icons.Outlined.Settings, "Settings", "Voice, safety and behaviour"),
         Entry(Routes.DIAGNOSTICS, Icons.Outlined.Security, "Permissions & Diagnostics", "Permissions, voice engines, audit log"),
     )
@@ -135,8 +136,14 @@ fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
                 SectionTitle("Voice")
                 SwitchRow("Voice responses", "Speak replies in ZENITH LIVE and after voice input", settings.voiceResponses) { scope.launch { c.settings.setVoiceResponses(it) } }
                 SwitchRow("Interrupt by talking", "With headphones or earbuds, start talking to cut ZENITH off. On the loudspeaker, tap the orb instead.", settings.bargeIn) { scope.launch { c.settings.setBargeIn(it) } }
-                Text("Speech rate: ${"%.1f".format(settings.speechRate)}×", style = MaterialTheme.typography.titleSmall)
-                Slider(value = settings.speechRate, onValueChange = { v -> scope.launch { c.settings.setSpeechRate(v) } }, valueRange = 0.5f..2.0f, steps = 14)
+                val voiceLabel = when (val sel = com.melhive.zenith.core.voice.VoiceSelection.parse(settings.voiceId)) {
+                    com.melhive.zenith.core.voice.VoiceSelection.SystemDefault -> "Phone default voice"
+                    is com.melhive.zenith.core.voice.VoiceSelection.System -> "Phone voice"
+                    is com.melhive.zenith.core.voice.VoiceSelection.Neural -> "${sel.voice.name} (${sel.pack.name})"
+                }
+                ZenithCard(onClick = { onNavigate(Routes.VOICE) }, accent = ZenithColors.Violet, modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
+                    IconLabel(Icons.Outlined.RecordVoiceOver, "Voice: $voiceLabel", "Speed ${"%.2f".format(settings.speechRate)}× · pitch ${"%.2f".format(settings.speechPitch)}× · tap to choose natural offline voices")
+                }
             }
         }
         item {
@@ -271,6 +278,7 @@ fun DiagnosticsScreen(onBack: () -> Unit) {
                         else -> "not available"
                     },
                     "Text-to-speech" to (ttsInfo ?: "checking…"),
+                    "Voice packs" to (c.voicePacks.installed.value.joinToString().ifEmpty { "none installed" } + " · ${DeviceInfo.formatBytes(c.voicePacks.usedBytes())}"),
                     "Document index" to "$chunkCount chunks",
                     "Network" to if (device.online) (if (device.unmetered) "online (unmetered)" else "online (metered)") else "offline",
                 )

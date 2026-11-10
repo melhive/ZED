@@ -1,0 +1,288 @@
+package com.melhive.zenith.ui.screens
+
+import android.content.Intent
+import android.speech.tts.TextToSpeech
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.RecordVoiceOver
+import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.melhive.zenith.android.DeviceInfo
+import com.melhive.zenith.core.voice.NeuralVoice
+import com.melhive.zenith.core.voice.VoiceCatalog
+import com.melhive.zenith.core.voice.VoiceGender
+import com.melhive.zenith.core.voice.VoicePack
+import com.melhive.zenith.core.voice.VoiceSelection
+import com.melhive.zenith.tasks.TaskTypes
+import com.melhive.zenith.tasks.input
+import com.melhive.zenith.tasks.statusEnum
+import com.melhive.zenith.ui.components.RealProgress
+import com.melhive.zenith.ui.components.SectionTitle
+import com.melhive.zenith.ui.components.StatusPill
+import com.melhive.zenith.ui.components.WrapRow
+import com.melhive.zenith.ui.components.ZenithCard
+import com.melhive.zenith.ui.navigation.rememberContainer
+import com.melhive.zenith.ui.theme.ZenithColors
+import com.melhive.zenith.voice.SystemVoice
+import com.melhive.zenith.voice.VoiceManager
+import kotlinx.coroutines.launch
+
+/** Choose how ZENITH sounds: offline neural voices, phone voices, speed and pitch. */
+@Composable
+fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
+    val c = rememberContainer()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val s by c.settings.settings.collectAsStateWithLifecycle(initialValue = null)
+    val status by c.voice.status.collectAsStateWithLifecycle()
+    val installed by c.voicePacks.installed.collectAsStateWithLifecycle()
+    val tasks by c.taskEngine.tasks.collectAsStateWithLifecycle(initialValue = emptyList())
+    val name by produceState<String?>(null) { value = c.memory.userName() }
+    var systemVoices by remember { mutableStateOf<List<SystemVoice>?>(null) }
+    var showAllSystem by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) { systemVoices = c.voice.systemVoices() }
+    val settings = s ?: return
+    val selection = VoiceSelection.parse(settings.voiceId)
+
+    val sample = "Hello${name?.let { ", $it" } ?: ""}. I'm ZENITH. It's 7:30, and you have 3 things on your list today."
+    fun choose(id: String) = scope.launch {
+        c.settings.setVoiceId(id)
+        if (!c.voice.preview(sample)) message = "That voice could not be loaded."
+    }
+    fun previewNow() = scope.launch { if (!c.voice.preview(sample)) message = "Speech is unavailable on this phone." }
+
+    ListScreen("Voice", onBack = onBack, subtitle = "Choose how ZENITH sounds. Every voice runs on your phone, offline.") {
+        item {
+            ZenithCard {
+                SectionTitle("Now speaking with")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.RecordVoiceOver, null, tint = ZenithColors.Cyan)
+                    Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                        Text(selectionLabel(selection), style = MaterialTheme.typography.titleMedium)
+                        (status.detail ?: "Tap Preview to hear it").let { Text(it, style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted) }
+                    }
+                    when (status.phase) {
+                        VoiceManager.Phase.LOADING -> StatusPill("Loading", ZenithColors.Amber)
+                        VoiceManager.Phase.READY -> StatusPill("Ready", ZenithColors.Green)
+                        VoiceManager.Phase.FALLBACK -> StatusPill("Fallback", ZenithColors.Amber)
+                        VoiceManager.Phase.IDLE -> Unit
+                    }
+                }
+                WrapRow(Modifier.padding(top = 8.dp)) {
+                    Button(onClick = { previewNow() }) { Text("Preview") }
+                    TextButton(onClick = { c.voice.stop() }) { Text("Stop") }
+                }
+                message?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = ZenithColors.Amber) }
+            }
+        }
+
+        item { SpeedAndPitch(settings.speechRate, settings.speechPitch,
+            onRate = { v -> scope.launch { c.settings.setSpeechRate(v); c.voice.preview("This is how fast I'll talk.") } },
+            onPitch = { v -> scope.launch { c.settings.setSpeechPitch(v); c.voice.preview("This is how my voice will sound.") } },
+        ) }
+
+        item { SectionTitle("Natural offline voices") }
+        items(VoiceCatalog.packs, key = { it.id }) { pack ->
+            val task = tasks.firstOrNull { it.type == TaskTypes.VOICE_DOWNLOAD && it.input()["pack"] == pack.id && !it.statusEnum().terminal }
+            VoicePackCard(
+                pack = pack,
+                installed = pack.id in installed,
+                downloading = task != null,
+                progress = task?.let { Triple(it.progressCurrent, it.progressTotal, it.progressLabel) },
+                selectedId = (selection as? VoiceSelection.Neural)?.voice?.id,
+                onDownload = {
+                    scope.launch {
+                        val free = DeviceInfo.snapshot(context).freeStorageBytes
+                        val need = c.voicePacks.requiredBytes(pack)
+                        if (free < need) { message = "Not enough storage: ${DeviceInfo.formatBytes(need)} needed, ${DeviceInfo.formatBytes(free)} free."; return@launch }
+                        val t = c.taskEngine.create(TaskTypes.VOICE_DOWNLOAD, "Download ${pack.name} voices", mapOf("pack" to pack.id))
+                        message = "Downloading ${pack.name} as task #${t.id}. You can keep using ZENITH."
+                    }
+                },
+                onCancel = { task?.let { t -> scope.launch { c.taskEngine.cancel(t.id) } } },
+                onOpenTasks = onOpenTasks,
+                onRemove = {
+                    scope.launch {
+                        if ((selection as? VoiceSelection.Neural)?.pack?.id == pack.id) { c.voice.unload(); c.settings.setVoiceId(VoiceSelection.SYSTEM_DEFAULT) }
+                        c.voicePacks.remove(pack)
+                        message = "Removed ${pack.name} voices"
+                    }
+                },
+                onSelect = { v -> choose(v.id) },
+            )
+        }
+
+        item { SectionTitle("Phone voices") }
+        item {
+            ZenithCard {
+                Text("Voices from your phone's text-to-speech engine. Quality depends on the phone; Google's high-quality offline voices sound best.",
+                    style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
+                VoiceRow("Phone default", "Your phone's default voice", selection is VoiceSelection.SystemDefault, featured = false) { choose(VoiceSelection.SYSTEM_DEFAULT) }
+                val list = systemVoices
+                when {
+                    list == null -> Text("Loading phone voices…", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
+                    list.isEmpty() -> Text("No phone voices found.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
+                    else -> {
+                        val shown = if (showAllSystem) list else list.filter { !it.needsNetwork }.take(6).ifEmpty { list.take(6) }
+                        shown.forEach { v ->
+                            VoiceRow(
+                                title = v.displayLanguage,
+                                subtitle = listOfNotNull(v.name, if (v.highQuality) "high quality" else null, if (v.needsNetwork) "needs internet" else "offline").joinToString(" · "),
+                                selected = (selection as? VoiceSelection.System)?.voiceName == v.name,
+                                featured = false,
+                            ) { choose(VoiceSelection.system(v.name)) }
+                        }
+                        if (list.size > shown.size || showAllSystem) TextButton(onClick = { showAllSystem = !showAllSystem }) { Text(if (showAllSystem) "Show fewer" else "Show all ${list.size} voices") }
+                    }
+                }
+                TextButton(onClick = {
+                    runCatching { context.startActivity(Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                        .onFailure { runCatching { context.startActivity(Intent("com.android.settings.TTS_SETTINGS").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } }
+                }) { Text("Get more phone voices") }
+            }
+        }
+        item {
+            Text("Neural voices are synthesized on this phone with sherpa-onnx; no text is sent online. They need an arm64 phone and 100–300 MB of free memory while speaking.",
+                style = MaterialTheme.typography.labelSmall, color = ZenithColors.Muted, modifier = Modifier.padding(4.dp))
+        }
+    }
+}
+
+private fun selectionLabel(s: VoiceSelection): String = when (s) {
+    VoiceSelection.SystemDefault -> "Phone default voice"
+    is VoiceSelection.System -> "Phone voice · ${s.voiceName}"
+    is VoiceSelection.Neural -> "${s.voice.name} · ${s.pack.name} (${s.voice.gender.label}, ${s.voice.accent})"
+}
+
+private data class Preset(val label: String, val value: Float)
+
+@Composable
+private fun SpeedAndPitch(rate: Float, pitch: Float, onRate: (Float) -> Unit, onPitch: (Float) -> Unit) {
+    var r by remember(rate) { mutableFloatStateOf(rate) }
+    var p by remember(pitch) { mutableFloatStateOf(pitch) }
+    ZenithCard {
+        SectionTitle("Speaking speed")
+        Text("${"%.2f".format(r)}× ${describeRate(r)}", style = MaterialTheme.typography.titleSmall)
+        Slider(value = r, onValueChange = { r = (it * 20).toInt() / 20f }, onValueChangeFinished = { onRate(r) }, valueRange = 0.5f..2.0f)
+        WrapRow {
+            listOf(Preset("Slow", 0.8f), Preset("Normal", 1.0f), Preset("Brisk", 1.2f), Preset("Fast", 1.5f)).forEach { pr ->
+                FilterChip(selected = kotlin.math.abs(r - pr.value) < 0.01f, onClick = { r = pr.value; onRate(pr.value) }, label = { Text(pr.label) })
+            }
+        }
+        SectionTitle("Voice pitch")
+        Text("${"%.2f".format(p)}× ${if (p < 0.97f) "lower" else if (p > 1.03f) "higher" else "natural"}", style = MaterialTheme.typography.titleSmall)
+        Slider(value = p, onValueChange = { p = (it * 20).toInt() / 20f }, onValueChangeFinished = { onPitch(p) }, valueRange = 0.7f..1.3f)
+        WrapRow {
+            listOf(Preset("Deeper", 0.85f), Preset("Natural", 1.0f), Preset("Brighter", 1.15f)).forEach { pr ->
+                FilterChip(selected = kotlin.math.abs(p - pr.value) < 0.01f, onClick = { p = pr.value; onPitch(pr.value) }, label = { Text(pr.label) })
+            }
+        }
+    }
+}
+
+private fun describeRate(r: Float) = when {
+    r < 0.85f -> "slow"
+    r < 0.97f -> "a little slower"
+    r <= 1.03f -> "normal"
+    r < 1.3f -> "a little faster"
+    else -> "fast"
+}
+
+@Composable
+private fun VoicePackCard(
+    pack: VoicePack,
+    installed: Boolean,
+    downloading: Boolean,
+    progress: Triple<Long?, Long?, String?>?,
+    selectedId: String?,
+    onDownload: () -> Unit,
+    onCancel: () -> Unit,
+    onOpenTasks: () -> Unit,
+    onRemove: () -> Unit,
+    onSelect: (NeuralVoice) -> Unit,
+) {
+    var gender by remember { mutableStateOf<VoiceGender?>(null) }
+    var accent by remember { mutableStateOf<String?>(null) }
+    var showAll by remember { mutableStateOf(false) }
+    ZenithCard(accent = if (installed) ZenithColors.Green else ZenithColors.Violet) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(pack.name, style = MaterialTheme.typography.titleMedium)
+                Text(pack.tagline, style = MaterialTheme.typography.labelMedium, color = ZenithColors.Cyan)
+            }
+            if (installed) StatusPill("Installed", ZenithColors.Green)
+        }
+        Text(pack.description, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
+        Text("${pack.voices.size} voices · ${DeviceInfo.formatBytes(pack.sizeBytes)} download · ${pack.license}", style = MaterialTheme.typography.labelSmall, color = ZenithColors.Muted)
+        when {
+            downloading -> {
+                RealProgress(progress?.first, progress?.second, Modifier.padding(top = 8.dp))
+                val (done, total, label) = progress ?: Triple(null, null, null)
+                Text(listOfNotNull(label, if (done != null && total != null) "${DeviceInfo.formatBytes(done)} / ${DeviceInfo.formatBytes(total)}" else null).joinToString(" · ").ifEmpty { "Queued" },
+                    style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
+                WrapRow { TextButton(onClick = onCancel) { Text("Cancel") }; TextButton(onClick = onOpenTasks) { Text("Open Tasks") } }
+            }
+            !installed -> WrapRow(Modifier.padding(top = 8.dp)) { Button(onClick = onDownload) { Text("Download ${DeviceInfo.formatBytes(pack.sizeBytes)}") } }
+            else -> {
+                val accents = pack.voices.map { it.accent }.distinct()
+                WrapRow(Modifier.padding(top = 8.dp)) {
+                    FilterChip(selected = gender == null && accent == null, onClick = { gender = null; accent = null }, label = { Text("All") })
+                    VoiceGender.entries.forEach { g -> FilterChip(selected = gender == g, onClick = { gender = if (gender == g) null else g }, label = { Text(g.label) }) }
+                    if (accents.size > 1) accents.forEach { a -> FilterChip(selected = accent == a, onClick = { accent = if (accent == a) null else a }, label = { Text(a) }) }
+                }
+                val filtered = pack.voices.filter { (gender == null || it.gender == gender) && (accent == null || it.accent == accent) }
+                val shown = if (showAll || gender != null || accent != null) filtered else filtered.filter { it.featured || it.id == selectedId }
+                shown.forEach { v ->
+                    VoiceRow(v.name, "${v.gender.label} · ${v.accent} · ${v.description}", v.id == selectedId, v.featured) { onSelect(v) }
+                }
+                if (!showAll && gender == null && accent == null && shown.size < filtered.size)
+                    TextButton(onClick = { showAll = true }) { Text("Show all ${pack.voices.size} voices") }
+                WrapRow { OutlinedButton(onClick = onRemove) { Text("Remove") } }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VoiceRow(title: String, subtitle: String, selected: Boolean, featured: Boolean, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(title, style = MaterialTheme.typography.titleSmall, color = if (selected) ZenithColors.Cyan else ZenithColors.Text)
+                if (featured) Icon(Icons.Outlined.Star, "Recommended", tint = ZenithColors.Amber, modifier = Modifier.padding(start = 4.dp).size(16.dp))
+            }
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
+        }
+        if (selected) Icon(Icons.Outlined.CheckCircle, "Selected", tint = ZenithColors.Cyan)
+        else Text("Tap to hear", style = MaterialTheme.typography.labelSmall, color = ZenithColors.Muted)
+    }
+}

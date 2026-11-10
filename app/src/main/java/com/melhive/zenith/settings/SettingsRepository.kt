@@ -38,6 +38,10 @@ data class AppSettings(
     val compatibleBaseUrl: String = "",
     val voiceResponses: Boolean = true,
     val speechRate: Float = 1.0f,
+    /** Voice pitch, 1.0 = natural. */
+    val speechPitch: Float = 1.0f,
+    /** Selected voice: see [com.melhive.zenith.core.voice.VoiceSelection]. */
+    val voiceId: String = "system",
     val confirmAllChanges: Boolean = false,
     val useKnowledge: Boolean = true,
     val autoIndex: Boolean = false,
@@ -63,6 +67,8 @@ class SettingsRepository(private val context: Context) {
         val compatibleUrl = stringPreferencesKey("compatible_url")
         val voice = booleanPreferencesKey("voice_responses")
         val rate = floatPreferencesKey("speech_rate")
+        val pitch = floatPreferencesKey("speech_pitch")
+        val voiceId = stringPreferencesKey("voice_id")
         val confirmAll = booleanPreferencesKey("confirm_all")
         val useKnowledge = booleanPreferencesKey("use_knowledge")
         val autoIndex = booleanPreferencesKey("auto_index")
@@ -86,6 +92,8 @@ class SettingsRepository(private val context: Context) {
             compatibleBaseUrl = p[K.compatibleUrl] ?: "",
             voiceResponses = p[K.voice] ?: defaults.voiceResponses,
             speechRate = p[K.rate] ?: defaults.speechRate,
+            speechPitch = p[K.pitch] ?: defaults.speechPitch,
+            voiceId = p[K.voiceId] ?: defaults.voiceId,
             confirmAllChanges = p[K.confirmAll] ?: defaults.confirmAllChanges,
             useKnowledge = p[K.useKnowledge] ?: defaults.useKnowledge,
             autoIndex = p[K.autoIndex] ?: defaults.autoIndex,
@@ -108,6 +116,8 @@ class SettingsRepository(private val context: Context) {
     suspend fun setCompatibleBaseUrl(url: String) = context.dataStore.edit { it[K.compatibleUrl] = url.trim() }
     suspend fun setVoiceResponses(v: Boolean) = context.dataStore.edit { it[K.voice] = v }
     suspend fun setSpeechRate(r: Float) = context.dataStore.edit { it[K.rate] = r.coerceIn(0.5f, 2.0f) }
+    suspend fun setSpeechPitch(p: Float) = context.dataStore.edit { it[K.pitch] = p.coerceIn(0.5f, 2.0f) }
+    suspend fun setVoiceId(id: String) = context.dataStore.edit { it[K.voiceId] = id }
     suspend fun setConfirmAllChanges(v: Boolean) = context.dataStore.edit { it[K.confirmAll] = v }
     suspend fun setUseKnowledge(v: Boolean) = context.dataStore.edit { it[K.useKnowledge] = v }
     suspend fun setAutoIndex(v: Boolean) = context.dataStore.edit { it[K.autoIndex] = v }

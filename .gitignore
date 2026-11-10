@@ -15,3 +15,5 @@ keystore.properties
 signing.properties
 google-services.json
 *.env
+# Downloaded at build time (sherpa-onnx AAR, checksum-verified in app/build.gradle.kts)
+/app/libs/

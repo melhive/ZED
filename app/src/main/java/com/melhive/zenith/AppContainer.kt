@@ -26,7 +26,6 @@ import com.melhive.zenith.tools.executors.AndroidCapabilityChecker
 import com.melhive.zenith.tools.executors.DefaultConfirmationText
 import com.melhive.zenith.tools.executors.registerExecutors
 import com.melhive.zenith.voice.AndroidSpeechToText
-import com.melhive.zenith.voice.AndroidTextToSpeech
 import com.melhive.zenith.voice.LiveSessionController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -76,7 +75,7 @@ class AppContainer(private val context: Context) {
     }
 
     val live by lazy {
-        LiveSessionController(context, orchestrator, conversations, settings, { AndroidSpeechToText(context) }, { AndroidTextToSpeech(context) })
+        LiveSessionController(context, orchestrator, conversations, settings, { AndroidSpeechToText(context) }, { voice.sessionHandle() })
     }
 
     val updates = com.melhive.zenith.android.UpdateChecker()
@@ -84,6 +83,12 @@ class AppContainer(private val context: Context) {
     /** Conversation Chat should show next (set by Home's "Ask ZENITH" box). */
     val chatFocus = kotlinx.coroutines.flow.MutableStateFlow<Long?>(null)
 
-    /** A one-shot TTS engine for reading chat replies aloud. */
-    val chatTts by lazy { AndroidTextToSpeech(context) }
+    /** Downloadable offline neural voice packs. */
+    val voicePacks by lazy { com.melhive.zenith.voice.VoicePackRepository(context) }
+
+    /** The voice ZENITH speaks with everywhere (system or neural, per Settings → Voice). */
+    val voice by lazy { com.melhive.zenith.voice.VoiceManager(context, settings, voicePacks, appScope) }
+
+    /** Reads chat replies aloud with the selected voice. */
+    val chatTts: com.melhive.zenith.voice.TextToSpeechEngine get() = voice
 }
