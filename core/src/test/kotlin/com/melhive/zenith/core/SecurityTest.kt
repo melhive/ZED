@@ -51,19 +51,18 @@ class SecurityTest {
         val del = catalog.find("file.delete")!!
         val create = catalog.find("file.create")!!
         val read = catalog.find("file.read")!!
-        val M = com.melhive.zenith.core.security.ConfirmMode
         val native = ToolRequest("x", origin = Origin.NATIVE)
         val model = ToolRequest("x", origin = Origin.ONLINE_MODEL)
         // NEVER: nothing asks (the user's choice), whoever requested it.
-        assertFalse(ConfirmationPolicy.requiresConfirmation(del, model, M.NEVER))
-        assertFalse(ConfirmationPolicy.requiresConfirmation(create, model, M.NEVER))
+        assertFalse(ConfirmationPolicy.requiresConfirmation(del, model, com.melhive.zenith.core.security.ConfirmMode.NEVER))
+        assertFalse(ConfirmationPolicy.requiresConfirmation(create, model, com.melhive.zenith.core.security.ConfirmMode.NEVER))
         // RISKY: only destructive tools.
-        assertTrue(ConfirmationPolicy.requiresConfirmation(del, native, M.RISKY))
-        assertFalse(ConfirmationPolicy.requiresConfirmation(create, model, M.RISKY))
+        assertTrue(ConfirmationPolicy.requiresConfirmation(del, native, com.melhive.zenith.core.security.ConfirmMode.RISKY))
+        assertFalse(ConfirmationPolicy.requiresConfirmation(create, model, com.melhive.zenith.core.security.ConfirmMode.RISKY))
         // ALWAYS: every change, never reads.
-        assertTrue(ConfirmationPolicy.requiresConfirmation(create, native, M.ALWAYS))
-        assertFalse(ConfirmationPolicy.requiresConfirmation(read, model, M.ALWAYS))
-        assertEquals(M.NEVER, M.parse(null))
+        assertTrue(ConfirmationPolicy.requiresConfirmation(create, native, com.melhive.zenith.core.security.ConfirmMode.ALWAYS))
+        assertFalse(ConfirmationPolicy.requiresConfirmation(read, model, com.melhive.zenith.core.security.ConfirmMode.ALWAYS))
+        assertEquals(com.melhive.zenith.core.security.ConfirmMode.NEVER, com.melhive.zenith.core.security.ConfirmMode.parse(null))
     }
 
     @Test fun toolCallExtraction() {
