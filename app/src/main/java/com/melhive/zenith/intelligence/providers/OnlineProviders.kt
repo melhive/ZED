@@ -379,6 +379,18 @@ class GeminiProvider(
         }
     }
 
+    /** Models that support the Live API (real-time voice). */
+    suspend fun listLiveModels(): Result<List<String>> = withContext(Dispatchers.IO) {
+        val key = apiKey() ?: return@withContext Result.failure(IllegalStateException("API key not set"))
+        Http.getJson("$baseUrl/v1beta/models?pageSize=200", mapOf("x-goog-api-key" to key)).map { root ->
+            (root["models"] as? JsonArray).orEmpty().mapNotNull { m ->
+                val o = m.obj() ?: return@mapNotNull null
+                val methods = (o["supportedGenerationMethods"] as? JsonArray).orEmpty().mapNotNull { it.str() }
+                if ("bidiGenerateContent" in methods) o["name"].str()?.removePrefix("models/") else null
+            }.sorted()
+        }
+    }
+
     companion object {
         const val BASE = "https://generativelanguage.googleapis.com"
         private const val SYNTHETIC_ID = "zenith-call-"

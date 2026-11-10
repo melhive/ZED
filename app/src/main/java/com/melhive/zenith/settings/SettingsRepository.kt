@@ -46,6 +46,10 @@ data class AppSettings(
     val persona: String = "COMPANION",
     /** How ZENITH addresses the user ("sir", "boss", a nickname); blank = by name. */
     val userTitle: String = "",
+    /** ZENITH LIVE engine: "standard" (speech recognizer + TTS) or "gemini_live" (real-time). */
+    val liveEngine: String = "standard",
+    val liveModel: String = "",
+    val liveVoice: String = "Charon",
     val confirmAllChanges: Boolean = false,
     val useKnowledge: Boolean = true,
     val autoIndex: Boolean = false,
@@ -75,6 +79,9 @@ class SettingsRepository(private val context: Context) {
         val voiceId = stringPreferencesKey("voice_id")
         val persona = stringPreferencesKey("persona")
         val userTitle = stringPreferencesKey("user_title")
+        val liveEngine = stringPreferencesKey("live_engine")
+        val liveModel = stringPreferencesKey("live_model")
+        val liveVoice = stringPreferencesKey("live_voice")
         val confirmAll = booleanPreferencesKey("confirm_all")
         val useKnowledge = booleanPreferencesKey("use_knowledge")
         val autoIndex = booleanPreferencesKey("auto_index")
@@ -102,6 +109,9 @@ class SettingsRepository(private val context: Context) {
             voiceId = p[K.voiceId] ?: defaults.voiceId,
             persona = p[K.persona] ?: defaults.persona,
             userTitle = p[K.userTitle] ?: defaults.userTitle,
+            liveEngine = p[K.liveEngine] ?: defaults.liveEngine,
+            liveModel = p[K.liveModel] ?: defaults.liveModel,
+            liveVoice = p[K.liveVoice] ?: defaults.liveVoice,
             confirmAllChanges = p[K.confirmAll] ?: defaults.confirmAllChanges,
             useKnowledge = p[K.useKnowledge] ?: defaults.useKnowledge,
             autoIndex = p[K.autoIndex] ?: defaults.autoIndex,
@@ -128,6 +138,9 @@ class SettingsRepository(private val context: Context) {
     suspend fun setVoiceId(id: String) = context.dataStore.edit { it[K.voiceId] = id }
     suspend fun setPersona(name: String) = context.dataStore.edit { it[K.persona] = name }
     suspend fun setUserTitle(title: String) = context.dataStore.edit { it[K.userTitle] = title.trim().take(40) }
+    suspend fun setLiveEngine(engine: String) = context.dataStore.edit { it[K.liveEngine] = engine }
+    suspend fun setLiveModel(model: String) = context.dataStore.edit { it[K.liveModel] = model.trim() }
+    suspend fun setLiveVoice(voice: String) = context.dataStore.edit { it[K.liveVoice] = voice }
     suspend fun setConfirmAllChanges(v: Boolean) = context.dataStore.edit { it[K.confirmAll] = v }
     suspend fun setUseKnowledge(v: Boolean) = context.dataStore.edit { it[K.useKnowledge] = v }
     suspend fun setAutoIndex(v: Boolean) = context.dataStore.edit { it[K.autoIndex] = v }

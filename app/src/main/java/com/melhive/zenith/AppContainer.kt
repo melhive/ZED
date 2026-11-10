@@ -75,7 +75,33 @@ class AppContainer(private val context: Context) {
     }
 
     val live by lazy {
-        LiveSessionController(context, orchestrator, conversations, settings, { AndroidSpeechToText(context) }, { voice.sessionHandle() })
+        LiveSessionController(context, orchestrator, conversations, settings, { AndroidSpeechToText(context) }, { voice.sessionHandle() }, { realtimeConfig() })
+    }
+
+    /** Gemini Live settings for ZENITH LIVE, or null when no Gemini key is configured. */
+    private suspend fun realtimeConfig(): com.melhive.zenith.voice.RealtimeConfig? {
+        val s = settings.current()
+        val key = secrets.get(SecretStore.apiKeyName(com.melhive.zenith.settings.OnlineProviderKind.GEMINI)) ?: return null
+        val tools = skills.enabledTools(s.enabledSkills).filter { it.name != "web.research" }
+        val now = java.time.ZonedDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("EEEE yyyy-MM-dd'T'HH:mm (VV)"))
+        val prompt = com.melhive.zenith.core.intelligence.PromptBuilder.systemPrompt(
+            tools = emptyList(), nowDescription = now, memories = memory.list(30).map { it.text }, knowledge = emptyList(),
+            voiceMode = true, userName = memory.userName(),
+            persona = com.melhive.zenith.core.intelligence.Persona.parse(s.persona), userTitle = s.userTitle.ifBlank { null },
+            nativeTools = tools.isNotEmpty(),
+        )
+        return com.melhive.zenith.voice.RealtimeConfig(
+            apiKey = key,
+            model = s.liveModel.ifBlank { com.melhive.zenith.voice.GeminiLiveSession.DEFAULT_MODEL },
+            voiceName = s.liveVoice,
+            systemPrompt = prompt,
+            tools = tools,
+            webSearch = true,
+            executeTool = { call ->
+                val out = toolManager.execute(com.melhive.zenith.core.tools.ToolRequest(call.name, call.args, com.melhive.zenith.core.tools.ToolRequest.Origin.ONLINE_MODEL))
+                com.melhive.zenith.intelligence.ToolCallResult(call.id, call.name, out.message, out is com.melhive.zenith.tools.ToolOutcome.Executed && out.result.ok)
+            },
+        )
     }
 
     val updates = com.melhive.zenith.android.UpdateChecker()

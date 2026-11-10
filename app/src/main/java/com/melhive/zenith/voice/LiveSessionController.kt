@@ -75,6 +75,8 @@ class LiveSessionController(
     private val settings: SettingsRepository,
     private val sttFactory: () -> SpeechToText,
     private val ttsFactory: () -> TextToSpeechEngine,
+    /** Gemini Live configuration when real-time voice is enabled and usable, else null. */
+    private val realtimeConfig: suspend () -> RealtimeConfig? = { null },
 ) {
     private val _state = MutableStateFlow(LiveUiState())
     val state: StateFlow<LiveUiState> = _state.asStateFlow()
@@ -97,6 +99,11 @@ class LiveSessionController(
     private var bargeInEnabled = true
     private var listenJob: Job? = null
 
+    // Real-time (Gemini Live) session, when active.
+    private var rt: GeminiLiveSession? = null
+    private var rtUserTurn = -1
+    private var rtModelTurn = -1
+
     fun start() {
         if (_state.value.active) return
         if (!PermissionCatalog.isGranted(context, PermissionCatalog.MICROPHONE)) {
@@ -117,6 +124,11 @@ class LiveSessionController(
             _state.update { it.copy(speakerOn = cfg.voiceResponses) }
             tts?.setRate(cfg.speechRate)
             conversationId = conversations.create("ZENITH LIVE session")
+            if (cfg.liveEngine == LIVE_ENGINE_REALTIME) {
+                val rc = runCatching { realtimeConfig() }.getOrNull()
+                if (rc != null) { startRealtime(rc); return@launch }
+                _state.update { it.copy(statusDetail = "Real-time voice needs a Gemini API key (Model Manager). Using standard voice.") }
+            }
             if (tts?.awaitReady() != true) _state.update { it.copy(speakerOn = false, statusDetail = "Text-to-speech is unavailable; replies will be shown only") }
             if (!recognitionAvailable()) {
                 setOrb(OrbState.ERROR, "No speech recognition service on this phone. Use the keyboard or system voice input below, or install Google's speech services.")
@@ -129,8 +141,63 @@ class LiveSessionController(
         s.launch { orchestrator.streamingText.collect { onStreamText(it) } }
     }
 
+    private fun startRealtime(rc: RealtimeConfig) {
+        val s = scope ?: return
+        _state.update { it.copy(sttEngine = "Gemini Live · ${rc.model}", statusDetail = "Connecting to Gemini Live…", orb = OrbState.THINKING) }
+        rtUserTurn = -1; rtModelTurn = -1
+        val session = GeminiLiveSession(context, rc, object : GeminiLiveSession.Listener {
+            override fun onConnected() { s.launch { _state.update { it.copy(statusDetail = "Real-time voice · just talk", echoCancellation = true) } } }
+            override fun onListening() { s.launch { if (rt != null) { focus?.release(); setOrb(OrbState.LISTENING, "Real-time voice · just talk") } } }
+            override fun onUserSpeech(text: String, final: Boolean) { s.launch { upsertTurn(fromUser = true, text, final) } }
+            override fun onAssistantSpeech(text: String, final: Boolean) { s.launch { upsertTurn(fromUser = false, text, final) } }
+            override fun onSpeaking(pulse: Boolean) {
+                s.launch {
+                    if (_state.value.orb != OrbState.SPEAKING) { focus?.acquire(); setOrb(OrbState.SPEAKING) }
+                    if (pulse) _state.update { it.copy(speechPulse = it.speechPulse + 1) }
+                }
+            }
+            override fun onTool(name: String) { s.launch { setOrb(OrbState.EXECUTING, name) } }
+            override fun onMicLevel(level: Float) { _state.update { it.copy(micLevel = level) } }
+            override fun onFailed(message: String, beforeSetup: Boolean) {
+                s.launch {
+                    rt?.close(); rt = null
+                    com.melhive.zenith.android.CrashReporter.recordNonFatal("gemini live", IllegalStateException(message))
+                    if (beforeSetup) {
+                        // Couldn't start (bad key/model, no network): continue with the standard pipeline.
+                        _state.update { it.copy(sttEngine = stt?.engineName.orEmpty(), statusDetail = "$message. Using standard voice instead.") }
+                        if (tts?.awaitReady() != true) _state.update { it.copy(speakerOn = false) }
+                        if (recognitionAvailable()) listen() else setOrb(OrbState.ERROR, message)
+                    } else setOrb(OrbState.ERROR, "$message. Tap the orb to reconnect.")
+                }
+            }
+        })
+        session.speakerOn = _state.value.speakerOn
+        rt = session
+        session.start()
+    }
+
+    /** Live transcript: updates the in-progress user/model turn, saving it to the conversation when final. */
+    private fun upsertTurn(fromUser: Boolean, text: String, final: Boolean) {
+        if (text.isBlank()) return
+        _state.update { st ->
+            val list = st.transcript.toMutableList()
+            val idx = if (fromUser) rtUserTurn else rtModelTurn
+            if (idx in list.indices) list[idx] = LiveTurn(fromUser, text) else {
+                list += LiveTurn(fromUser, text)
+                if (fromUser) rtUserTurn = list.lastIndex else rtModelTurn = list.lastIndex
+            }
+            st.copy(transcript = list, partial = if (fromUser && !final) text else "")
+        }
+        if (final) {
+            if (fromUser) rtUserTurn = -1 else rtModelTurn = -1
+            val id = conversationId
+            if (id != null) scope?.launch { conversations.addMessage(id, if (fromUser) "user" else "assistant", text, source = if (fromUser) "voice" else "gemini-live") }
+        }
+    }
+
     /** Ends the voice session. Background tasks keep running. */
     fun end() {
+        rt?.close(); rt = null
         listenJob?.cancel()
         requestJob?.cancel()
         monitor?.stop()
@@ -146,6 +213,7 @@ class LiveSessionController(
     fun toggleMute() {
         val muted = !_state.value.micMuted
         _state.update { it.copy(micMuted = muted) }
+        rt?.let { it.setMuted(muted); setOrb(if (muted) OrbState.IDLE else OrbState.LISTENING, if (muted) "Microphone muted" else null); return }
         if (muted) {
             stt?.cancel(); monitor?.stop()
             if (_state.value.orb == OrbState.LISTENING) setOrb(OrbState.IDLE, "Microphone muted")
@@ -155,11 +223,24 @@ class LiveSessionController(
     fun toggleSpeaker() {
         val on = !_state.value.speakerOn
         _state.update { it.copy(speakerOn = on) }
+        rt?.let { it.speakerOn = on; if (!on) it.interrupt(); return }
         if (!on) { tts?.stop(); pendingUtterances.clear(); monitor?.stop(); focus?.release(); if (replyFinished) listen() }
     }
 
     /** Tap on the orb: interrupt speech, cancel the pending request, or start listening. */
     fun tapOrb() {
+        rt?.let { session ->
+            when (_state.value.orb) {
+                OrbState.SPEAKING, OrbState.THINKING, OrbState.EXECUTING -> session.interrupt()
+                else -> if (_state.value.micMuted) toggleMute()
+            }
+            return
+        }
+        // A real-time session that failed mid-way: tap to reconnect.
+        if (_state.value.orb == OrbState.ERROR && _state.value.sttEngine.startsWith("Gemini Live")) {
+            scope?.launch { runCatching { realtimeConfig() }.getOrNull()?.let { startRealtime(it) } }
+            return
+        }
         when (_state.value.orb) {
             OrbState.SPEAKING -> interrupt()
             OrbState.THINKING, OrbState.SEARCHING, OrbState.RESEARCHING -> { cancelRequest(); listen() }
@@ -171,6 +252,7 @@ class LiveSessionController(
     /** Sends typed text or text from the system voice-input popup (fallbacks when live recognition fails). */
     fun submitText(text: String) {
         if (!_state.value.active || text.isBlank()) return
+        rt?.let { it.sendText(text.trim()); return }
         listenJob?.cancel(); stt?.cancel(); monitor?.stop()
         tts?.stop(); pendingUtterances.clear()
         if (!replyFinished) { requestJob?.cancel(); orchestrator.cancelCurrent() }
@@ -184,6 +266,7 @@ class LiveSessionController(
 
     /** Cancels only the current assistant request (not background tasks). */
     fun cancelRequest() {
+        rt?.let { it.interrupt(); return }
         requestJob?.cancel()
         orchestrator.cancelCurrent()
         tts?.stop(); pendingUtterances.clear(); replyFinished = true
@@ -353,5 +436,10 @@ class LiveSessionController(
         listenJob?.cancel()
         tts?.stop(); pendingUtterances.clear(); monitor?.stop(); stt?.cancel(); focus?.release()
         setOrb(OrbState.IDLE, "$reason. Tap the orb to continue.")
+    }
+
+    companion object {
+        const val LIVE_ENGINE_STANDARD = "standard"
+        const val LIVE_ENGINE_REALTIME = "gemini_live"
     }
 }
