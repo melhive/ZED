@@ -96,7 +96,7 @@ Failed tests: none.
 | Briefing & routines | Open-Meteo weather, calendar read, briefing notification, routines with voice/time/Bluetooth triggers | Core tests (scheduling, presets, JSON); needs device |
 | Vision | Photo (camera/gallery) to Gemini/OpenAI/Claude; LIVE camera; Gemini Live video frame | CI build |
 | Home Assistant | REST client, entity matching, low-risk control vs always-confirmed locks/covers | Parser tests; needs an HA instance |
-| Wake word | sherpa-onnx KWS (GigaSpeech zipformer), foreground microphone service, opens LIVE or answers hands-free | Verified with the real engine against synthesized speech (see below) |
+| Wake word | sherpa-onnx KWS (GigaSpeech zipformer), foreground microphone service, opens LIVE or answers hands-free | Real engine: model's own human recordings detected correctly; synthesized "Hey Zenith" detected 4/4 (Kokoro voices) and 4/12 (Supertonic); 0/16 false alarms on near-miss phrases at normal sensitivity. The "-mobile" model variant crashes ONNX Runtime and is not used. Real voices need device testing; hands-free answering may be blocked by the speech service while ZENITH is in the background on some phones |
 | UX | What's new history + post-update dialog + update notification; Arc/Pulse/Chime LIVE sounds; recognizer beep muted with crash-safe restore; sliding transitions | CI build |
 
 ## Natural offline voices (v0.1.10–v0.1.11)

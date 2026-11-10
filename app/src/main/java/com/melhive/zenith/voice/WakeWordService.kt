@@ -206,11 +206,16 @@ class WakeWordService : Service() {
         private const val RATE = 16_000
         private const val NOTIFICATION_ID = 65_000
         private const val ACTION_STOP = "com.melhive.zenith.wake.STOP"
-        /** sherpa-onnx keyword format: BPE tokens of the phrase, then @label. Verified against synthesized speech. */
+        /**
+         * sherpa-onnx keyword format: BPE tokens of the phrase, then @label. Chosen by testing seven spellings
+         * against synthesized "Hey Zenith" (Kokoro 4/4 detected) and 16 near-miss phrases ("its zenith",
+         * "Hey Kenny", "Hey Siri"…): no false alarms at the normal setting. Real voices still need tuning.
+         */
         const val KEYWORDS = "▁HE Y ▁ Z EN I TH @HEY_ZENITH"
-        private val THRESHOLD_LOW = 0.3f to 1.0f
-        private val THRESHOLD_NORMAL = 0.25f to 1.0f
-        private val THRESHOLD_HIGH = 0.2f to 1.5f
+        /** (threshold, boosting score) per sensitivity; normal = zero false alarms in testing. */
+        private val THRESHOLD_LOW = 0.15f to 1.5f
+        private val THRESHOLD_NORMAL = 0.1f to 2.0f
+        private val THRESHOLD_HIGH = 0.08f to 2.5f
 
         /** True while ZENITH LIVE is using the microphone. */
         val paused = MutableStateFlow(false)
