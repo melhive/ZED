@@ -56,6 +56,49 @@
             </intent-filter>
         </activity>
 
+        <!-- Default digital assistant: the assist gesture and headset voice buttons open ZENITH LIVE. -->
+        <activity
+            android:name=".assist.AssistActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.ASSIST" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VOICE_COMMAND" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Quick Settings tile -->
+        <service
+            android:name=".assist.LiveTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_stat_zenith"
+            android:label="@string/tile_live"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!-- Home-screen widget -->
+        <receiver
+            android:name=".assist.ZenithWidgetProvider"
+            android:exported="false"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_zenith_info" />
+        </receiver>
+
         <receiver
             android:name=".android.ReminderReceiver"
             android:exported="false" />

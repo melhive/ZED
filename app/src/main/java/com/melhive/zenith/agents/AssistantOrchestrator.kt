@@ -188,6 +188,7 @@ class AssistantOrchestrator(
     private suspend fun nativeConversation(conversationId: Long, text: String): AssistantReply {
         val ctx = SmallTalk.Context(
             userName = memory.userName(),
+            addressAs = settings.current().userTitle.ifBlank { null },
             modelConfiguredButUnavailable = providers.anyConfigured(),
             hourOfDay = LocalTime.now().hour,
         )
@@ -232,6 +233,8 @@ class AssistantOrchestrator(
                 voiceMode = voice,
                 compact = isLocal,
                 userName = userName,
+                persona = com.melhive.zenith.core.intelligence.Persona.parse(s.persona),
+                userTitle = s.userTitle.ifBlank { null },
             )
             val request = GenerationRequest(
                 system = system,

@@ -2,4 +2,10 @@
 <resources>
     <string name="app_name">ZENITH</string>
     <string name="tagline">Think. Learn. Organize. Automate. Execute.</string>
+    <string name="tile_live">ZENITH LIVE</string>
+    <string name="tile_live_subtitle">Talk to ZENITH</string>
+    <string name="widget_hint">Tap to talk</string>
+    <string name="widget_talk">Talk</string>
+    <string name="widget_type">Type</string>
+    <string name="widget_description">Talk or type to ZENITH, with your next reminder</string>
 </resources>

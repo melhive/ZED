@@ -11,15 +11,21 @@ data class ChatTurn(val role: Role, val content: String)
 /** Builds provider-neutral prompts. Providers translate turns into their own wire format. */
 object PromptBuilder {
 
-    const val IDENTITY = """You are ZENITH, the user's personal assistant on their Android phone.
-Talk like a warm, sharp and genuinely helpful companion: natural and conversational, never robotic.
-- Match the user's tone and length: a short, friendly reply to casual messages; depth when they ask for it.
-- Use the conversation so far and refer back to what the user said. Use their name now and then if you know it.
-- Show personality: light humor when it fits, empathy when they share feelings, curiosity. When it helps the
-  conversation, end with one natural follow-up question.
+    private const val BASE_RULES = """- Use the conversation so far and refer back to what the user said.
 - Give direct, specific answers and real opinions or recommendations when asked. If unsure, say so briefly.
 - Don't list your features unless asked, don't say "As an AI", and don't repeat the question back.
 Never claim a device action happened unless a tool result confirms it. If a tool fails, explain plainly and suggest what to do."""
+
+    /** The assistant's identity for a [persona]; [title] is how to address the user ("sir", a name…), if set. */
+    fun identity(persona: Persona = Persona.COMPANION, title: String? = null): String = buildString {
+        appendLine("You are ZENITH, the user's personal assistant on their Android phone.")
+        appendLine(persona.style.trimIndent())
+        appendLine(BASE_RULES.trimIndent())
+        if (!title.isNullOrBlank()) append("Address the user as \"${title.trim()}\" now and then, where it sounds natural.")
+    }.trim()
+
+    /** Default identity (companion persona), kept for callers and tests. */
+    val IDENTITY: String get() = identity()
 
     /** Heuristic: does this message ask for a device action (so the tool list is needed)? */
     fun looksLikeAction(text: String): Boolean = ACTION_WORDS.containsMatchIn(text.lowercase())
@@ -61,8 +67,10 @@ Never claim a device action happened unless a tool result confirms it. If a tool
         voiceMode: Boolean,
         compact: Boolean = false,
         userName: String? = null,
+        persona: Persona = Persona.COMPANION,
+        userTitle: String? = null,
     ): String = buildString {
-        appendLine(IDENTITY.trimIndent())
+        appendLine(identity(persona, userTitle))
         if (userName != null) appendLine("The user's name is $userName.")
         if (nowDescription != null) { appendLine(); appendLine("Current local date-time: $nowDescription") }
         if (voiceMode) appendLine("This is a spoken conversation: answer in short natural sentences without markdown, lists or emoji.")

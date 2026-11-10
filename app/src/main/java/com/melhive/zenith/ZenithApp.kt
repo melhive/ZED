@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.ComponentCallbacks2
 import com.melhive.zenith.android.CrashReporter
 import com.melhive.zenith.android.Notifications
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 class ZenithApp : Application() {
@@ -27,6 +28,12 @@ class ZenithApp : Application() {
             runCatching { container.taskEngine.recover() }
             runCatching { container.reminderScheduler.rescheduleAll() }
             runCatching { container.audit.prune() }
+            // Keep the home-screen widget's next reminder and task count current.
+            launch {
+                kotlinx.coroutines.flow.combine(container.db.reminders().observeAll(), container.db.todos().observeAll()) { r, t -> r.size to t.hashCode() + r.hashCode() }
+                    .distinctUntilChanged()
+                    .collect { runCatching { com.melhive.zenith.assist.ZenithWidgetProvider.refresh(this@ZenithApp) } }
+            }
             // Update check against GitHub Releases (public metadata only); can be turned off in Settings.
             runCatching { if (container.settings.current().checkUpdates) container.updates.check() }
         }

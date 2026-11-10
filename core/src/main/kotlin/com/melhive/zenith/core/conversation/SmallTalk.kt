@@ -18,6 +18,8 @@ class SmallTalk(private val random: Random = Random.Default) {
         /** True when an AI provider exists but is currently unavailable (e.g. offline). */
         val modelConfiguredButUnavailable: Boolean = false,
         val hourOfDay: Int = 12,
+        /** How to address the user in greetings ("sir", a nickname); falls back to [userName]. */
+        val addressAs: String? = null,
     )
 
     private enum class Topic { NONE, GREETING, HOW_ARE_YOU, JOKE, FACT, QUOTE, RIDDLE, FEELING_BAD, FEELING_GOOD, IDENTITY, RECOMMEND }
@@ -36,7 +38,7 @@ class SmallTalk(private val random: Random = Random.Default) {
         return list[i]
     }
 
-    private fun Context.name(prefix: String = ", ") = userName?.let { "$prefix$it" } ?: ""
+    private fun Context.name(prefix: String = ", ") = (addressAs?.takeIf { it.isNotBlank() } ?: userName)?.let { "$prefix$it" } ?: ""
 
     private val opt = setOf(RegexOption.IGNORE_CASE)
     private fun rx(p: String) = Regex("^(?:hey |oh |ok |okay |well |so |um+ )?(?:zenith[,!]?\\s*)?(?:$p)(?:[,!]?\\s*(?:zenith|buddy|friend|mate|bro))?[.!?]*$", opt)

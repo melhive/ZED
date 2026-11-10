@@ -131,6 +131,8 @@ fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
             }
             if (editName) NameDialog(initial = name ?: "", onDismiss = { editName = false }) { n -> scope.launch { c.memory.setUserName(n); editName = false } }
         }
+        item { PersonalityCard(settings.persona, settings.userTitle, name) { persona, title -> scope.launch { c.settings.setPersona(persona); c.settings.setUserTitle(title) } } }
+        item { AssistantShortcutsCard() }
         item {
             ZenithCard {
                 SectionTitle("Voice")
@@ -304,3 +306,62 @@ fun DiagnosticsScreen(onBack: () -> Unit) {
     }
 }
 
+@Composable
+private fun PersonalityCard(persona: String, title: String, userName: String?, onChange: (String, String) -> Unit) {
+    val current = com.melhive.zenith.core.intelligence.Persona.parse(persona)
+    var customTitle by remember(title) { mutableStateOf(title) }
+    ZenithCard(accent = ZenithColors.Violet) {
+        SectionTitle("Personality")
+        Text("How ZENITH talks to you. Applies to AI replies in Chat and LIVE.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
+        WrapRow(Modifier.padding(top = 6.dp)) {
+            com.melhive.zenith.core.intelligence.Persona.entries.forEach { p ->
+                androidx.compose.material3.FilterChip(selected = p == current, onClick = { onChange(p.name, title) }, label = { Text(p.label) })
+            }
+        }
+        Text(current.summary, style = MaterialTheme.typography.bodySmall, color = ZenithColors.Cyan)
+        Text("Call me", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 10.dp))
+        WrapRow {
+            val options = listOfNotNull("" to (userName ?: "My name"), "sir" to "Sir", "ma'am" to "Ma'am", "boss" to "Boss")
+            options.forEach { (value, label) ->
+                androidx.compose.material3.FilterChip(selected = title.equals(value, ignoreCase = true), onClick = { customTitle = value; onChange(current.name, value) }, label = { Text(label) })
+            }
+        }
+        androidx.compose.material3.OutlinedTextField(
+            value = customTitle, onValueChange = { customTitle = it.take(40) }, singleLine = true,
+            label = { Text("Or type a title or nickname") }, modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            trailingIcon = { if (customTitle != title) TextButton(onClick = { onChange(current.name, customTitle) }) { Text("Save") } },
+        )
+    }
+}
+
+@Composable
+private fun AssistantShortcutsCard() {
+    val context = LocalContext.current
+    var refresh by remember { mutableIntStateOf(0) }
+    var note by remember { mutableStateOf<String?>(null) }
+    val isDefault = remember(refresh) { com.melhive.zenith.assist.ZenithLaunch.isDefaultAssistant(context) }
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycle) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e -> if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) refresh++ }
+        lifecycle.lifecycle.addObserver(obs)
+        onDispose { lifecycle.lifecycle.removeObserver(obs) }
+    }
+    ZenithCard(accent = if (isDefault) ZenithColors.Green else ZenithColors.Cyan) {
+        SectionTitle("Open ZENITH from anywhere")
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Default assistant", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            StatusPill(if (isDefault) "ZENITH" else "Not set", if (isDefault) ZenithColors.Green else ZenithColors.Amber)
+        }
+        Text(
+            if (isDefault) "Hold the power or home button (or swipe up from a bottom corner) to talk to ZENITH."
+            else "Make ZENITH your phone's assistant so holding the power or home button opens ZENITH LIVE. In the screen that opens, choose Digital assistant app → ZENITH.",
+            style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted,
+        )
+        WrapRow {
+            if (!isDefault) Button(onClick = { com.melhive.zenith.assist.ZenithLaunch.openAssistantSettings(context) }) { Text("Set as assistant") }
+            TextButton(onClick = { com.melhive.zenith.assist.ZenithLaunch.requestAddTile(context) { note = it } }) { Text("Add Quick Settings tile") }
+        }
+        Text("Widget: long-press your home screen → Widgets → ZENITH.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
+        note?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = ZenithColors.Cyan) }
+    }
+}

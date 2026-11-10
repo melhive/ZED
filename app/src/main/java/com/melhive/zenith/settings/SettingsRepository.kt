@@ -42,6 +42,10 @@ data class AppSettings(
     val speechPitch: Float = 1.0f,
     /** Selected voice: see [com.melhive.zenith.core.voice.VoiceSelection]. */
     val voiceId: String = "system",
+    /** Personality preset name, see [com.melhive.zenith.core.intelligence.Persona]. */
+    val persona: String = "COMPANION",
+    /** How ZENITH addresses the user ("sir", "boss", a nickname); blank = by name. */
+    val userTitle: String = "",
     val confirmAllChanges: Boolean = false,
     val useKnowledge: Boolean = true,
     val autoIndex: Boolean = false,
@@ -69,6 +73,8 @@ class SettingsRepository(private val context: Context) {
         val rate = floatPreferencesKey("speech_rate")
         val pitch = floatPreferencesKey("speech_pitch")
         val voiceId = stringPreferencesKey("voice_id")
+        val persona = stringPreferencesKey("persona")
+        val userTitle = stringPreferencesKey("user_title")
         val confirmAll = booleanPreferencesKey("confirm_all")
         val useKnowledge = booleanPreferencesKey("use_knowledge")
         val autoIndex = booleanPreferencesKey("auto_index")
@@ -94,6 +100,8 @@ class SettingsRepository(private val context: Context) {
             speechRate = p[K.rate] ?: defaults.speechRate,
             speechPitch = p[K.pitch] ?: defaults.speechPitch,
             voiceId = p[K.voiceId] ?: defaults.voiceId,
+            persona = p[K.persona] ?: defaults.persona,
+            userTitle = p[K.userTitle] ?: defaults.userTitle,
             confirmAllChanges = p[K.confirmAll] ?: defaults.confirmAllChanges,
             useKnowledge = p[K.useKnowledge] ?: defaults.useKnowledge,
             autoIndex = p[K.autoIndex] ?: defaults.autoIndex,
@@ -118,6 +126,8 @@ class SettingsRepository(private val context: Context) {
     suspend fun setSpeechRate(r: Float) = context.dataStore.edit { it[K.rate] = r.coerceIn(0.5f, 2.0f) }
     suspend fun setSpeechPitch(p: Float) = context.dataStore.edit { it[K.pitch] = p.coerceIn(0.5f, 2.0f) }
     suspend fun setVoiceId(id: String) = context.dataStore.edit { it[K.voiceId] = id }
+    suspend fun setPersona(name: String) = context.dataStore.edit { it[K.persona] = name }
+    suspend fun setUserTitle(title: String) = context.dataStore.edit { it[K.userTitle] = title.trim().take(40) }
     suspend fun setConfirmAllChanges(v: Boolean) = context.dataStore.edit { it[K.confirmAll] = v }
     suspend fun setUseKnowledge(v: Boolean) = context.dataStore.edit { it[K.useKnowledge] = v }
     suspend fun setAutoIndex(v: Boolean) = context.dataStore.edit { it[K.autoIndex] = v }
