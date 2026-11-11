@@ -19,10 +19,10 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ZENITH"
+rootProject.name = "ZED"
 include(":core")
-// `-Pzenith.coreOnly=true` skips the Android module so the pure-Kotlin core
+// `-Pzed.coreOnly=true` skips the Android module so the pure-Kotlin core
 // can be tested on machines without an Android SDK (e.g. Termux).
-if (providers.gradleProperty("zenith.coreOnly").orNull != "true") {
+if (providers.gradleProperty("zed.coreOnly").orNull != "true") {
     include(":app")
 }

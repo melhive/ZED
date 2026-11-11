@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="zenith_background">#FF05070D</color>
-    <color name="zenith_accent">#FF5CE1FF</color>
-    <style name="Theme.Zenith" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">@color/zenith_background</item>
+    <color name="zed_background">#FF05070D</color>
+    <color name="zed_accent">#FF5CE1FF</color>
+    <style name="Theme.Zed" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/zed_background</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">false</item>
     </style>
     <!-- Floating assistant overlay: see-through window over the current app. -->
-    <style name="Theme.Zenith.Overlay" parent="android:Theme.Material.NoActionBar">
+    <style name="Theme.Zed.Overlay" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:windowNoTitle">true</item>

@@ -31,7 +31,7 @@
 | Permission | Why | When requested |
 |---|---|---|
 | `INTERNET`, `ACCESS_NETWORK_STATE` | Optional online providers and model downloads | Install time (normal) |
-| `RECORD_AUDIO` | Voice input and ZENITH LIVE | When the user starts voice |
+| `RECORD_AUDIO` | Voice input and ZED LIVE | When the user starts voice |
 | `POST_NOTIFICATIONS` | Task results and reminders | From Diagnostics or first need |
 | `SET_ALARM` | AlarmClock intents | Install time (normal) |
 | `SCHEDULE_EXACT_ALARM` | Optional exact reminder timing | User grants in system settings |

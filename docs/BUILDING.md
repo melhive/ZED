@@ -1,12 +1,12 @@
-# Building ZENITH
+# Building ZED
 
-ZENITH is built remotely by **GitHub Actions** — no Android Studio or local Android SDK is needed.
+ZED is built remotely by **GitHub Actions** — no Android Studio or local Android SDK is needed.
 
 ## Install or update the app (no GitHub account needed)
 
 1. On your Android phone open **https://github.com/melhive/ZED/releases/latest/download/zed.apk**
 2. Open the downloaded `zed.apk` and tap **Install**. The first time, Android asks you to allow installing apps from your browser — allow it.
-3. To update later, open the same link again and tap **Install** — it replaces the old version and keeps your data. ZENITH shows an **Update available** card on the Dashboard when a newer release exists (Settings → App updates → Check now).
+3. To update later, open the same link again and tap **Install** — it replaces the old version and keeps your data. ZED shows an **Update available** card on the Dashboard when a newer release exists (Settings → App updates → Check now).
 
 Share the same link with anyone. The releases page lists every version with its changes: https://github.com/melhive/ZED/releases
 
@@ -19,7 +19,7 @@ Share the same link with anyone. The releases page lists every version with its 
 
 ### Debug builds (for development)
 
-Each push to `develop` also builds a debug APK (Actions → Android Build → artifact `zenith-debug-apk`). It installs as a separate app (`com.melhive.zenith.debug`) and is signed with a throwaway key, so it cannot update itself — use the release link above for normal use.
+Each push to `develop` also builds a debug APK (Actions → Android Build → artifact `zed-debug-apk`). It installs as a separate app (`com.melhive.zed.debug`) and is signed with a throwaway key, so it cannot update itself — use the release link above for normal use.
 
 ## Trigger a build
 
@@ -37,7 +37,7 @@ apt install openjdk-17-jdk-headless   # once
 ./scripts/test-core.sh
 ```
 
-The script copies the project to `~/zenith-build` (Android shared storage does not support Gradle's file locks) and runs `:core:test` with `-Pzenith.coreOnly=true`, which skips the Android module.
+The script copies the project to `~/zed-build` (Android shared storage does not support Gradle's file locks) and runs `:core:test` with `-Pzed.coreOnly=true`, which skips the Android module.
 
 ## Release signing
 
@@ -46,18 +46,18 @@ The release key was generated once and is stored as repository secrets. **Keep a
 To create a new key (only if starting over):
 
 ```bash
-keytool -genkeypair -v -keystore zenith-release.jks -alias zenith -keyalg RSA -keysize 4096 -validity 10000
-base64 -w0 zenith-release.jks > keystore.b64
+keytool -genkeypair -v -keystore zed-release.jks -alias zed -keyalg RSA -keysize 4096 -validity 10000
+base64 -w0 zed-release.jks > keystore.b64
 ```
 
 Add repository secrets (Settings → Secrets and variables → Actions):
 
 | Secret | Value |
 |---|---|
-| `ZENITH_KEYSTORE_BASE64` | contents of `keystore.b64` |
-| `ZENITH_KEYSTORE_PASSWORD` | keystore password |
-| `ZENITH_KEY_ALIAS` | `zenith` |
-| `ZENITH_KEY_PASSWORD` | key password |
+| `ZED_KEYSTORE_BASE64` | contents of `keystore.b64` |
+| `ZED_KEYSTORE_PASSWORD` | keystore password |
+| `ZED_KEY_ALIAS` | `zed` |
+| `ZED_KEY_PASSWORD` | key password |
 
 Never commit the keystore or passwords; `.gitignore` blocks `*.jks`, `*.keystore` and `keystore.properties`. Without the secrets the release job stops with an error instead of publishing an APK that could not update older installs.
 

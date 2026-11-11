@@ -47,15 +47,15 @@ if (!sherpaAar.exists() || sha256Of(sherpaAar) != sherpaSha256) {
 }
 
 android {
-    namespace = "com.melhive.zenith"
+    namespace = "com.melhive.zed"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.melhive.zenith"
+        applicationId = "com.melhive.zed"
         minSdk = 26
         targetSdk = 36
-        versionCode = (System.getenv("ZENITH_VERSION_CODE") ?: "1").toInt()
-        versionName = System.getenv("ZENITH_VERSION_NAME") ?: "0.1.0"
+        versionCode = (System.getenv("ZED_VERSION_CODE") ?: "1").toInt()
+        versionName = System.getenv("ZED_VERSION_NAME") ?: "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
         // LiteRT-LM ships native libraries for these ABIs only.
@@ -64,12 +64,12 @@ android {
 
     signingConfigs {
         create("release") {
-            val storePath = signingValue("storeFile", "ZENITH_KEYSTORE_PATH")
+            val storePath = signingValue("storeFile", "ZED_KEYSTORE_PATH")
             if (storePath != null) {
                 storeFile = file(storePath)
-                storePassword = signingValue("storePassword", "ZENITH_KEYSTORE_PASSWORD")
-                keyAlias = signingValue("keyAlias", "ZENITH_KEY_ALIAS")
-                keyPassword = signingValue("keyPassword", "ZENITH_KEY_PASSWORD")
+                storePassword = signingValue("storePassword", "ZED_KEYSTORE_PASSWORD")
+                keyAlias = signingValue("keyAlias", "ZED_KEY_ALIAS")
+                keyPassword = signingValue("keyPassword", "ZED_KEY_PASSWORD")
             }
         }
     }

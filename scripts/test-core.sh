@@ -4,7 +4,7 @@
 # storage (/sdcard) does not support the file locks Gradle needs.
 set -euo pipefail
 SRC="$(cd "$(dirname "$0")/.." && pwd)"
-DEST="${ZENITH_BUILD_DIR:-$HOME/zenith-build}"
+DEST="${ZED_BUILD_DIR:-$HOME/zed-build}"
 mkdir -p "$DEST"
 if command -v rsync >/dev/null; then
   rsync -a --delete --exclude '.git' --exclude 'build' --exclude '.gradle' --exclude 'app' "$SRC/" "$DEST/"
@@ -14,4 +14,4 @@ else
 fi
 cd "$DEST"
 chmod +x gradlew
-./gradlew -Pzenith.coreOnly=true -Pkotlin.compiler.execution.strategy=in-process -Dorg.gradle.jvmargs=-Xmx768m --no-daemon :core:test "$@"
+./gradlew -Pzed.coreOnly=true -Pkotlin.compiler.execution.strategy=in-process -Dorg.gradle.jvmargs=-Xmx768m --no-daemon :core:test "$@"

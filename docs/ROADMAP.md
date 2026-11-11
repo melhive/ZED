@@ -10,7 +10,7 @@
 | P5 Chat Mode | Conversations, provider abstraction, streaming, tool requests, voice input, attachments | Done |
 | P6 Local AI | LiteRT-LM integration, model loading, streaming inference, resource management | Integrated (on-device inference validation pending) |
 | P7 Model Manager & online AI | Catalog, download/import/remove, switching, Gemini/OpenAI/Claude/compatible, Keystore keys | Done |
-| P8 ZENITH LIVE | STT, TTS, VAD, barge-in, audio focus, orb | Done (device validation pending) |
+| P8 ZED LIVE | STT, TTS, VAD, barge-in, audio focus, orb | Done (device validation pending) |
 | P9 Background tasks | Queue, WorkManager, progress, notifications, history, in-app indicator | Done |
 | P10 Advanced intelligence | Local retrieval, skills, context management, research | Done (first version) |
 | P11 Security & release | Audit, tests, release workflow | In progress |

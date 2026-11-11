@@ -5,7 +5,7 @@
     <!-- Online AI providers and model downloads (both optional). -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <!-- ZENITH LIVE and voice input. Requested only when the user starts voice. -->
+    <!-- ZED LIVE and voice input. Requested only when the user starts voice. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Task, reminder and assistant notifications (Android 13+ runtime permission). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -27,7 +27,7 @@
     <uses-permission android:name="android.permission.SEND_SMS" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <!-- "Hey Zenith": on-device wake word listening, and opening LIVE over other apps when it hears it. -->
+    <!-- "Hey Zed": on-device wake word listening, and opening LIVE over other apps when it hears it. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
@@ -49,16 +49,16 @@
     </queries>
 
     <application
-        android:name=".ZenithApp"
+        android:name=".ZedApp"
         android:allowBackup="false"
         android:fullBackupContent="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:networkSecurityConfig="@xml/network_security_config"
         android:icon="@mipmap/ic_launcher"
-        android:roundIcon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Zenith"
+        android:theme="@style/Theme.Zed"
         android:enableOnBackInvokedCallback="true"
         tools:targetApi="36">
 
@@ -74,14 +74,14 @@
             android:launchMode="singleTask"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density|fontScale|locale|layoutDirection"
             android:windowSoftInputMode="adjustResize"
-            android:theme="@style/Theme.Zenith">
+            android:theme="@style/Theme.Zed">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- Default digital assistant: the assist gesture and headset voice buttons open ZENITH LIVE. -->
+        <!-- Default digital assistant: the assist gesture and headset voice buttons open ZED LIVE. -->
         <activity
             android:name=".assist.AssistActivity"
             android:exported="true"
@@ -101,7 +101,7 @@
 
         <!-- "What did I miss?": reads notifications only after the user grants access. -->
         <service
-            android:name=".android.ZenithNotificationListener"
+            android:name=".android.ZedNotificationListener"
             android:exported="true"
             android:label="@string/app_name"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
@@ -135,23 +135,23 @@
             android:exported="false"
             android:foregroundServiceType="microphone" />
 
-        <!-- Floating assistant: orb + HUD over the current app (assist gesture, "Hey Zenith", tile). -->
+        <!-- Floating assistant: orb + HUD over the current app (assist gesture, "Hey Zed", tile). -->
         <activity
             android:name=".assist.AssistOverlayActivity"
             android:exported="false"
             android:excludeFromRecents="true"
             android:launchMode="singleInstance"
-            android:taskAffinity="com.melhive.zenith.assistant"
+            android:taskAffinity="com.melhive.zed.assistant"
             android:showWhenLocked="true"
             android:turnScreenOn="true"
             android:windowSoftInputMode="adjustResize"
-            android:theme="@style/Theme.Zenith.Overlay" />
+            android:theme="@style/Theme.Zed.Overlay" />
 
         <!-- Quick Settings tile -->
         <service
             android:name=".assist.LiveTileService"
             android:exported="true"
-            android:icon="@drawable/ic_stat_zenith"
+            android:icon="@drawable/ic_stat_zed"
             android:label="@string/tile_live"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
@@ -161,7 +161,7 @@
 
         <!-- Home-screen widget -->
         <receiver
-            android:name=".assist.ZenithWidgetProvider"
+            android:name=".assist.ZedWidgetProvider"
             android:exported="false"
             android:label="@string/app_name">
             <intent-filter>
@@ -169,7 +169,7 @@
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/widget_zenith_info" />
+                android:resource="@xml/widget_zed_info" />
         </receiver>
 
         <receiver

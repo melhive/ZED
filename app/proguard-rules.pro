@@ -3,8 +3,8 @@
 -dontwarn com.google.ai.edge.litertlm.**
 # kotlinx.serialization
 -keepattributes *Annotation*, InnerClasses
--keepclassmembers class com.melhive.zenith.** { *** Companion; }
--keepclasseswithmembers class com.melhive.zenith.** { kotlinx.serialization.KSerializer serializer(...); }
+-keepclassmembers class com.melhive.zed.** { *** Companion; }
+-keepclasseswithmembers class com.melhive.zed.** { kotlinx.serialization.KSerializer serializer(...); }
 # Room entities and WorkManager workers are kept by their own consumer rules.
 -dontwarn org.bouncycastle.**
 -dontwarn org.conscrypt.**

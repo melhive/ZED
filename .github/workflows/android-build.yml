@@ -50,7 +50,7 @@ jobs:
       - name: Upload debug APK
         uses: actions/upload-artifact@v7
         with:
-          name: zenith-debug-apk
+          name: zed-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 30
@@ -79,11 +79,11 @@ jobs:
         if: always()
         run: |
           {
-            echo "## ZENITH build"
+            echo "## ZED build"
             echo "- Commit: \`${GITHUB_SHA::7}\` on \`${GITHUB_REF_NAME}\`"
             if ls app/build/outputs/apk/debug/*.apk >/dev/null 2>&1; then
               for f in app/build/outputs/apk/debug/*.apk; do echo "- APK: \`$(basename "$f")\` ($(du -h "$f" | cut -f1))"; done
-              echo "- Download it from the **Artifacts** section of this run (zenith-debug-apk)."
+              echo "- Download it from the **Artifacts** section of this run (zed-debug-apk)."
             else
               echo "- No APK was produced. Check the failed step above."
             fi

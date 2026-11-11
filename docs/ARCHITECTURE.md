@@ -1,17 +1,17 @@
-# ZENITH Architecture
+# ZED Architecture
 
-ZENITH is a native Android application (Kotlin, Jetpack Compose) split into two Gradle modules:
+ZED is a native Android application (Kotlin, Jetpack Compose) split into two Gradle modules:
 
 | Module | Type | Purpose |
 |---|---|---|
 | `:core` | Pure Kotlin/JVM | Deterministic logic with no Android dependencies: command parsing, time parsing, tool schemas and validation, security policy, task state machine, retrieval scoring, voice activity detection, prompt building, skills registry. Tested on any JVM (including Termux). |
 | `:app` | Android application | Everything that touches Android: UI, Room, DataStore, Keystore, WorkManager, SAF, intents, audio, LiteRT-LM, HTTP providers. |
 
-## Package map (`app/src/main/java/com/melhive/zenith`)
+## Package map (`app/src/main/java/com/melhive/zed`)
 
 | Package | Responsibility |
 |---|---|
-| `AppContainer`, `ZenithApp` | Manual dependency container (one per process) and startup recovery |
+| `AppContainer`, `ZedApp` | Manual dependency container (one per process) and startup recovery |
 | `agents/` | `AssistantOrchestrator` (one user turn end-to-end), `ConfirmationBroker`, `WorkflowEngine` |
 | `intelligence/` | `IntelligenceProvider` abstraction, `ProviderRegistry`, `LocalModelRuntime` (LiteRT-LM), online providers (`providers/`) |
 | `tools/` | `ToolManager` (the only path to Android operations), executors, capability checker |
@@ -62,7 +62,7 @@ Request (native | local model | online model | workflow | UI)
   → AuditLogger        every attempt recorded (executed / denied / invalid / failed / cancelled)
 ```
 
-Model output is never executed directly. Tool calls must appear in a ```` ```zenith-tool ```` fenced JSON block with only `tool` and scalar `args`; anything else is ignored.
+Model output is never executed directly. Tool calls must appear in a ```` ```zed-tool ```` fenced JSON block with only `tool` and scalar `args`; anything else is ignored.
 
 ## Task engine
 
@@ -77,9 +77,9 @@ FAILED/CANCELLED → QUEUED (explicit retry)
 - **Index** walks text files and reports files processed / total.
 - **Model download** runs as foreground work (`dataSync`), reports bytes, verifies SHA-256.
 - Dependencies (`dependsOn`) and conflicts (overlapping resource keys) are checked before execution.
-- Closing ZENITH LIVE or leaving a screen never cancels tasks; only Cancel / Cancel all do.
+- Closing ZED LIVE or leaving a screen never cancels tasks; only Cancel / Cancel all do.
 - After process death, tasks that were mid-run are marked failed with an explicit retry (never silently re-run).
 
 ## Data
 
-All data is local. Room database `zenith.db` (version 1, schema exported). Settings in DataStore. Secrets in a separate SharedPreferences file, encrypted with an AES-256-GCM key held in Android Keystore. Backups and device transfer are disabled.
+All data is local. Room database `zed.db` (version 1, schema exported). Settings in DataStore. Secrets in a separate SharedPreferences file, encrypted with an AES-256-GCM key held in Android Keystore. Backups and device transfer are disabled.
