@@ -2,6 +2,8 @@
 
 # ZED
 
+**Website:** https://melhive.github.io/ZED/ · **Download:** https://github.com/melhive/ZED/releases/latest/download/zed.apk
+
 **Think. Learn. Organize. Automate. Execute.**
 
 ZED is a native Android personal AI assistant written in Kotlin with Jetpack Compose. It is useful with **no model and no internet**, gets smarter with an **on-device model** (Google LiteRT-LM, e.g. Gemma 4 E2B), and can optionally use **online providers** (Gemini, OpenAI, Claude, or any OpenAI-compatible endpoint).

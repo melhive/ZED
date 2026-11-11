@@ -13,6 +13,8 @@ name: Release
 on:
   push:
     branches: [main]
+    # Website-only changes don't publish a new app release.
+    paths-ignore: ["site/**"]
   workflow_dispatch:
 
 concurrency:
