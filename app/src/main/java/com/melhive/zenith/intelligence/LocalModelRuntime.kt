@@ -67,6 +67,9 @@ class LocalModelRuntime(private val cacheDir: File) {
         private set
     @Volatile var cpuThreads: Int? = null
         private set
+    /** Why the GPU couldn't be used for the loaded model (it then runs on the CPU), or null. */
+    @Volatile var gpuFallbackReason: String? = null
+        private set
 
     /** The live LiteRT-LM conversation and the user turns it has already seen. */
     private class Session(val key: String, val system: String, val conversation: Conversation, val userTurns: MutableList<String>)
@@ -83,23 +86,34 @@ class LocalModelRuntime(private val cacheDir: File) {
             val started = System.currentTimeMillis()
             try {
                 val threads = com.melhive.zenith.android.DeviceInfo.performanceCores()
-                fun config(speculative: Boolean) = EngineConfig(
+                fun config(speculative: Boolean, gpu: Boolean) = EngineConfig(
                     modelPath = file.absolutePath,
                     // CPU: only the fast cores — slow efficiency cores drag every token down on big.LITTLE phones.
-                    backend = if (options.backend == LocalBackend.GPU) Backend.GPU() else Backend.CPU(threads, threads),
+                    backend = if (gpu) Backend.GPU() else Backend.CPU(threads, threads),
                     maxNumTokens = options.contextTokens,
                     cacheDir = cacheDir.absolutePath,
                     speculativeDecodingConfig = if (speculative) com.google.ai.edge.litertlm.SpeculativeDecodingConfig(com.google.ai.edge.litertlm.SpeculativeDecodingMode.ADAPTIVE) else null,
                 )
                 // Speculative decoding drafts and verifies several tokens per step (same output, faster).
                 // Models without support fail to initialize with it, so retry without.
-                val e = runCatching { Engine(config(speculative = true)).also { it.initialize() } }.getOrElse {
+                fun start(gpu: Boolean): Engine = runCatching { Engine(config(speculative = true, gpu = gpu)).also { it.initialize() } }.getOrElse {
                     speculativeEnabled = false
-                    Engine(config(speculative = false)).also { it.initialize() }
+                    Engine(config(speculative = false, gpu = gpu)).also { it.initialize() }
                 }.also { if (speculativeEnabled == null) speculativeEnabled = true }
+                var usedBackend = options.backend
+                val e = if (options.backend == LocalBackend.GPU) {
+                    try { start(gpu = true) } catch (gpuError: Throwable) {
+                        // The GPU couldn't start (driver missing or unsupported): run on the CPU instead of failing.
+                        gpuFallbackReason = gpuError.message ?: gpuError.javaClass.simpleName
+                        usedBackend = LocalBackend.CPU
+                        try { start(gpu = false) } catch (cpuError: Throwable) {
+                            throw IllegalStateException("The GPU couldn't start ($gpuFallbackReason) and this build doesn't run on the CPU. Download the CPU build of this model.", cpuError)
+                        }
+                    }
+                } else { gpuFallbackReason = null; start(gpu = false) }
                 engine = e; loadedKey = key; contextTokens = options.contextTokens
-                cpuThreads = if (options.backend == LocalBackend.GPU) null else threads
-                _state.value = State.Ready(modelId, options.backend, System.currentTimeMillis() - started, options.contextTokens)
+                cpuThreads = if (usedBackend == LocalBackend.GPU) null else threads
+                _state.value = State.Ready(modelId, usedBackend, System.currentTimeMillis() - started, options.contextTokens)
                 e
             } catch (t: Throwable) {
                 _state.value = State.Failed(modelId, friendlyLoadError(t, options))
@@ -111,7 +125,7 @@ class LocalModelRuntime(private val cacheDir: File) {
     private fun friendlyLoadError(t: Throwable, o: LocalModelOptions): String {
         val raw = t.message ?: t.javaClass.simpleName
         return when {
-            o.backend == LocalBackend.GPU -> "Could not start the model on the GPU ($raw). Switch to CPU in Model Manager."
+            raw.startsWith("The GPU couldn't start") -> raw
             raw.contains("memory", ignoreCase = true) -> "Not enough memory to load the model ($raw). Close other apps or choose a smaller context size."
             else -> "Could not load the model: $raw"
         }

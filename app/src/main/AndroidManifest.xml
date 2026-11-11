@@ -62,6 +62,12 @@
         android:enableOnBackInvokedCallback="true"
         tools:targetApi="36">
 
+        <!-- GPU inference: Android 12+ only lets apps load the phone's OpenCL driver when it is declared. -->
+        <uses-native-library android:name="libOpenCL.so" android:required="false" />
+        <uses-native-library android:name="libOpenCL-pixel.so" android:required="false" />
+        <uses-native-library android:name="libOpenCL-car.so" android:required="false" />
+        <uses-native-library android:name="libGLES_mali.so" android:required="false" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

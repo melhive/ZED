@@ -85,17 +85,22 @@ fun MoreScreen(onNavigate: (String) -> Unit) {
             item(key = "g-$title") { SectionTitle(title) }
             items(entries, key = { it.route }) { e -> ZenithCard(onClick = { onNavigate(e.route) }) { IconLabel(e.icon, e.title, e.subtitle) } }
         }
-        item { ZedFooter() }
+        item { ZedFooter(onNavigate) }
     }
 }
 
 /** "ZED · version · MelHive Project" at the bottom of More and Settings. */
 @Composable
-fun ZedFooter() {
+fun ZedFooter(onNavigate: (String) -> Unit) {
     androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().padding(vertical = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text("ZED", style = MaterialTheme.typography.titleLarge, color = ZenithColors.Cyan, letterSpacing = androidx.compose.ui.unit.TextUnit(10f, androidx.compose.ui.unit.TextUnitType.Sp))
         Text("Version ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.labelMedium, color = ZenithColors.Muted)
         Text("MelHive Project", style = MaterialTheme.typography.labelSmall, color = ZenithColors.Muted.copy(alpha = 0.8f), letterSpacing = androidx.compose.ui.unit.TextUnit(2f, androidx.compose.ui.unit.TextUnitType.Sp))
+        Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = { onNavigate(Routes.TERMS) }) { Text("Terms of Use", style = MaterialTheme.typography.labelMedium, color = ZenithColors.Cyan) }
+            Text("·", color = ZenithColors.Muted)
+            TextButton(onClick = { onNavigate(Routes.PRIVACY) }) { Text("Privacy Policy", style = MaterialTheme.typography.labelMedium, color = ZenithColors.Cyan) }
+        }
     }
 }
 
@@ -239,7 +244,7 @@ fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
         item {
             ZenithCard(onClick = { onNavigate(Routes.MODELS) }) { IconLabel(Icons.Outlined.Psychology, "Models & providers", "Configure intelligence layers in Model Manager") }
         }
-        item { ZedFooter() }
+        item { ZedFooter(onNavigate) }
     }
 }
 

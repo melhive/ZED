@@ -75,6 +75,10 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
     fun activate(m: InstalledModelEntity) = viewModelScope.launch {
         c.localRuntime.unload()
         c.settings.setActiveLocalModel(m.id)
+        // Each build runs on the processor it was made for.
+        com.melhive.zenith.models.ModelCatalog.find(m.id)?.let { cat ->
+            c.settings.setLocalBackend(if (cat.isGpuBuild) com.melhive.zenith.settings.LocalBackend.GPU else com.melhive.zenith.settings.LocalBackend.CPU)
+        }
         c.settings.setMode(IntelligenceMode.LOCAL)
         message.value = "${m.displayName} is now the active model. It loads on first use."
     }

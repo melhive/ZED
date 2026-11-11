@@ -75,6 +75,8 @@ object Routes {
     const val VOICE = "voice"
     const val ROUTINES = "routines"
     const val SCHEDULE = "schedule"
+    const val TERMS = "terms"
+    const val PRIVACY = "privacy"
     const val WHATS_NEW = "whats_new"
     fun task(id: Long) = "task/$id"
     fun chat(conversationId: Long?) = if (conversationId == null) CHAT else "$CHAT?id=$conversationId"
@@ -169,6 +171,8 @@ fun ZenithRoot(requestedRoute: String?, onRouteConsumed: () -> Unit) {
                 screen(Routes.SKILLS) { SkillsScreen(onBack = { nav.popBackStack() }) }
                 screen(Routes.SETTINGS) { SettingsScreen(onBack = { nav.popBackStack() }, onNavigate = { nav.navigate(it) }) }
                 screen(Routes.DIAGNOSTICS) { DiagnosticsScreen(onBack = { nav.popBackStack() }) }
+                screen(Routes.TERMS) { com.melhive.zenith.ui.screens.TermsScreen(onBack = { nav.popBackStack() }) }
+                screen(Routes.PRIVACY) { com.melhive.zenith.ui.screens.PrivacyScreen(onBack = { nav.popBackStack() }) }
                 screen(Routes.SCHEDULE) { MemoryScreen(onBack = { nav.popBackStack() }, initialTab = 4) }
                 screen(Routes.WHATS_NEW) { com.melhive.zenith.ui.screens.WhatsNewScreen(onBack = { nav.popBackStack() }) }
                 screen(Routes.ROUTINES) { com.melhive.zenith.ui.screens.RoutinesScreen(onBack = { nav.popBackStack() }) }

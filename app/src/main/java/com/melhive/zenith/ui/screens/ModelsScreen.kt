@@ -98,7 +98,8 @@ fun ModelsScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
                 Text("Runtime: " + when (val r = runtime) {
                     LocalModelRuntime.State.Unloaded -> "no model loaded"
                     is LocalModelRuntime.State.Loading -> "loading ${r.modelId}…"
-                    is LocalModelRuntime.State.Ready -> "${r.modelId} loaded on ${r.backend} in ${r.loadMillis} ms, ${r.contextTokens} token context"
+                    is LocalModelRuntime.State.Ready -> "${r.modelId} loaded on ${r.backend} in ${r.loadMillis} ms, ${r.contextTokens} token context" +
+                        (vm.c.localRuntime.gpuFallbackReason?.let { " — the GPU couldn't start, so it runs on the CPU ($it)" } ?: "")
                     is LocalModelRuntime.State.Failed -> "failed to load ${r.modelId}: ${r.message}"
                 })
                 WrapRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

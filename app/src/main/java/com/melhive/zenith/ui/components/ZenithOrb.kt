@@ -64,9 +64,10 @@ fun rememberContinuousRotation(degreesPerSecond: Float): Float {
     val speed by androidx.compose.runtime.rememberUpdatedState(degreesPerSecond)
     var angle by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
     LaunchedEffect(Unit) {
-        var last = androidx.compose.runtime.withFrameNanos { it }
+        // withInfiniteAnimationFrameNanos (not withFrameNanos): an endless animation that UI tests can pause.
+        var last = androidx.compose.animation.core.withInfiniteAnimationFrameNanos { it }
         while (true) {
-            androidx.compose.runtime.withFrameNanos { now ->
+            androidx.compose.animation.core.withInfiniteAnimationFrameNanos { now ->
                 angle = (angle + (now - last) / 1_000_000_000f * speed) % 360_000f
                 last = now
             }

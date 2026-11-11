@@ -38,6 +38,8 @@ object Changelog {
             "“How much time until 9 AM?” is now calculated exactly by ZED (e.g. “9:00 AM is 4 minutes away”) instead of being guessed by the AI; time zones are no longer read out.",
             "The green “done” orb no longer shows a check mark.",
             "The project is now github.com/melhive/ZED; downloads are zed.apk (old links keep working).",
+            "Gemma 4 E2B · GPU now starts on phones like yours: ZED declares the phone's OpenCL driver (Android 12+ requires it). If a GPU still can't start, ZED runs the model on the CPU instead of failing.",
+            "Terms of Use and Privacy Policy, linked at the bottom of More and Settings.",
         )),
         Release("0.1.15", "2026-11-11", "Meet ZED", listOf(
             "ZENITH is now ZED — a short name speech recognition hears reliably. Say “Hey Zed” (wake word tested against “he said”, “Hey Ted”, “Hey Ed”… with no false alarms).",
