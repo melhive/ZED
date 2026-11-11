@@ -71,7 +71,7 @@ data class AppSettings(
     /** The user closed the "Allow everything" card in Settings. */
     val permissionsCardHidden: Boolean = false,
     /** 0 = fewer false alarms, 1 = normal, 2 = hears it more easily. */
-    val wakeSensitivity: Int = 1,
+    val wakeSensitivity: Int = 2,
     val confirmAllChanges: Boolean = false,
     val useKnowledge: Boolean = true,
     val autoIndex: Boolean = false,
@@ -159,7 +159,7 @@ class SettingsRepository(private val context: Context) {
             // Users who had "confirm every change" on keep being asked.
             permissionsCardHidden = p[K.permsHidden] ?: false,
             confirmMode = p[K.confirmMode] ?: if (p[K.confirmAll] == true) "ALWAYS" else "NEVER",
-            wakeSensitivity = p[K.wakeSensitivity] ?: 1,
+            wakeSensitivity = p[K.wakeSensitivity] ?: 2,
             confirmAllChanges = p[K.confirmAll] ?: defaults.confirmAllChanges,
             useKnowledge = p[K.useKnowledge] ?: defaults.useKnowledge,
             autoIndex = p[K.autoIndex] ?: defaults.autoIndex,

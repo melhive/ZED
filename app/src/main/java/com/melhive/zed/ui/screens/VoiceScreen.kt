@@ -159,7 +159,7 @@ fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
                 if (settings.wakeWordEnabled) {
                     Text("Sensitivity", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 6.dp))
                     WrapRow {
-                        listOf(0 to "Fewer false alarms", 1 to "Normal", 2 to "Hears it easily").forEach { (v, l) ->
+                        listOf(0 to "Fewer false alarms", 1 to "Balanced", 2 to "Most sensitive").forEach { (v, l) ->
                             FilterChip(selected = settings.wakeSensitivity == v, onClick = { safely {
                                 c.settings.setWakeSensitivity(v)
                                 com.melhive.zed.voice.WakeWordService.stop(context); com.melhive.zed.voice.WakeWordService.start(context)

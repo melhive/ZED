@@ -70,6 +70,9 @@ class LocalModelRuntime(private val cacheDir: File) {
     /** Why the GPU couldn't be used for the loaded model (it then runs on the CPU), or null. */
     @Volatile var gpuFallbackReason: String? = null
         private set
+    /** Whether the loaded model can look at photos (its vision encoder started). */
+    @Volatile var visionReady: Boolean = false
+        private set
 
     /** The live LiteRT-LM conversation and the user turns it has already seen. */
     private class Session(val key: String, val system: String, val conversation: Conversation, val userTurns: MutableList<String>)
@@ -86,20 +89,29 @@ class LocalModelRuntime(private val cacheDir: File) {
             val started = System.currentTimeMillis()
             try {
                 val threads = com.melhive.zed.android.DeviceInfo.performanceCores()
+                val wantsVision = com.melhive.zed.models.ModelCatalog.find(modelId)?.vision == true
+                var vision = wantsVision
                 fun config(speculative: Boolean, gpu: Boolean) = EngineConfig(
                     modelPath = file.absolutePath,
                     // CPU: only the fast cores — slow efficiency cores drag every token down on big.LITTLE phones.
                     backend = if (gpu) Backend.GPU() else Backend.CPU(threads, threads),
+                    // Photos ("what is this?") run through the model's own vision encoder, on the phone.
+                    visionBackend = if (!vision) null else if (gpu) Backend.GPU() else Backend.CPU(threads, threads),
+                    maxNumImages = if (vision) 1 else null,
                     maxNumTokens = options.contextTokens,
                     cacheDir = cacheDir.absolutePath,
                     speculativeDecodingConfig = if (speculative) com.google.ai.edge.litertlm.SpeculativeDecodingConfig(com.google.ai.edge.litertlm.SpeculativeDecodingMode.ADAPTIVE) else null,
                 )
                 // Speculative decoding drafts and verifies several tokens per step (same output, faster).
                 // Models without support fail to initialize with it, so retry without.
-                fun start(gpu: Boolean): Engine = runCatching { Engine(config(speculative = true, gpu = gpu)).also { it.initialize() } }.getOrElse {
+                fun startText(gpu: Boolean): Engine = runCatching { Engine(config(speculative = true, gpu = gpu)).also { it.initialize() } }.getOrElse {
                     speculativeEnabled = false
                     Engine(config(speculative = false, gpu = gpu)).also { it.initialize() }
                 }.also { if (speculativeEnabled == null) speculativeEnabled = true }
+                // A model without a usable vision encoder still starts, just without photos.
+                fun start(gpu: Boolean): Engine = if (!vision) startText(gpu) else try { startText(gpu) } catch (t: Throwable) {
+                    vision = false; speculativeEnabled = null; startText(gpu)
+                }
                 var usedBackend = options.backend
                 val e = if (options.backend == LocalBackend.GPU) {
                     try { start(gpu = true) } catch (gpuError: Throwable) {
@@ -112,6 +124,7 @@ class LocalModelRuntime(private val cacheDir: File) {
                     }
                 } else { gpuFallbackReason = null; start(gpu = false) }
                 engine = e; loadedKey = key; contextTokens = options.contextTokens
+                visionReady = vision
                 cpuThreads = if (usedBackend == LocalBackend.GPU) null else threads
                 _state.value = State.Ready(modelId, usedBackend, System.currentTimeMillis() - started, options.contextTokens)
                 e
@@ -180,8 +193,14 @@ class LocalModelRuntime(private val cacheDir: File) {
         val last = turns.last()
         val previousUserTurns = turns.dropLast(1).filter { it.role == Role.USER }.map { it.content }
         val current = session
-        val messageTokens = estimateTokens(message)
-        val reuse = !minimalHistory && current != null && request.sessionKey != null && current.key == request.sessionKey &&
+        // A photo goes to the model's vision encoder; it starts a fresh conversation (history as text).
+        if (request.images.isNotEmpty() && !visionReady) {
+            emit(GenerationEvent.Error("This model build can't look at photos on your phone. Try Gemma 4 E2B or E4B, or an online AI."))
+            return
+        }
+        val image = request.images.firstOrNull()
+        val messageTokens = estimateTokens(message) + if (image != null) IMAGE_TOKENS else 0
+        val reuse = image == null && !minimalHistory && current != null && request.sessionKey != null && current.key == request.sessionKey &&
             current.system == request.system && current.userTurns == previousUserTurns &&
             runCatching { current.conversation.getTokenCount() }.getOrDefault(Int.MAX_VALUE) + messageTokens + replyBudget < contextTokens
 
@@ -209,7 +228,10 @@ class LocalModelRuntime(private val cacheDir: File) {
         var produced = false
         try {
             try {
-                s.conversation.sendMessageAsync(message).collect { msg ->
+                val reply = if (image == null) s.conversation.sendMessageAsync(message) else s.conversation.sendMessageAsync(
+                    Contents.of(Content.ImageBytes(android.util.Base64.decode(image.base64, android.util.Base64.NO_WRAP)), Content.Text(message)),
+                )
+                reply.collect { msg ->
                     val text = msg.contents.contents.filterIsInstance<Content.Text>().joinToString("") { it.text }
                     if (text.isNotEmpty()) { produced = true; emit(GenerationEvent.Delta(text)) }
                 }
@@ -220,6 +242,7 @@ class LocalModelRuntime(private val cacheDir: File) {
             }
             completed = true
             s.userTurns += last.content
+            if (image != null) closeSession()
             emit(GenerationEvent.Done("stop"))
         } finally {
             activeConversation = null
@@ -244,6 +267,8 @@ class LocalModelRuntime(private val cacheDir: File) {
     companion object {
         const val DEFAULT_CONTEXT = 4096
         private const val SAFETY_TOKENS = 96
+        /** Room a photo takes in the context window. */
+        private const val IMAGE_TOKENS = 300
 
         /** Conservative estimate (~3 characters per token for mixed English text). */
         fun estimateTokens(text: String): Int = text.length / 3 + 4

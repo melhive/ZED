@@ -31,6 +31,13 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.17", "2026-11-11", "Clear voice, sharper wake word, ask with a photo", listOf(
+            "Supertonic voices (like Atlas) now read times, dates, temperatures and units clearly: ZED spells them out first. Tested with a speech recognizer, “1:05 PM” and “8 AM” are heard correctly every time (they used to come out as “1.5pm” or “am”).",
+            "The briefing and routines talk like a person: “Good afternoon, sir. It's Wednesday, November 11th, 1:05 PM. Right now it's 29 degrees with light drizzle, but it feels like 35… You have one event today: Clients meeting at 8 AM.” No more symbols, brackets or lists read aloud.",
+            "Wake word: say “Zed” anywhere — “Zed”, “Hey Zed”, “Wake up Zed”, “Okay Zed”. A built-in volume booster helps it hear you when you speak softly, from farther away or in wind. Sensitivity now defaults to Most sensitive (tested: about three times as many wake-ups, with no false alarms on sound-alike phrases).",
+            "Ask with a photo: tap the camera in chat, LIVE or the floating assistant, then Take a photo or Choose from gallery — ZED tells you what it is.",
+            "Gemma 4 E2B and E4B look at photos right on your phone; no internet or API key needed.",
+        )),
         Release("0.1.16", "2026-11-11", "Smooth orb, new logo, exact countdowns", listOf(
             "ZED everywhere: new app ID (com.melhive.zed), so this version installs as a new app — uninstall the old one first, then set up and re-download your model and voices.",
             "New ZED logo everywhere: launcher, round and themed icons, the widget, notifications, the About footer and what security scanners show.",

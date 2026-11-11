@@ -97,7 +97,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         if (text.isBlank() && att == null && img == null) return
         attachment.value = null
         photo.value = null
-        val prompt = text.ifBlank { if (img != null) "What do you see in this photo?" else "Please review the attached file." }
+        val prompt = text.ifBlank { if (img != null) "What is this?" else "Please review the attached file." }
         c.orchestrator.submit(id, prompt, att?.name, att?.text, voice = viaVoice, image = img) { reply ->
             viewModelScope.launch {
                 val s = c.settings.current()

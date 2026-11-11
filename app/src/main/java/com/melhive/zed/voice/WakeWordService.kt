@@ -117,6 +117,8 @@ class WakeWordService : Service() {
             running = false; stopSelf(); return
         }
         val stream = kws.createStream("")
+        // Boosts quiet or distant speech (up to +24 dB) and softly limits loud audio before the detector.
+        val leveler = com.melhive.zed.core.voice.MicLeveler()
         val buf = ShortArray(RATE / 10)
         val floats = FloatArray(buf.size)
         try {
@@ -133,7 +135,9 @@ class WakeWordService : Service() {
                         val n = rec.read(buf, 0, buf.size)
                         if (n <= 0) { Thread.sleep(50); continue }
                         for (i in 0 until n) floats[i] = buf[i] / 32768f
-                        stream.acceptWaveform(if (n == buf.size) floats else floats.copyOf(n), RATE)
+                        val block = if (n == buf.size) floats else floats.copyOf(n)
+                        leveler.process(block)
+                        stream.acceptWaveform(block, RATE)
                         while (kws.isReady(stream)) {
                             kws.decode(stream)
                             if (kws.getResult(stream).keyword.isNotBlank()) { kws.reset(stream); woke = true; break }
@@ -208,16 +212,18 @@ class WakeWordService : Service() {
         private const val NOTIFICATION_ID = 65_000
         private const val ACTION_STOP = "com.melhive.zed.wake.STOP"
         /**
-         * sherpa-onnx keyword format: BPE tokens of the phrase, then @label. "Hey Zed" was chosen by testing
-         * spellings with the real engine on synthesized speech (11 clips, several voices) against 30 near-miss
-         * clips ("he said", "Hey Ted", "Hey Ed", "Hey Jed", "hazed", "Hey Zack"…): ▁ Z ED detected 9/11 at
-         * threshold 0.08 with zero false alarms; the ▁ Z E D spelling barely triggers.
+         * sherpa-onnx keyword format: BPE tokens of the phrase, then @label. ZED wakes on "Zed" anywhere —
+         * alone or in "Hey Zed", "Wake up Zed", "Okay Zed", "Hi Zed". Tested with the real engine on 34 spoken
+         * wake phrases × 5 conditions (clean, −30 dB quiet, far with echo, wind, quiet + wind) and 50 near-miss
+         * sentences ("he said", "the bed", "zebra", "Hey Ed", "fed up"…): "Hey Zed" alone woke 22/170;
+         * these keywords with the mic leveler 58/170 (balanced, 0 false alarms) and 66/170 (most sensitive,
+         * 1 false alarm: the letter Z said "zed").
          */
-        const val KEYWORDS = "▁HE Y ▁ Z ED @HEY_ZED"
-        /** (threshold, boosting score) per sensitivity; normal had zero false alarms in testing. */
-        private val THRESHOLD_LOW = 0.15f to 1.5f
-        private val THRESHOLD_NORMAL = 0.08f to 2.5f
-        private val THRESHOLD_HIGH = 0.06f to 3.0f
+        const val KEYWORDS = "▁ Z ED @ZED\n▁HE Y ▁ Z ED @ZED\n▁WA KE ▁UP ▁ Z ED @ZED\n▁OKAY ▁ Z ED @ZED\n▁HI ▁ Z ED @ZED"
+        /** (threshold, boosting score) per sensitivity, from the test above. */
+        private val THRESHOLD_LOW = 0.12f to 2.0f
+        private val THRESHOLD_NORMAL = 0.05f to 3.0f
+        private val THRESHOLD_HIGH = 0.03f to 3.5f
 
         /** True while ZED LIVE is using the microphone. */
         val paused = MutableStateFlow(false)

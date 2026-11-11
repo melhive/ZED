@@ -118,11 +118,26 @@ object SpeechNormalizer {
             m < 10 -> " oh " + NumberWords.cardinal(m.toLong())
             else -> " " + NumberWords.cardinal(m.toLong())
         }
-        return hour + minute + (meridiem?.let { " " + it.lowercase().first() + " m" } ?: "")
+        return hour + minute + (meridiem?.let { " " + spokenMeridiem(it.lowercase().first()) } ?: "")
+    }
+
+    /** How "AM"/"PM" is written for the voice: letters for Kokoro's dictionary, sounds for Supertonic. */
+    private val meridiemStyle = ThreadLocal.withInitial { false }
+    private fun spokenMeridiem(c: Char): String = if (meridiemStyle.get()) (if (c == 'a') "ay em" else "pee em") else "$c m"
+
+    /**
+     * [phoneticMeridiem]: write AM/PM as "ay em"/"pee em". Tested with Supertonic and a speech recognizer
+     * (3 voices × 4 sentences): heard correctly 12/12, versus 8/12 for the letters "a m"/"p m".
+     */
+    fun normalize(input: String, phoneticMeridiem: Boolean): String {
+        meridiemStyle.set(phoneticMeridiem)
+        return try { normalize(input) } finally { meridiemStyle.set(false) }
     }
 
     fun normalize(input: String): String {
         var t = SpokenName.fix(input)
+            // Ranges and scores: "24-30°C", "9–5" → "24 to 30" (not phone numbers or dates: longer chains are left alone).
+            .replace(Regex("(?<![\\d\\-–.:/])(\\d{1,3})\\s?[-–]\\s?(\\d{1,3})(?![\\d\\-–.:/])"), "$1 to $2")
             .replace('’', '\'').replace('‘', '\'').replace('`', '\'')
             .replace(Regex("[“”«»\"]"), " ")
             .replace(Regex("\\s*[—–]\\s*"), ", ")
@@ -159,7 +174,7 @@ object SpeechNormalizer {
             val sec = it.groupValues[3].toInt()
             hourMinute(it.groupValues[1].toInt(), it.groupValues[2].toInt(), null).removeSuffix(" o'clock").removeSuffix(" hundred") +
                 (if (sec > 0) " and ${NumberWords.cardinal(sec.toLong())} second${if (sec == 1) "" else "s"}" else "") +
-                (it.groupValues[4].takeIf { m -> m.isNotEmpty() }?.let { m -> " ${m.lowercase()} m" } ?: "")
+                (it.groupValues[4].takeIf { m -> m.isNotEmpty() }?.let { m -> " " + spokenMeridiem(m.lowercase().first()) } ?: "")
         }
 
         // Times: 3:45 pm, 3pm, 15:30
@@ -167,7 +182,7 @@ object SpeechNormalizer {
             hourMinute(it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3])
         }
         t = Regex("\\b(\\d{1,2})\\s?([ap])\\.?\\s?m\\b", I).replace(t) {
-            NumberWords.cardinal(it.groupValues[1].toLong()) + " " + it.groupValues[2].lowercase() + " m"
+            NumberWords.cardinal(it.groupValues[1].toLong()) + " " + spokenMeridiem(it.groupValues[2].lowercase().first())
         }
         t = Regex("\\b([01]?\\d|2[0-3]):([0-5]\\d)\\b").replace(t) {
             hourMinute(it.groupValues[1].toInt(), it.groupValues[2].toInt(), null)

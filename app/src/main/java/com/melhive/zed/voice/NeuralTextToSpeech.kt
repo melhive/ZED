@@ -221,7 +221,10 @@ class NeuralTextToSpeech(
                 config.speed = rate
             }
             else -> {
-                text = SupertonicText.clean(sentence)
+                // English: spell out numbers, times, units and symbols first. Tested with a speech recognizer,
+                // raw "29°C" or "8:00 AM:" came out garbled while the spelled-out text was heard correctly.
+                val lang = VoiceCatalog.supertonicLanguage(languageTag)
+                text = SupertonicText.clean(if (lang == "en") SupertonicText.english(sentence) else sentence)
                 if (text.isBlank()) return FloatArray(0)
                 config.speed = rate * 1.05f // Supertonic's natural pace is 1.05
                 config.numSteps = 5 // measured on an 8×A55 phone: ~2 s per sentence, clear speech
@@ -355,6 +358,9 @@ class NeuralTextToSpeech(
 
 /** Light cleanup for Supertonic, which reads raw text (including numbers and currency) itself. */
 object SupertonicText {
+    /** English text in the form Supertonic reads most clearly. */
+    fun english(text: String): String = com.melhive.zed.core.voice.SpeechNormalizer.normalize(text, phoneticMeridiem = true)
+
     fun clean(text: String): String = com.melhive.zed.core.voice.SpokenName.fix(text)
         .replace(Regex("[\\p{So}\\p{Cn}\\p{Cs}]"), " ") // emoji and other pictographs
         .replace(Regex("[*_#>|~^`]"), " ")

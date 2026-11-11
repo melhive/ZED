@@ -46,11 +46,14 @@ class WeatherService(private val context: Context) {
         val lm = context.getSystemService(LocationManager::class.java)
         val loc = listOf(LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER, LocationManager.GPS_PROVIDER)
             .mapNotNull { runCatching { lm.getLastKnownLocation(it) }.getOrNull() }.maxByOrNull { it.time } ?: return null
-        return Place("your location", loc.latitude, loc.longitude)
+        return Place("", loc.latitude, loc.longitude)
     }
 
-    /** Resolves [place] (or the default) and returns a one-paragraph forecast. */
-    suspend fun report(place: String?, defaultCity: String): Result<String> = withContext(Dispatchers.IO) {
+    /** Resolves [place] (or the default) and returns the forecast in natural sentences. */
+    suspend fun report(place: String?, defaultCity: String): Result<String> =
+        fetch(place, defaultCity).map { com.melhive.zed.core.briefing.BriefingText.weather(it) }
+
+    suspend fun fetch(place: String?, defaultCity: String): Result<com.melhive.zed.core.briefing.WeatherNow> = withContext(Dispatchers.IO) {
         runCatching {
             val p = when {
                 !place.isNullOrBlank() -> geocode(place) ?: error("I couldn't find “$place”.")
@@ -67,31 +70,15 @@ class WeatherService(private val context: Context) {
             val t = cur.d("temperature_2m")?.roundToInt()
             val feels = cur.d("apparent_temperature")?.roundToInt()
             val code = cur.d("weather_code")?.toInt() ?: -1
-            buildString {
-                append("${p.name}: ${describe(code)}, ${t}°C")
-                if (feels != null && feels != t) append(" (feels like $feels°C)")
-                cur.d("relative_humidity_2m")?.let { append(", humidity ${it.roundToInt()}%") }
-                cur.d("wind_speed_10m")?.let { append(", wind ${it.roundToInt()} km/h") }
-                append(". Today ")
-                append("${first("temperature_2m_min")?.roundToInt()}–${first("temperature_2m_max")?.roundToInt()}°C")
-                first("precipitation_probability_max")?.let { append(", ${it.roundToInt()}% chance of rain") }
-                append(".")
-            }
+            com.melhive.zed.core.briefing.WeatherNow(
+                place = p.name.ifBlank { null }, code = code, temperature = t, feelsLike = feels,
+                humidity = cur.d("relative_humidity_2m")?.roundToInt(), windKmh = cur.d("wind_speed_10m")?.roundToInt(),
+                min = first("temperature_2m_min")?.roundToInt(), max = first("temperature_2m_max")?.roundToInt(),
+                rainChance = first("precipitation_probability_max")?.roundToInt(),
+            )
         }
     }
 
-    /** WMO weather interpretation codes. */
-    private fun describe(code: Int) = when (code) {
-        0 -> "clear sky"; 1 -> "mainly clear"; 2 -> "partly cloudy"; 3 -> "overcast"
-        45, 48 -> "fog"
-        51, 53, 55 -> "drizzle"; 56, 57 -> "freezing drizzle"
-        61 -> "light rain"; 63 -> "rain"; 65 -> "heavy rain"; 66, 67 -> "freezing rain"
-        71, 73, 75, 77 -> "snow"
-        80 -> "light showers"; 81 -> "showers"; 82 -> "heavy showers"
-        85, 86 -> "snow showers"
-        95 -> "thunderstorms"; 96, 99 -> "thunderstorms with hail"
-        else -> "unknown conditions"
-    }
 }
 
 /** Reads (never writes) calendar events for a day. */
@@ -105,24 +92,27 @@ class CalendarReader(private val context: Context) {
         else -> runCatching { LocalDate.parse(text.trim()) }.getOrNull()
     }
 
-    fun events(day: LocalDate): List<String> {
+    fun events(day: LocalDate): List<String> = dayEvents(day).map { e ->
+        val loc = e.location?.let { " at $it" } ?: ""
+        if (e.start == null) "All day: ${e.title}$loc" else "${com.melhive.zed.core.briefing.BriefingText.clock(e.start)}: ${e.title}$loc"
+    }
+
+    fun dayEvents(day: LocalDate): List<com.melhive.zed.core.briefing.DayEvent> {
         if (!granted()) return emptyList()
         val zone = ZoneId.systemDefault()
         val start = day.atStartOfDay(zone).toInstant().toEpochMilli()
         val end = day.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
         val uri = CalendarContract.Instances.CONTENT_URI.buildUpon().also { android.content.ContentUris.appendId(it, start); android.content.ContentUris.appendId(it, end) }.build()
-        val fmt = DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault())
-        val out = mutableListOf<String>()
+        val out = mutableListOf<com.melhive.zed.core.briefing.DayEvent>()
         context.contentResolver.query(
             uri, arrayOf(CalendarContract.Instances.TITLE, CalendarContract.Instances.BEGIN, CalendarContract.Instances.END, CalendarContract.Instances.ALL_DAY, CalendarContract.Instances.EVENT_LOCATION),
             null, null, "${CalendarContract.Instances.BEGIN} ASC",
         )?.use { c ->
             while (c.moveToNext()) {
-                val title = c.getString(0)?.takeIf { it.isNotBlank() } ?: "(no title)"
+                val title = c.getString(0)?.takeIf { it.isNotBlank() } ?: "An untitled event"
                 val allDay = c.getInt(3) == 1
                 val begin = java.time.Instant.ofEpochMilli(c.getLong(1)).atZone(zone)
-                val loc = c.getString(4)?.takeIf { it.isNotBlank() }?.let { " at $it" } ?: ""
-                out += if (allDay) "All day: $title$loc" else "${begin.format(fmt)}: $title$loc"
+                out += com.melhive.zed.core.briefing.DayEvent(title, if (allDay) null else begin.toLocalTime(), c.getString(4)?.takeIf { it.isNotBlank() })
             }
         }
         return out
@@ -142,8 +132,7 @@ class CalendarReader(private val context: Context) {
     fun describe(day: LocalDate): String {
         if (!granted()) return "I need calendar permission to read your events (More → Permissions & Diagnostics)."
         val label = when (day) { LocalDate.now() -> "today"; LocalDate.now().plusDays(1) -> "tomorrow"; else -> day.toString() }
-        val ev = events(day)
-        return if (ev.isEmpty()) "Nothing on your calendar $label." else "Your calendar $label (${ev.size}):\n" + ev.joinToString("\n") { "• $it" }
+        return com.melhive.zed.core.briefing.BriefingText.calendar(dayEvents(day), if (day == LocalDate.now()) java.time.LocalTime.now() else null, label)
     }
 }
 
@@ -152,29 +141,24 @@ class BriefingComposer(private val context: Context, private val c: AppContainer
     suspend fun compose(): String {
         val s = c.settings.current()
         val now = java.time.LocalDateTime.now()
-        val hour = now.hour
-        val greeting = when { hour < 12 -> "Good morning"; hour < 18 -> "Good afternoon"; else -> "Good evening" }
         val who = s.userTitle.ifBlank { null } ?: c.memory.userName()
+        val text = com.melhive.zed.core.briefing.BriefingText
         val parts = mutableListOf<String>()
-        parts += "$greeting${who?.let { ", $it" } ?: ""}. It's ${now.format(DateTimeFormatter.ofPattern("EEEE, MMMM d, h:mm a", Locale.getDefault()))}."
+        parts += text.greeting(now, who)
         WeatherService(context).report(null, s.weatherCity).onSuccess { parts += it }
         val cal = CalendarReader(context)
-        if (cal.granted()) parts += cal.describe(LocalDate.now())
+        if (cal.granted()) parts += text.calendar(cal.dayEvents(LocalDate.now()), now.toLocalTime())
         val nowMs = System.currentTimeMillis()
         val endOfDay = LocalDate.now().plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val reminders = c.db.reminders().scheduled().filter { it.triggerAt in nowMs until endOfDay }
-        if (reminders.isNotEmpty()) parts += "Reminders today: " + reminders.joinToString("; ") {
-            java.time.Instant.ofEpochMilli(it.triggerAt).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("h:mm a")) + " " + it.text
-        } + "."
-        val todos = c.todos.list(false)
-        if (todos.isNotEmpty()) parts += "${todos.size} open task${if (todos.size == 1) "" else "s"}: " + todos.take(5).joinToString("; ") { it.title } + if (todos.size > 5) "…" else "."
+        text.reminders(reminders.map { it.text to java.time.Instant.ofEpochMilli(it.triggerAt).atZone(ZoneId.systemDefault()).toLocalTime() })?.let { parts += it }
+        text.tasks(c.todos.list(false).map { it.title })?.let { parts += it }
         if (com.melhive.zed.android.ZedNotificationListener.hasAccess(context)) {
             val missed = com.melhive.zed.android.ZedNotificationListener.recent(context, null, 10)
-            if (missed.isNotEmpty()) parts += "${missed.size} notification${if (missed.size == 1) "" else "s"} since last night, mostly from " +
-                missed.groupingBy { it.app }.eachCount().entries.sortedByDescending { it.value }.take(3).joinToString { it.key } + "."
+            text.notifications(missed.size, missed.groupingBy { it.app }.eachCount().entries.sortedByDescending { it.value }.take(2).map { it.key })?.let { parts += it }
         }
         val active = c.taskEngine.activeCount.first()
-        if (active > 0) parts += "$active background task${if (active == 1) " is" else "s are"} running."
+        if (active > 0) parts += "${if (active == 1) "One background task is" else "$active background tasks are"} still running."
         return parts.joinToString("\n\n")
     }
 }

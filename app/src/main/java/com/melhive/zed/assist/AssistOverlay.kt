@@ -142,13 +142,19 @@ private fun AssistOverlay(onClose: () -> Unit, onOpenApp: () -> Unit) {
     LaunchedEffect(Unit) { shown = true }
 
     var captureUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    fun askAbout(uri: android.net.Uri) = scope.launch {
+        runCatching { ImageInput.fromUri(activity, uri) }.onSuccess { live.submitImage(it, "What is this?") }
+    }
     val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
         activity.keepAlive = false
         val uri = captureUri
-        if (ok && uri != null) scope.launch {
-            runCatching { ImageInput.fromUri(activity, uri) }.onSuccess { live.submitImage(it, "What am I looking at?") }
-        }
+        if (ok && uri != null) askAbout(uri)
     }
+    val gallery = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        activity.keepAlive = false
+        uri?.let { askAbout(it) }
+    }
+    var photoMenu by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize()) {
         // Dim the app behind; tapping the empty area closes.
@@ -191,8 +197,19 @@ private fun AssistOverlay(onClose: () -> Unit, onOpenApp: () -> Unit) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                     HudButton(if (state.micMuted) Icons.Outlined.MicOff else Icons.Outlined.Mic, if (state.micMuted) "Unmute" else "Mute", live::toggleMute)
                     HudButton(if (state.speakerOn) Icons.AutoMirrored.Outlined.VolumeUp else Icons.AutoMirrored.Outlined.VolumeOff, "Voice replies", live::toggleSpeaker)
-                    HudButton(Icons.Outlined.PhotoCamera, "What am I looking at?") {
-                        runCatching { ImageInput.newCaptureUri(activity) }.onSuccess { activity.keepAlive = true; captureUri = it; camera.launch(it) }
+                    Box {
+                        HudButton(Icons.Outlined.PhotoCamera, "Ask about a photo") { photoMenu = true }
+                        androidx.compose.material3.DropdownMenu(expanded = photoMenu, onDismissRequest = { photoMenu = false }) {
+                            androidx.compose.material3.DropdownMenuItem(text = { Text("Take a photo") }, onClick = {
+                                photoMenu = false
+                                runCatching { ImageInput.newCaptureUri(activity) }.onSuccess { activity.keepAlive = true; captureUri = it; camera.launch(it) }
+                            })
+                            androidx.compose.material3.DropdownMenuItem(text = { Text("Choose from gallery") }, onClick = {
+                                photoMenu = false
+                                activity.keepAlive = true
+                                gallery.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            })
+                        }
                     }
                     HudButton(Icons.Outlined.Keyboard, "Type") { typing = !typing }
                     HudButton(Icons.Outlined.StopCircle, "Stop", live::cancelRequest)

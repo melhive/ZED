@@ -28,6 +28,7 @@ import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.MicOff
 import androidx.compose.material.icons.outlined.StopCircle
 import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.automirrored.outlined.VolumeOff
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material3.FilledTonalIconButton
@@ -83,13 +84,17 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit) {
     }
     val liveScope = androidx.compose.runtime.rememberCoroutineScope()
     var liveCapture by remember { mutableStateOf<android.net.Uri?>(null) }
+    // Ask with a photo: take one or pick one, then ZED is asked "What is this?" right away.
+    fun askAbout(uri: android.net.Uri) = liveScope.launch {
+        runCatching { com.melhive.zed.intelligence.ImageInput.fromUri(context, uri) }
+            .onSuccess { live.submitImage(it, "What is this?") }
+    }
     val liveCamera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
         val uri = liveCapture
-        if (ok && uri != null) liveScope.launch {
-            runCatching { com.melhive.zed.intelligence.ImageInput.fromUri(context, uri) }
-                .onSuccess { live.submitImage(it, "What am I looking at?") }
-        }
+        if (ok && uri != null) askAbout(uri)
     }
+    val liveGallery = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> uri?.let { askAbout(it) } }
+    var photoMenu by remember { mutableStateOf(false) }
     var typing by remember { mutableStateOf(false) }
     var typed by remember { mutableStateOf("") }
     fun launchSystemVoice() {
@@ -185,10 +190,20 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit) {
                 FilledTonalIconButton(onClick = live::toggleSpeaker, modifier = Modifier.size(56.dp)) {
                     Icon(if (state.speakerOn) Icons.AutoMirrored.Outlined.VolumeUp else Icons.AutoMirrored.Outlined.VolumeOff, if (state.speakerOn) "Mute voice replies" else "Enable voice replies")
                 }
-                FilledTonalIconButton(onClick = {
-                    runCatching { com.melhive.zed.intelligence.ImageInput.newCaptureUri(context) }.onSuccess { liveCapture = it; liveCamera.launch(it) }
-                }, modifier = Modifier.size(56.dp)) {
-                    Icon(Icons.Outlined.PhotoCamera, "What am I looking at? Take a photo")
+                androidx.compose.foundation.layout.Box {
+                    FilledTonalIconButton(onClick = { photoMenu = true }, modifier = Modifier.size(56.dp)) {
+                        Icon(Icons.Outlined.PhotoCamera, "Ask about a photo")
+                    }
+                    androidx.compose.material3.DropdownMenu(expanded = photoMenu, onDismissRequest = { photoMenu = false }) {
+                        androidx.compose.material3.DropdownMenuItem(text = { Text("Take a photo") }, leadingIcon = { Icon(Icons.Outlined.PhotoCamera, null) }, onClick = {
+                            photoMenu = false
+                            runCatching { com.melhive.zed.intelligence.ImageInput.newCaptureUri(context) }.onSuccess { liveCapture = it; liveCamera.launch(it) }
+                        })
+                        androidx.compose.material3.DropdownMenuItem(text = { Text("Choose from gallery") }, leadingIcon = { Icon(Icons.Outlined.PhotoLibrary, null) }, onClick = {
+                            photoMenu = false
+                            liveGallery.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        })
+                    }
                 }
                 FilledTonalIconButton(onClick = live::cancelRequest, modifier = Modifier.size(56.dp)) {
                     Icon(Icons.Outlined.StopCircle, "Cancel current request")

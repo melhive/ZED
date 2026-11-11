@@ -32,6 +32,8 @@ data class CatalogModel(
     val verified: Boolean = false,
     /** Thinks step by step before answering (smarter on puzzles, slower to reply). */
     val reasoning: Boolean = false,
+    /** Can look at photos on the phone ("what is this?"). */
+    val vision: Boolean = false,
 ) {
     val downloadUrl: String get() = "https://huggingface.co/$repo/resolve/main/$fileName"
     val pageUrl: String get() = "https://huggingface.co/$repo"
@@ -67,7 +69,7 @@ object ModelCatalog {
             repo = "litert-community/gemma-4-E2B-it-litert-lm", fileName = "gemma-4-E2B-it-gpu.litertlm",
             sizeBytes = 2_008_432_640, sha256 = "a53a59001894c58e6bdb5b9b227709f91a2e3e556baa7d85acf9c55402ba5cf5",
             license = "Apache-2.0", minRamBytes = 4 * GB, recommendedBackend = "GPU", contextTokens = 32768,
-            bestFor = listOf("Everyday chat", "Actions", "Multilingual"), quality = 4, speed = 4, verified = true,
+            bestFor = listOf("Everyday chat", "Actions", "Multilingual"), quality = 4, speed = 4, verified = true, vision = true,
         ),
         CatalogModel(
             id = "gemma-4-e2b-it", name = "Gemma 4 E2B · CPU",
@@ -75,7 +77,7 @@ object ModelCatalog {
             repo = "litert-community/gemma-4-E2B-it-litert-lm", fileName = "gemma-4-E2B-it.litertlm",
             sizeBytes = 2_588_147_712, sha256 = "181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c",
             license = "Apache-2.0", minRamBytes = 4 * GB, recommendedBackend = "CPU", contextTokens = 32768,
-            bestFor = listOf("Everyday chat", "Actions", "Any phone"), quality = 4, speed = 3, verified = true,
+            bestFor = listOf("Everyday chat", "Actions", "Any phone"), quality = 4, speed = 3, verified = true, vision = true,
         ),
         CatalogModel(
             id = "gemma-4-e4b-it-gpu", name = "Gemma 4 E4B · GPU",
@@ -83,7 +85,7 @@ object ModelCatalog {
             repo = "litert-community/gemma-4-E4B-it-litert-lm", fileName = "gemma-4-E4B-it-gpu.litertlm",
             sizeBytes = 2_969_059_328, sha256 = "4912bb5a9c30993c51a7711f763212077458529312175df0573a78323a2bb7ff",
             license = "Apache-2.0", minRamBytes = 7 * GB, recommendedBackend = "GPU", contextTokens = 32768,
-            bestFor = listOf("Best quality", "Writing", "Explanations"), quality = 5, speed = 2,
+            bestFor = listOf("Best quality", "Writing", "Explanations"), quality = 5, speed = 2, vision = true,
         ),
         CatalogModel(
             id = "qwen3.5-4b", name = "Qwen 3.5 4B",

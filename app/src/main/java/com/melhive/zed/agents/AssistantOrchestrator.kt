@@ -131,8 +131,10 @@ class AssistantOrchestrator(
         _streamingText.value = ""
         return try {
             val provider = providers.active()
-            if (image != null && (provider == null || provider.id == "local")) {
-                val msg = "Looking at photos needs an online AI (Gemini, OpenAI or Claude). Add a key in Model Manager and set the mode to Auto or Online."
+            val localSees = provider?.id == "local" &&
+                com.melhive.zed.models.ModelCatalog.find(settings.current().activeLocalModelId ?: "")?.vision == true
+            if (image != null && (provider == null || (provider.id == "local" && !localSees))) {
+                val msg = "This model can't look at photos. Gemma 4 E2B or E4B can, right on your phone (Model Manager), or add a Gemini, OpenAI or Claude key."
                 conversations.addMessage(conversationId, "assistant", msg, source = "system")
                 setPhase(AssistantPhase.COMPLETED, null, conversationId)
                 return AssistantReply(msg, false, "system")
@@ -264,7 +266,7 @@ class AssistantOrchestrator(
                 maxOutputTokens = when { isLocal && voice -> 384; isLocal -> 1024; voice -> 1024; else -> 4096 },
                 sessionKey = "conversation-$conversationId",
                 volatileContext = if (isLocal) PromptBuilder.volatileContext(now, knowledgeSnippets) else null,
-                images = if (isLocal) emptyList() else listOfNotNull(currentImage),
+                images = listOfNotNull(currentImage),
             )
             val loading = isLocal && providers.localRuntime.state.value !is LocalModelRuntime.State.Ready
             setPhase(AssistantPhase.THINKING, if (loading) "Loading on-device model (first reply takes longer)…" else provider.label, conversationId)
