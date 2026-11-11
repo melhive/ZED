@@ -24,6 +24,7 @@
 | Audit | Every tool attempt is recorded and viewable in Diagnostics; pruned after 90 days | `security/AuditLogger` |
 | Model files | Catalog downloads verified by size and SHA-256; imports hashed and labelled unverified unless they match the catalog | `models/` |
 | Backups | `allowBackup=false`; data-extraction rules exclude everything | `AndroidManifest.xml` |
+| User backups | Only on request, to a file the user picks. Data and settings are stored readable in that file (it is the user's own copy — keep it private). API keys are included only with a password: AES-256-GCM, key from PBKDF2-HMAC-SHA256 (120k rounds). Restore verifies CRC-32 of every entry and the end marker before anything live is replaced; entry names are restricted to safe relative paths. | `core/backup/BackupArchive.kt`, `backup/BackupManager.kt` |
 | Build secrets | Signing material only from CI secrets / untracked `keystore.properties`; `.gitignore` blocks keystores | `app/build.gradle.kts`, `.github/workflows/release.yml` |
 
 ## Permissions
