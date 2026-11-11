@@ -31,6 +31,11 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.19", "2026-11-11", "Ask with a photo, fixed", listOf(
+            "Photos from the camera and the gallery now load. Every photo used to fail with “Couldn't open the photo” before ZED could look at it.",
+            "Phone photos come out upright, large photos are shrunk before they're sent, and HEIC photos are supported.",
+            "Clear messages when a file isn't a photo or ZED wasn't allowed to read it.",
+        )),
         Release("0.1.18", "2026-11-11", "Photos work on-device", listOf(
             "Ask with a photo now works with Gemma 4: the Gemma 4 E2B · GPU file ZED downloaded before was a text-only build. Model Manager shows “Update — adds photo support” on it; one tap downloads the new GPU build (2.3 GB), which can see photos and replies just as fast.",
             "ZED checks the model file itself for photo support, so it never pretends a model can see.",
