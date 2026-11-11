@@ -34,6 +34,7 @@ object Changelog {
         Release("0.1.16", "2026-11-11", "Smooth orb, new logo, exact countdowns", listOf(
             "ZED everywhere: new app ID (com.melhive.zed), so this version installs as a new app — uninstall the old one first, then set up and re-download your model and voices.",
             "New ZED logo everywhere: launcher, round and themed icons, the widget, notifications, the About footer and what security scanners show.",
+            "ZED says its name clearly as “Zed” (rhymes with “bed”) in every voice and in Gemini Live — never spelled out as Z-E-D.",
             "The orb animates continuously — no more little jump every few seconds.",
             "Cleaner panels: borderless dark glass with a soft accent glow, and no more decorative lines on panels, headings, titles, the background or the tab bar.",
             "“How much time until 9 AM?” is now calculated exactly by ZED (e.g. “9:00 AM is 4 minutes away”) instead of being guessed by the AI; time zones are no longer read out.",
