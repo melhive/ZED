@@ -150,7 +150,7 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit) {
             if (state.transcript.isNotEmpty()) LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxWidth().heightIn(max = 150.dp)
-                    .background(ZenithColors.Surface.copy(alpha = 0.6f), androidx.compose.foundation.shape.CutCornerShape(topEnd = 12.dp, bottomStart = 12.dp))
+                    .background(ZenithColors.Surface.copy(alpha = 0.6f), androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {

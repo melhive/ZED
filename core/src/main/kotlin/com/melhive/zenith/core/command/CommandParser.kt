@@ -101,6 +101,7 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         Rule(rx("(?:what(?:'s| is) the |tell me the |current )?(?:time|date|day)(?: is it)?(?: now| today)?|what(?:'s| is) today(?:'s date)?|what day is (?:it|today)|what time is it(?: now)?")) { tool("time.now") },
 
         // Countdowns: exact time left (before reminders).
+        Rule(rx("(?:how (?:long|much time|many (?:minutes|hours|seconds))(?: is it| do i have| is there| is left| are left| left| remaining)?|time (?:left|remaining)) (?:until|till|til|before|to) (?:my |the )?(.+)")) { m -> tool("time.left", "target" to m.groupValues[1]) },
         Rule(rx("how much (?:time )?(?:is )?left(?: on (?:my |the )?(.+?))?|how (?:long|much time) (?:is )?(?:left|remaining)(?: (?:on|for|until) (?:my |the )?(.+?))?|time (?:left|remaining)(?: on (?:my |the )?(.+?))?|how long (?:until|till|before) (?:my |the )?(.+?)|when(?:'s| is) my next (reminder|alarm|meeting|event|timer)")) { m ->
             tool("time.left", "target" to m.groupValues.drop(1).firstOrNull { it.isNotEmpty() })
         },

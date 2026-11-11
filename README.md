@@ -23,13 +23,13 @@ ZENITH is a native Android personal AI assistant written in Kotlin with Jetpack 
 
 **On your Android phone, open:**
 
-### 👉 https://github.com/melhive/ZENITH/releases/latest/download/zenith.apk
+### 👉 https://github.com/melhive/ZED/releases/latest/download/zed.apk
 
 Tap the downloaded file and choose **Install** (allow "Install unknown apps" for your browser the first time).
 
 - This link always gives the **newest version** — share it with anyone.
 - Updates install **over** the old version and keep your data. ZENITH also shows an **Update available** card when a new release is out.
-- All versions: https://github.com/melhive/ZENITH/releases
+- All versions: https://github.com/melhive/ZED/releases
 
 ## Documentation
 

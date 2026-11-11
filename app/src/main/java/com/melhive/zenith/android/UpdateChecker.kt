@@ -48,7 +48,7 @@ class UpdateChecker(private val repo: String = REPO) {
 
     companion object {
         const val REPO = "melhive/ZED"
-        const val LATEST_APK = "https://github.com/$REPO/releases/latest/download/zenith.apk"
+        const val LATEST_APK = "https://github.com/$REPO/releases/latest/download/zed.apk"
 
         /** Release tags are "v0.1.<versionCode>". */
         fun parse(root: JsonObject): UpdateInfo? {
@@ -56,7 +56,7 @@ class UpdateChecker(private val repo: String = REPO) {
             val code = tag.substringAfterLast('.').toIntOrNull() ?: return null
             val apk = (root["assets"] as? JsonArray).orEmpty()
                 .mapNotNull { it as? JsonObject }
-                .firstOrNull { (it["name"] as? JsonPrimitive)?.contentOrNull == "zenith.apk" }
+                .firstOrNull { (it["name"] as? JsonPrimitive)?.contentOrNull in setOf("zed.apk", "zenith.apk") }
                 ?.let { (it["browser_download_url"] as? JsonPrimitive)?.contentOrNull } ?: LATEST_APK
             val page = (root["html_url"] as? JsonPrimitive)?.contentOrNull ?: "https://github.com/$REPO/releases/latest"
             return UpdateInfo(tag.removePrefix("v"), code, apk, page)

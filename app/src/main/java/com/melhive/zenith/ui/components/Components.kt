@@ -54,20 +54,22 @@ fun ZenithCard(
     accent: Color = ZenithColors.Cyan,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    // HUD panel: chamfered corners, a faint accent edge and corner brackets.
-    val shape = androidx.compose.foundation.shape.CutCornerShape(topEnd = 16.dp, bottomStart = 16.dp)
+    // Borderless glass panel: deep translucent fill, a soft accent glow from the corner and a small accent tab.
+    val shape = RoundedCornerShape(22.dp)
     Column(
         modifier
             .clip(shape)
-            .background(Brush.verticalGradient(listOf(ZenithColors.SurfaceHigh.copy(alpha = 0.94f), ZenithColors.Surface.copy(alpha = 0.94f))))
-            .border(1.dp, Brush.linearGradient(listOf(accent.copy(alpha = 0.5f), ZenithColors.Outline, accent.copy(alpha = 0.2f))), shape)
+            .background(Brush.linearGradient(listOf(ZenithColors.SurfaceHigh.copy(alpha = 0.85f), ZenithColors.Surface.copy(alpha = 0.7f))))
             .drawWithContent {
+                drawCircle(
+                    Brush.radialGradient(listOf(accent.copy(alpha = 0.16f), Color.Transparent), androidx.compose.ui.geometry.Offset.Zero, size.minDimension * 0.95f),
+                    size.minDimension * 0.95f, androidx.compose.ui.geometry.Offset.Zero,
+                )
+                drawRoundRect(
+                    accent.copy(alpha = 0.9f), topLeft = androidx.compose.ui.geometry.Offset(20.dp.toPx(), 0f),
+                    size = androidx.compose.ui.geometry.Size(28.dp.toPx(), 3.dp.toPx()), cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx()),
+                )
                 drawContent()
-                val l = 18.dp.toPx(); val w = 2.dp.toPx(); val c = accent.copy(alpha = 0.85f)
-                drawLine(c, androidx.compose.ui.geometry.Offset(0f, w / 2), androidx.compose.ui.geometry.Offset(l, w / 2), w)
-                drawLine(c, androidx.compose.ui.geometry.Offset(w / 2, 0f), androidx.compose.ui.geometry.Offset(w / 2, l), w)
-                drawLine(c, androidx.compose.ui.geometry.Offset(size.width - l, size.height - w / 2), androidx.compose.ui.geometry.Offset(size.width, size.height - w / 2), w)
-                drawLine(c, androidx.compose.ui.geometry.Offset(size.width - w / 2, size.height - l), androidx.compose.ui.geometry.Offset(size.width - w / 2, size.height), w)
             }
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(16.dp),
@@ -90,8 +92,7 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier, action: (@Composab
 @Composable
 fun StatusPill(text: String, color: Color = ZenithColors.Cyan, modifier: Modifier = Modifier) {
     Row(
-        modifier.clip(androidx.compose.foundation.shape.CutCornerShape(6.dp)).background(color.copy(alpha = 0.12f))
-            .border(1.dp, color.copy(alpha = 0.4f), androidx.compose.foundation.shape.CutCornerShape(6.dp)).padding(horizontal = 10.dp, vertical = 4.dp),
+        modifier.clip(RoundedCornerShape(10.dp)).background(color.copy(alpha = 0.16f)).padding(horizontal = 10.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(6.dp).clip(CircleShape).background(color))
@@ -103,8 +104,8 @@ fun StatusPill(text: String, color: Color = ZenithColors.Cyan, modifier: Modifie
 @Composable
 fun IconLabel(icon: ImageVector, title: String, subtitle: String? = null, tint: Color = ZenithColors.Cyan, trailing: (@Composable () -> Unit)? = null) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(40.dp).clip(androidx.compose.foundation.shape.CutCornerShape(10.dp)).background(tint.copy(alpha = 0.12f))
-            .border(1.dp, tint.copy(alpha = 0.35f), androidx.compose.foundation.shape.CutCornerShape(10.dp)), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(42.dp).clip(RoundedCornerShape(14.dp))
+            .background(Brush.linearGradient(listOf(tint.copy(alpha = 0.28f), tint.copy(alpha = 0.08f)))), contentAlignment = Alignment.Center) {
             Icon(icon, null, tint = tint)
         }
         Spacer(Modifier.width(12.dp))

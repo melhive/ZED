@@ -2,7 +2,8 @@ name: Release
 
 # Publishes a signed APK as a GitHub Release on every push to main.
 # Share this link — it always downloads the newest version:
-#   https://github.com/melhive/ZENITH/releases/latest/download/zenith.apk
+#   https://github.com/melhive/ZED/releases/latest/download/zed.apk
+# (zenith.apk is attached too, so versions released as ZENITH still find their updates)
 #
 # Every release is signed with the same key and gets a higher versionCode,
 # so Android installs it as an update over the previous version.
@@ -76,6 +77,7 @@ jobs:
           echo "Using $APKSIGNER"
           "$APKSIGNER" verify --verbose --print-certs "$APK" 2>&1 | tee verify.txt
           grep -q "Verifies" verify.txt
+          cp "$APK" zed.apk
           cp "$APK" zenith.apk
 
       - name: Publish GitHub Release
@@ -85,16 +87,16 @@ jobs:
           TAG="v${ZENITH_VERSION_NAME}"
           PREV=$(git describe --tags --abbrev=0 2>/dev/null || true)
           {
-            echo "## ZENITH ${ZENITH_VERSION_NAME}"
+            echo "## ZED ${ZENITH_VERSION_NAME}"
             echo
             echo "**Install / update:** open this link on your Android phone and install:"
-            echo "https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/zenith.apk"
+            echo "https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/zed.apk"
             echo
             echo "Installs over the previous version (same signing key, versionCode ${ZENITH_VERSION_CODE}). Your data is kept."
             echo
             echo "### Changes"
             if [ -n "$PREV" ]; then git log --pretty='- %s' "$PREV..HEAD"; else git log --pretty='- %s' -n 20; fi
           } > notes.md
-          gh release create "$TAG" zenith.apk --title "ZENITH ${ZENITH_VERSION_NAME}" --notes-file notes.md --target "$GITHUB_SHA" --latest
+          gh release create "$TAG" zed.apk zenith.apk --title "ZED ${ZENITH_VERSION_NAME}" --notes-file notes.md --target "$GITHUB_SHA" --latest
           echo "### Released ${TAG}" >> "$GITHUB_STEP_SUMMARY"
-          echo "Download: https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/zenith.apk" >> "$GITHUB_STEP_SUMMARY"
+          echo "Download: https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/zed.apk" >> "$GITHUB_STEP_SUMMARY"

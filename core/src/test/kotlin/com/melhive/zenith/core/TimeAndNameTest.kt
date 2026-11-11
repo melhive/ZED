@@ -35,6 +35,12 @@ class TimeAndNameTest {
         assertEquals("time.left" to mapOf("target" to "meeting"), tool("how long until my meeting"))
         assertEquals("time.left" to mapOf("target" to "reminder"), tool("when is my next reminder"))
         assertEquals("time.now", tool("what time is it").first)
+        assertEquals("time.left" to mapOf("target" to "9am"), tool("how much time left until 9am"))
+        assertEquals("time.left" to mapOf("target" to "9am"), tool("how many minutes until 9am?"))
+        assertEquals("time.left" to mapOf("target" to "5:30 pm"), tool("how long till 5:30 pm"))
+        val at = com.melhive.zenith.core.time.TimeParser.parseDateTime("9am", LocalDateTime.of(2026, 11, 11, 8, 56))!!
+        assertEquals(LocalDateTime.of(2026, 11, 11, 9, 0), at)
+        assertEquals("4 minutes", Durations.describe(java.time.Duration.between(LocalDateTime.of(2026, 11, 11, 8, 56), at).seconds))
     }
 
     @Test fun answersToZed() {

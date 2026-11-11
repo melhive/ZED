@@ -75,7 +75,7 @@ Never claim a device action happened unless a tool result confirms it. If a tool
         if (userName != null) appendLine("The user's name is $userName.")
         if (nowDescription != null) {
             appendLine(); appendLine("Current local date-time: $nowDescription")
-            appendLine("Use this exact time for anything time-related. For countdowns (\"how long until…\", \"how much time is left\") compute the exact difference and say it in hours, minutes and seconds.")
+            appendLine("Use this exact time for anything time-related. For countdowns (\"how long until…\", \"how much time is left\") compute the exact difference and say it in hours, minutes and seconds. Don't mention the time zone unless the user asks.")
         }
         if (voiceMode) appendLine("This is a spoken conversation: answer in short natural sentences without markdown, lists or emoji.")
         if (memories.isNotEmpty()) {

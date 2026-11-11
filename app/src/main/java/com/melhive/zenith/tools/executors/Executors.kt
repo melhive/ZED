@@ -222,7 +222,7 @@ fun registerExecutors(tm: ToolManager, c: AppContainer, context: Context) {
     tm.register("time.now") { _, _ ->
         val now = java.time.ZonedDateTime.now()
         ok("It's " + now.format(DateTimeFormatter.ofPattern("h:mm:ss a", java.util.Locale.ENGLISH)) + " on " +
-            now.format(DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", java.util.Locale.ENGLISH)) + " (${now.zone.id}).")
+            now.format(DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", java.util.Locale.ENGLISH)) + ".")
     }
     tm.register("time.left") { a, _ ->
         val now = System.currentTimeMillis()
@@ -230,6 +230,16 @@ fun registerExecutors(tm: ToolManager, c: AppContainer, context: Context) {
         fun left(at: Long) = com.melhive.zenith.core.time.Durations.describe((at - now) / 1000)
         fun clock(at: Long) = java.time.Instant.ofEpochMilli(at).atZone(java.time.ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("h:mm:ss a", java.util.Locale.ENGLISH))
         fun wants(kind: String, label: String = "") = target == null || target.contains(kind) || (label.isNotBlank() && label.lowercase().contains(target))
+        // "until 9am", "till 5:30 pm", "until tomorrow at 7": exact time to a clock time.
+        val keywords = listOf("timer", "alarm", "reminder", "meeting", "event", "calendar", "appointment")
+        if (target != null && keywords.none { target.contains(it) }) {
+            val nowLdt = LocalDateTime.now()
+            com.melhive.zenith.core.time.TimeParser.parseDateTime(target, nowLdt)?.let { at ->
+                val atMs = at.epochMillis()
+                val day = when (at.toLocalDate()) { nowLdt.toLocalDate() -> ""; nowLdt.toLocalDate().plusDays(1) -> " tomorrow"; else -> " on " + at.format(DateTimeFormatter.ofPattern("EEEE, MMMM d", java.util.Locale.ENGLISH)) }
+                return@register ok("It's ${clock(now)}. ${at.format(DateTimeFormatter.ofPattern(if (at.second == 0) "h:mm a" else "h:mm:ss a", java.util.Locale.ENGLISH))}$day is ${left(atMs)} away.")
+            }
+        }
         val lines = mutableListOf<String>()
         com.melhive.zenith.android.Countdowns(context).active(now).forEach { e ->
             if (wants(e.kind, e.label)) lines += "${e.kind.replaceFirstChar { it.uppercase() }}${if (e.label.isNotBlank()) " “${e.label}”" else ""}: ${left(e.endAt)} left (at ${clock(e.endAt)})"

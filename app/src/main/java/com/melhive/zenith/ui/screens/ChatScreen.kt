@@ -239,7 +239,7 @@ private fun MessageBubble(m: MessageEntity, showRegenerate: Boolean = false, onR
     if (m.role == "tool") {
         Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
             Column(
-                Modifier.fillMaxWidth().background(ZenithColors.Surface, RoundedCornerShape(10.dp)).border(1.dp, ZenithColors.Outline, RoundedCornerShape(10.dp)).padding(10.dp)
+                Modifier.fillMaxWidth().background(ZenithColors.Surface, RoundedCornerShape(12.dp)).padding(10.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.Build, null, tint = ZenithColors.Amber, modifier = Modifier.size(14.dp))

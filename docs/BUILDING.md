@@ -4,15 +4,15 @@ ZENITH is built remotely by **GitHub Actions** — no Android Studio or local An
 
 ## Install or update the app (no GitHub account needed)
 
-1. On your Android phone open **https://github.com/melhive/ZENITH/releases/latest/download/zenith.apk**
-2. Open the downloaded `zenith.apk` and tap **Install**. The first time, Android asks you to allow installing apps from your browser — allow it.
+1. On your Android phone open **https://github.com/melhive/ZED/releases/latest/download/zed.apk**
+2. Open the downloaded `zed.apk` and tap **Install**. The first time, Android asks you to allow installing apps from your browser — allow it.
 3. To update later, open the same link again and tap **Install** — it replaces the old version and keeps your data. ZENITH shows an **Update available** card on the Dashboard when a newer release exists (Settings → App updates → Check now).
 
-Share the same link with anyone. The releases page lists every version with its changes: https://github.com/melhive/ZENITH/releases
+Share the same link with anyone. The releases page lists every version with its changes: https://github.com/melhive/ZED/releases
 
 ### How releases are made
 
-- Every push to `main` runs `.github/workflows/release.yml`: tests → signed release APK → GitHub Release `v0.1.<N>` with `zenith.apk` attached and marked **Latest**.
+- Every push to `main` runs `.github/workflows/release.yml`: tests → signed release APK → GitHub Release `v0.1.<N>` with `zed.apk` attached and marked **Latest**.
 - `N` is the workflow run number and is used as the `versionCode`, so each release is higher than the last.
 - All releases are signed with the same key, which is what lets Android install them as updates.
 - Work happens on `develop`; merging to `main` publishes.

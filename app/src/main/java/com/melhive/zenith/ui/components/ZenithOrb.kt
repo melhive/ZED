@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -54,6 +55,27 @@ private fun secondaryFor(s: OrbState) = when (s) {
 }
 
 /**
+ * An angle in degrees that keeps growing at [degreesPerSecond] for as long as the composable is shown.
+ * It wraps at 360,000° (1,000 turns), so any element that rotates at a multiple like 0.7× or 1.07×
+ * of it is still at a whole number of turns when it wraps — the motion stays seamless.
+ */
+@Composable
+fun rememberContinuousRotation(degreesPerSecond: Float): Float {
+    val speed by androidx.compose.runtime.rememberUpdatedState(degreesPerSecond)
+    var angle by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+    LaunchedEffect(Unit) {
+        var last = androidx.compose.runtime.withFrameNanos { it }
+        while (true) {
+            androidx.compose.runtime.withFrameNanos { now ->
+                angle = (angle + (now - last) / 1_000_000_000f * speed) % 360_000f
+                last = now
+            }
+        }
+    }
+    return angle
+}
+
+/**
  * The ZED orb. Every state-specific effect is driven by real inputs:
  * [micLevel] comes from the recognizer / barge-in monitor RMS, [speechPulse]
  * increments on each TTS word boundary, and [state] follows the assistant
@@ -74,7 +96,9 @@ fun ZenithOrb(
 
     val t = rememberInfiniteTransition(label = "orb")
     val breathe by t.animateFloat(0f, 1f, infiniteRepeatable(tween(3600, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "breathe")
-    val spin by t.animateFloat(0f, 360f, infiniteRepeatable(tween(if (state == OrbState.EXECUTING) 1800 else 6000, easing = LinearEasing)), label = "spin")
+    // One continuously accumulated angle drives every rotation: no restart every cycle, and speed
+    // changes (e.g. when ZED starts working) only change the rate — the orb never jumps.
+    val spin = rememberContinuousRotation(if (state == OrbState.EXECUTING) 200f else 60f)
     val scan by t.animateFloat(0f, 1f, infiniteRepeatable(tween(1600, easing = LinearEasing), RepeatMode.Restart), label = "scan")
 
     // Speaking pulse: each TTS word boundary kicks the pulse, which then decays.
@@ -166,7 +190,6 @@ fun ZenithOrb(
         )
         drawCircle(Brush.sweepGradient(listOf(primary, secondary, primary), center), r, center, style = Stroke(2.dp.toPx()))
 
-        if (state == OrbState.COMPLETED) drawCheck(center, r * 0.45f, done.value)
         if (state == OrbState.ERROR) drawWarning(center, r * 0.42f)
     }
 }

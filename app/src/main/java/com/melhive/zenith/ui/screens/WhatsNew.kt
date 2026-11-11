@@ -31,6 +31,14 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.16", "2026-11-11", "Smooth orb, new logo, exact countdowns", listOf(
+            "New ZED logo: the arc-reactor orb, with a themed-icon version for Android 13+.",
+            "The orb animates continuously — no more little jump every few seconds.",
+            "Cleaner panels: borderless dark glass with a soft accent glow instead of outlined boxes.",
+            "“How much time until 9 AM?” is now calculated exactly by ZED (e.g. “9:00 AM is 4 minutes away”) instead of being guessed by the AI; time zones are no longer read out.",
+            "The green “done” orb no longer shows a check mark.",
+            "The project is now github.com/melhive/ZED; downloads are zed.apk (old links keep working).",
+        )),
         Release("0.1.15", "2026-11-11", "Meet ZED", listOf(
             "ZENITH is now ZED — a short name speech recognition hears reliably. Say “Hey Zed” (wake word tested against “he said”, “Hey Ted”, “Hey Ed”… with no false alarms).",
             "A new futuristic look: HUD panels with chamfered corners, a faint grid, glowing headings and a cleaner, grouped More menu.",
