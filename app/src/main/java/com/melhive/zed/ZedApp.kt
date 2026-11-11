@@ -21,11 +21,15 @@ class ZedApp : Application() {
         container = AppContainer(this)
         isVoiceProcess = currentProcessName().endsWith(":voice")
         if (isVoiceProcess) return
+        // A verified restore waiting from Backup & restore is swapped in now, before the database or settings are opened.
+        runCatching { com.melhive.zed.backup.BackupManager.applyPendingRestore(this) }
+            .onFailure { CrashReporter.recordNonFatal("restore", it) }
         // If ZED stopped while the recognizer beep was muted, put the volume back.
         runCatching { com.melhive.zed.voice.BeepSuppressor.restore(this) }
         Notifications.createChannels(this)
         container.appScope.launch {
             // Recover state after process death: streaming messages and interrupted tasks.
+            runCatching { container.afterRestore() }
             runCatching { container.conversations.recoverInterrupted() }
             runCatching { container.taskEngine.recover() }
             runCatching { container.reminderScheduler.rescheduleAll() }

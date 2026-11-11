@@ -13,6 +13,8 @@ import com.melhive.zed.ui.components.ZedOrb
 import com.melhive.zed.ui.theme.ZedTheme
 import com.melhive.zed.voice.OrbState
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.mutableStateOf
 import org.junit.Rule
 import org.junit.Test
@@ -27,6 +29,12 @@ import kotlin.test.assertEquals
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class UiComponentsTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test fun brainGlyphAnimates() {
+        compose.setContent { ZedTheme { com.melhive.zed.ui.screens.BrainGlyph(androidx.compose.ui.Modifier.size(64.dp)) } }
+        compose.mainClock.advanceTimeBy(1500)
+        compose.waitForIdle()
+    }
 
     @Test fun orbRendersEveryState() {
         val state = mutableStateOf(OrbState.IDLE)

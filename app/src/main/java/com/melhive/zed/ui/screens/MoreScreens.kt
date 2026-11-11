@@ -14,6 +14,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Hub
+import androidx.compose.material.icons.outlined.SettingsBackupRestore
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.NewReleases
@@ -69,7 +71,9 @@ fun MoreScreen(onNavigate: (String) -> Unit) {
         "Your data" to listOf(
             Entry(Routes.SCHEDULE, Icons.Outlined.Memory, "Schedule", "Calendar events and reminders"),
             Entry(Routes.MEMORY, Icons.Outlined.Memory, "Memory", "Facts, task list, reminders and documents"),
+            Entry(Routes.BRAIN, Icons.Outlined.Hub, "Live Brain", "Everything ZED knows as a living, connected network"),
             Entry(Routes.FILES, Icons.Outlined.Folder, "Files", "Granted folders, browse and organize"),
+            Entry(Routes.BACKUP, Icons.Outlined.SettingsBackupRestore, "Backup & restore", "Save everything to a file, or move ZED to another phone"),
         ),
         "Intelligence" to listOf(
             Entry(Routes.MODELS, Icons.Outlined.Psychology, "Models & AI", "On-device models matched to your phone, online providers"),
@@ -245,6 +249,9 @@ fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
         }
         item {
             ZedCard(onClick = { onNavigate(Routes.MODELS) }) { IconLabel(Icons.Outlined.Psychology, "Models & providers", "Configure intelligence layers in Model Manager") }
+        }
+        item {
+            ZedCard(onClick = { onNavigate(Routes.BACKUP) }) { IconLabel(Icons.Outlined.SettingsBackupRestore, "Backup & restore", "Save your data, models, voices and settings to one file") }
         }
         item { ZedFooter(onNavigate) }
     }

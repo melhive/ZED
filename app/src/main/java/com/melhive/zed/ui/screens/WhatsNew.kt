@@ -31,6 +31,14 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.20", "2026-11-11", "Live Brain, backup & restore, machine sounds", listOf(
+            "Live Brain (Memory → Live Brain, or More): everything ZED knows as a glowing, moving network. Areas like People, Work and Health orbit the core, every memory, task, reminder, document and conversation hangs off its area, and shared ideas (a name, a place) link them together. Signals run along the connections and new memories pop in as you save them.",
+            "In the brain: pinch to zoom, drag to move, tap anything to read it and see what it's connected to, search, and filter by type. Pin or forget a memory right there.",
+            "Backup & restore (More → Backup & restore): save your memories, tasks, reminders, conversations, routines and every setting to one file — and optionally your AI models, offline voices and wake word, so a new phone needs no re-downloading.",
+            "API keys travel in the backup only if you set a password; they're encrypted with it.",
+            "Restore checks the whole file before changing anything, then restarts ZED with everything in place. A damaged file or a wrong password leaves ZED untouched.",
+            "LIVE sounds rebuilt to sound like a machine, not a ghost: Arc is now a motor spin-up, a lock click and two crisp beeps. Pulse and Chime are replaced by Servo, Droid, Data, Retro and Airlock — all tuned to be loud and clear on a phone speaker (More → Voice → LIVE sounds, tap to hear).",
+        )),
         Release("0.1.19", "2026-11-11", "Ask with a photo, fixed", listOf(
             "Photos from the camera and the gallery now load. Every photo used to fail with “Couldn't open the photo” before ZED could look at it.",
             "Phone photos come out upright, large photos are shrunk before they're sent, and HEIC photos are supported.",

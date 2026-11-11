@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.isImeVisible
@@ -78,6 +80,8 @@ object Routes {
     const val TERMS = "terms"
     const val PRIVACY = "privacy"
     const val WHATS_NEW = "whats_new"
+    const val BRAIN = "brain"
+    const val BACKUP = "backup"
     fun task(id: Long) = "task/$id"
     fun chat(conversationId: Long?) = if (conversationId == null) CHAT else "$CHAT?id=$conversationId"
 }
@@ -161,7 +165,9 @@ fun ZedRoot(requestedRoute: String?, onRouteConsumed: () -> Unit) {
                     TaskDetailScreen(taskId = entry.arguments?.getLong("id") ?: 0L, onBack = { nav.popBackStack() })
                 }
                 screen(Routes.MORE) { MoreScreen(onNavigate = { nav.navigate(it) }) }
-                screen(Routes.MEMORY) { MemoryScreen(onBack = { nav.popBackStack() }) }
+                screen(Routes.MEMORY) { MemoryScreen(onBack = { nav.popBackStack() }, onOpenBrain = { nav.navigate(Routes.BRAIN) }) }
+                screen(Routes.BRAIN) { com.melhive.zed.ui.screens.BrainScreen(onBack = { nav.popBackStack() }, onOpenChat = { nav.navigate(Routes.chat(it)) }) }
+                screen(Routes.BACKUP) { com.melhive.zed.ui.screens.BackupScreen(onBack = { nav.popBackStack() }) }
                 screen(Routes.MODELS) { ModelsScreen(onBack = { nav.popBackStack() }, onOpenTasks = { nav.navigateTab(Routes.TASKS) }) }
                 screen(Routes.FILES) { FilesScreen(onBack = { nav.popBackStack() }) }
                 screen(Routes.SKILLS) { SkillsScreen(onBack = { nav.popBackStack() }) }
@@ -187,6 +193,18 @@ fun ZedRoot(requestedRoute: String?, onRouteConsumed: () -> Unit) {
     } else if (st != null && st.lastSeenVersion == null && !st.onboardingDone) {
         // Fresh install: nothing to announce.
         LaunchedEffect(Unit) { container.settings.setLastSeenVersion(com.melhive.zed.BuildConfig.VERSION_NAME) }
+    }
+
+    // After a restore was applied on startup: say what came back and what still needs setting up.
+    val restoreNotice by container.backup.restoreNotice.collectAsStateWithLifecycle()
+    restoreNotice?.let { notice ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { container.backup.restoreNotice.value = null },
+            title = { Text("Restore complete") },
+            text = { Text(notice, modifier = Modifier.verticalScroll(rememberScrollState())) },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { container.backup.restoreNotice.value = null }) { Text("OK") } },
+            containerColor = ZedColors.SurfaceHigh,
+        )
     }
 
     confirmations.firstOrNull()?.let { req ->

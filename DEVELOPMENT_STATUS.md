@@ -1,6 +1,6 @@
 # ZED — Development Status
 
-_Last updated: 2026-11-10_
+_Last updated: 2026-11-11_
 
 ## Overview
 
@@ -13,7 +13,7 @@ Native Android personal AI assistant (Kotlin, Jetpack Compose). Three intelligen
 | Default branch | `main` (stable merges) |
 | Latest commit | see `git log -1` (this file is updated with each milestone) |
 | Build status | ✅ GitHub Actions **Android Build** green: core tests, Android unit tests, debug APK |
-| Releases | ✅ Signed release **v0.1.19** published (latest). Install/share link: https://github.com/melhive/ZED/releases/latest/download/zed.apk. Every push to `main` publishes the version in `VERSION` (bump it for a new release; re-pushing the same version replaces that release). App id `com.melhive.zed`, signed with the key in `/root/zed-signing` (back it up — updates need the same key). |
+| Releases | ✅ Signed release **v0.1.20** published (latest). Install/share link: https://github.com/melhive/ZED/releases/latest/download/zed.apk. Every push to `main` publishes the version in `VERSION` (bump it for a new release; re-pushing the same version replaces that release). App id `com.melhive.zed`, signed with the key in `/root/zed-signing` (back it up — updates need the same key). |
 
 ## Milestones
 
@@ -60,6 +60,12 @@ Failed tests: none.
 | Keystore secret storage | | ✅ | ✅ | |
 | STT / TTS / sentence streaming / barge-in / audio focus | VAD only | ✅ | ✅ | |
 
+## Live Brain, backup & restore, machine sounds (v0.1.20)
+
+- **Live Brain** (Memory → Live Brain): a knowledge graph built on the fly from memories, tasks, reminders, indexed documents and conversations (`core/brain/BrainGraph.kt`: areas, shared-word concepts, force-directed layout — unit-tested). Drawn on a Compose canvas with glow, travelling signals, pan/zoom, search and type filters. No schema change. **Rendering needs device validation.**
+- **Backup & restore** (More → Backup & restore): one `.zedbackup` file (`core/backup/BackupArchive.kt`: streamed entries with CRC-32, end marker; API keys AES-GCM/PBKDF2 under a user password — unit-tested incl. truncation, corruption and path-escape). Restore stages and verifies everything, then swaps it in at the next start (`BackupManager.applyPendingRestore`, Robolectric round-trip test). Models and voices optional. **Multi-GB files and the automatic restart need device validation.**
+- **LIVE sounds** rebuilt as machine sounds (`core/voice/SoundSynth.kt`, band-limited pulse/saw, motor buzz, relay clicks, metal latch); tests check loudness, phone-speaker frequency range and brightness. **How they sound needs the user's ears.**
+
 ## Conversation intelligence (v0.1.5+)
 
 - **Auto mode** (default): online provider (key set + connected) → on-device model → native. First downloaded model activates itself.
@@ -97,7 +103,7 @@ Failed tests: none.
 | Vision | Photo (camera/gallery) to Gemini/OpenAI/Claude; LIVE camera; Gemini Live video frame | CI build |
 | Home Assistant | REST client, entity matching, low-risk control vs always-confirmed locks/covers | Parser tests; needs an HA instance |
 | Wake word | sherpa-onnx KWS (GigaSpeech zipformer), foreground microphone service, opens LIVE or answers hands-free | Real engine: model's own human recordings detected correctly; synthesized "Hey Zed" detected 4/4 (Kokoro voices) and 4/12 (Supertonic); 0/16 false alarms on near-miss phrases at normal sensitivity. The "-mobile" model variant crashes ONNX Runtime and is not used. Real voices need device testing; hands-free answering may be blocked by the speech service while ZED is in the background on some phones |
-| UX | What's new history + post-update dialog + update notification; Arc/Pulse/Chime LIVE sounds; recognizer beep muted with crash-safe restore; sliding transitions | CI build |
+| UX | What's new history + post-update dialog + update notification; machine-style LIVE sounds (Arc, Servo, Droid, Data, Retro, Airlock); recognizer beep muted with crash-safe restore; sliding transitions | CI build |
 
 ## Natural offline voices (v0.1.10–v0.1.11)
 

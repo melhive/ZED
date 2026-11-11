@@ -7,6 +7,7 @@ import com.melhive.zed.agents.WorkflowEngine
 import com.melhive.zed.android.ReminderScheduler
 import com.melhive.zed.core.skills.SkillRegistry
 import com.melhive.zed.core.tools.ToolCatalog
+import androidx.room.withTransaction
 import com.melhive.zed.database.ZedDatabase
 import com.melhive.zed.files.SafFileSystem
 import com.melhive.zed.intelligence.LocalModelRuntime
@@ -127,6 +128,40 @@ class AppContainer(private val context: Context) {
 
     /** The voice ZED speaks with everywhere (system or neural, per Settings → Voice). */
     val voice by lazy { com.melhive.zed.voice.VoiceManager(context, settings, voicePacks, appScope) }
+
+    /** Backup to a file and restore from one (More → Backup & restore). */
+    val backup by lazy {
+        com.melhive.zed.backup.BackupManager(
+            context, appScope, ZedDatabase.VERSION, BuildConfig.VERSION_NAME,
+            lockDatabase = { block ->
+                // Fold the write-ahead log into the main file first (best effort), then copy while writers wait.
+                runCatching { db.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)").use { it.moveToFirst() } }
+                db.withTransaction { block() }
+            },
+            readSecrets = { secrets.configured.value.mapNotNull { name -> secrets.get(name)?.let { name to it } }.toMap() },
+            writeSecret = { name, value -> secrets.put(name, value) },
+            counts = {
+                mapOf(
+                    "memories" to memory.list(100_000).size,
+                    "tasks" to todos.list(includeDone = true).size,
+                    "reminders" to db.reminders().count(),
+                    "conversations" to db.conversations().count(),
+                    "indexed documents" to db.knowledge().docCount(),
+                )
+            },
+        )
+    }
+
+    /**
+     * Runs once after a restore was swapped in: forgets models whose files did
+     * not come with the backup, so they show as "not downloaded" instead of failing to load.
+     */
+    suspend fun afterRestore() {
+        if (!backup.consumeNotice()) return
+        for (m in db.models().all()) if (!models.fileFor(m).exists()) db.models().delete(m.id)
+        val active = settings.current().activeLocalModelId
+        if (active != null && models.get(active) == null) settings.setActiveLocalModel(models.firstInstalled()?.id)
+    }
 
     /** Reads chat replies aloud with the selected voice. */
     val chatTts: com.melhive.zed.voice.TextToSpeechEngine get() = voice

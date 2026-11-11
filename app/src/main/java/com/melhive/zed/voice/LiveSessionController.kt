@@ -99,7 +99,7 @@ class LiveSessionController(
     private var bargeInEnabled = true
     private var listenJob: Job? = null
 
-    private var soundStyle = ZedSounds.Style.ARC
+    private var soundStyle = com.melhive.zed.core.voice.SoundSynth.Style.ARC
     private var hideBeep = true
 
     // Real-time (Gemini Live) session, when active.
@@ -124,7 +124,7 @@ class LiveSessionController(
 
         s.launch {
             val cfg = settings.current()
-            soundStyle = ZedSounds.Style.parse(cfg.liveSound)
+            soundStyle = com.melhive.zed.core.voice.SoundSynth.Style.parse(cfg.liveSound)
             hideBeep = cfg.hideRecognizerBeep
             val soundMs = ZedSounds.play(context, soundStyle, start = true)
             bargeInEnabled = cfg.bargeIn

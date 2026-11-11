@@ -154,7 +154,7 @@ class WakeWordService : Service() {
     /** Opens LIVE when allowed; otherwise handles one request hands-free. */
     private suspend fun onWake() {
         val c = (application as ZedApp).container
-        val style = ZedSounds.Style.parse(c.settings.current().liveSound)
+        val style = com.melhive.zed.core.voice.SoundSynth.Style.parse(c.settings.current().liveSound)
         val foreground = ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
         if (foreground || Settings.canDrawOverlays(this)) {
             // The floating orb over whatever is on screen (not the full app).

@@ -2,6 +2,7 @@ package com.melhive.zed.ui.screens
 
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
@@ -38,7 +39,7 @@ import com.melhive.zed.ui.theme.ZedColors
 import kotlinx.coroutines.launch
 
 @Composable
-fun MemoryScreen(onBack: () -> Unit, initialTab: Int = 0) {
+fun MemoryScreen(onBack: () -> Unit, initialTab: Int = 0, onOpenBrain: (() -> Unit)? = null) {
     val c = rememberContainer()
     val scope = rememberCoroutineScope()
     var tab by remember { mutableIntStateOf(initialTab) }
@@ -61,6 +62,17 @@ fun MemoryScreen(onBack: () -> Unit, initialTab: Int = 0) {
     ListScreen("Memory", onBack = onBack, subtitle = "Stored only on this device", actions = {
         if (tab == 0 || tab == 1) IconButton(onClick = { adding = true }) { Icon(Icons.Outlined.Add, "Add") }
     }) {
+        if (onOpenBrain != null) item(key = "brain") {
+            ZedCard(onClick = onOpenBrain, accent = ZedColors.Violet) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    com.melhive.zed.ui.screens.BrainGlyph(Modifier.padding(end = 14.dp).size(64.dp))
+                    androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+                        Text("LIVE BRAIN", style = MaterialTheme.typography.titleMedium, color = ZedColors.Cyan, letterSpacing = androidx.compose.ui.unit.TextUnit(2f, androidx.compose.ui.unit.TextUnitType.Sp))
+                        Text("See everything ZED knows as a living network — ${facts.size + todos.size + docs.size} things, organized and connected.", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
+                    }
+                }
+            }
+        }
         item {
             SecondaryScrollableTabRow(selectedTabIndex = tab, containerColor = ZedColors.Background, edgePadding = 0.dp) {
                 listOf("Facts", "Task list", "Reminders", "Knowledge", "Schedule").forEachIndexed { i, label ->

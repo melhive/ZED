@@ -34,6 +34,9 @@ interface ConversationDao {
 
     @Query("SELECT COUNT(*) FROM conversations")
     fun observeCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM conversations")
+    suspend fun count(): Int
 }
 
 @Dao
@@ -128,6 +131,9 @@ interface ReminderDao {
 
     @Query("UPDATE reminders SET status = :status WHERE id = :id")
     suspend fun setStatus(id: Long, status: String)
+
+    @Query("SELECT COUNT(*) FROM reminders")
+    suspend fun count(): Int
 
     @Query("UPDATE reminders SET exact = :exact WHERE id = :id")
     suspend fun setExact(id: Long, exact: Boolean)
@@ -232,6 +238,9 @@ interface KnowledgeDao {
            WHERE knowledge_chunks_fts MATCH :match LIMIT :limit"""
     )
     suspend fun searchChunks(match: String, limit: Int = 50): List<KnowledgeChunkEntity>
+
+    @Query("SELECT COUNT(*) FROM knowledge_docs")
+    suspend fun docCount(): Int
 
     @Query("SELECT COUNT(*) FROM knowledge_chunks")
     suspend fun chunkCount(): Int

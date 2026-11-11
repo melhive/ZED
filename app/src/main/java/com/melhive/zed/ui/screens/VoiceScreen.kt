@@ -181,7 +181,7 @@ fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
                 SectionTitle("LIVE sounds")
                 Text("The sound when ZED LIVE opens and closes. Tap one to hear it.", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
                 WrapRow(Modifier.padding(top = 6.dp)) {
-                    com.melhive.zed.voice.ZedSounds.Style.entries.forEach { st ->
+                    com.melhive.zed.core.voice.SoundSynth.Style.entries.forEach { st ->
                         FilterChip(selected = settings.liveSound == st.id, onClick = {
                             safely { c.settings.setLiveSound(st.id) }
                             val ms = com.melhive.zed.voice.ZedSounds.play(context, st, start = true)
@@ -189,7 +189,7 @@ fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
                         }, label = { Text(st.label) })
                     }
                 }
-                Text(com.melhive.zed.voice.ZedSounds.Style.parse(settings.liveSound).description, style = MaterialTheme.typography.labelSmall, color = ZedColors.Cyan)
+                Text(com.melhive.zed.core.voice.SoundSynth.Style.parse(settings.liveSound).description, style = MaterialTheme.typography.labelSmall, color = ZedColors.Cyan)
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
                     Column(Modifier.weight(1f)) {
                         Text("Hide the recognizer beep", style = MaterialTheme.typography.titleSmall)
