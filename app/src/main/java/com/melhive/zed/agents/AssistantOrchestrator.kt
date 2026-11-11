@@ -131,10 +131,10 @@ class AssistantOrchestrator(
         _streamingText.value = ""
         return try {
             val provider = providers.active()
-            val localSees = provider?.id == "local" &&
-                com.melhive.zed.models.ModelCatalog.find(settings.current().activeLocalModelId ?: "")?.vision == true
+            // Local models: let the runtime decide from the file itself (it explains when a copy has no vision).
+            val localSees = provider?.id == "local"
             if (image != null && (provider == null || (provider.id == "local" && !localSees))) {
-                val msg = "This model can't look at photos. Gemma 4 E2B or E4B can, right on your phone (Model Manager), or add a Gemini, OpenAI or Claude key."
+                val msg = "This model can't look at photos. Gemma 4 E2B or E4B can, right on your phone: download one in Model Manager, or add a Gemini, OpenAI or Claude key."
                 conversations.addMessage(conversationId, "assistant", msg, source = "system")
                 setPhase(AssistantPhase.COMPLETED, null, conversationId)
                 return AssistantReply(msg, false, "system")

@@ -167,7 +167,10 @@ fun ModelsScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
                 com.melhive.zed.models.Fit.SLOW -> ZedColors.Amber
                 else -> ZedColors.Red
             }
-            val isInstalled = installed.any { it.id == m.id }
+            val installedCopy = installed.firstOrNull { it.id == m.id }
+            val isInstalled = installedCopy != null
+            // A newer build of this model is in the catalog (e.g. one that can look at photos).
+            val outdated = installedCopy != null && installedCopy.source == "catalog" && installedCopy.sizeBytes != m.sizeBytes
             val taskId = downloads[m.id]
             ZedCard(accent = color) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -179,6 +182,7 @@ fun ModelsScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
                     m.bestFor.forEach { StatusPill(it, ZedColors.Violet) }
                     if (m.reasoning) StatusPill("Thinks first", ZedColors.Amber)
                     if (m.verified) StatusPill("Tested with ZED", ZedColors.Teal)
+                    if (m.vision) StatusPill("Sees photos", ZedColors.Cyan)
                 }
                 Row(Modifier.padding(top = 6.dp)) {
                     Text("Quality ${"●".repeat(m.quality)}${"○".repeat(5 - m.quality)}", style = MaterialTheme.typography.labelMedium, color = ZedColors.Cyan, modifier = Modifier.weight(1f))
@@ -189,8 +193,9 @@ fun ModelsScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
                     style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted)
                 WrapRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
                     when {
-                        isInstalled -> StatusPill("Installed", ZedColors.Green)
                         taskId != null -> OutlinedButton(onClick = onOpenTasks) { Text("Downloading — view task #$taskId") }
+                        outdated -> Button(onClick = { vm.download(m) }) { Text(if (m.vision) "Update — adds photo support" else "Update") }
+                        isInstalled -> StatusPill("Installed", ZedColors.Green)
                         else -> Button(onClick = { vm.download(m) }, enabled = fit != com.melhive.zed.models.Fit.INCOMPATIBLE && fit != com.melhive.zed.models.Fit.TOO_BIG) { Text("Download") }
                     }
                     TextButton(onClick = { uri.openUri(m.pageUrl) }) { Text("Model page") }

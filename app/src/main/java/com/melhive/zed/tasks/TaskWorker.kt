@@ -154,6 +154,8 @@ class TaskWorker(appContext: Context, params: WorkerParameters) : CoroutineWorke
         }
         // First model installed becomes the active one so conversation works right away.
         if (container.settings.current().activeLocalModelId == null) container.settings.setActiveLocalModel(model.id)
+        // An updated file replaces the old one: reload it on next use.
+        else if (container.settings.current().activeLocalModelId == model.id) container.localRuntime.unload()
         return succeed(task, "${model.name} installed and verified (SHA-256). It is ready to use.")
     }
 

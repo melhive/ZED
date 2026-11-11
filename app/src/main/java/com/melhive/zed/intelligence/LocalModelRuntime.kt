@@ -89,8 +89,8 @@ class LocalModelRuntime(private val cacheDir: File) {
             val started = System.currentTimeMillis()
             try {
                 val threads = com.melhive.zed.android.DeviceInfo.performanceCores()
-                val wantsVision = com.melhive.zed.models.ModelCatalog.find(modelId)?.vision == true
-                var vision = wantsVision
+                // Only files that contain a vision encoder can look at photos (checked in the file itself).
+                var vision = hasVisionEncoder(file)
                 fun config(speculative: Boolean, gpu: Boolean) = EngineConfig(
                     modelPath = file.absolutePath,
                     // CPU: only the fast cores — slow efficiency cores drag every token down on big.LITTLE phones.
@@ -195,7 +195,7 @@ class LocalModelRuntime(private val cacheDir: File) {
         val current = session
         // A photo goes to the model's vision encoder; it starts a fresh conversation (history as text).
         if (request.images.isNotEmpty() && !visionReady) {
-            emit(GenerationEvent.Error("This model build can't look at photos on your phone. Try Gemma 4 E2B or E4B, or an online AI."))
+            emit(GenerationEvent.Error("Your copy of this model has no photo support. Open Model Manager and tap “Update — adds photo support” (or download Gemma 4 E2B), then ask again."))
             return
         }
         val image = request.images.firstOrNull()
@@ -269,6 +269,16 @@ class LocalModelRuntime(private val cacheDir: File) {
         private const val SAFETY_TOKENS = 96
         /** Room a photo takes in the context window. */
         private const val IMAGE_TOKENS = 300
+
+        /**
+         * True when a .litertlm file contains a vision encoder. Its section table near the start of the
+         * file names each part ("tf_lite_vision_encoder", "tf_lite_audio_encoder_hw", …).
+         */
+        fun hasVisionEncoder(file: File): Boolean = runCatching {
+            val head = ByteArray(minOf(file.length(), 4L shl 20).toInt())
+            java.io.RandomAccessFile(file, "r").use { it.readFully(head) }
+            String(head, Charsets.ISO_8859_1).contains("tf_lite_vision_encoder")
+        }.getOrDefault(false)
 
         /** Conservative estimate (~3 characters per token for mixed English text). */
         fun estimateTokens(text: String): Int = text.length / 3 + 4

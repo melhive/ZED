@@ -31,6 +31,11 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.18", "2026-11-11", "Photos work on-device", listOf(
+            "Ask with a photo now works with Gemma 4: the Gemma 4 E2B · GPU file ZED downloaded before was a text-only build. Model Manager shows “Update — adds photo support” on it; one tap downloads the new GPU build (2.3 GB), which can see photos and replies just as fast.",
+            "ZED checks the model file itself for photo support, so it never pretends a model can see.",
+            "Models that can look at photos are marked “Sees photos” in Model Manager.",
+        )),
         Release("0.1.17", "2026-11-11", "Clear voice, sharper wake word, ask with a photo", listOf(
             "Supertonic voices (like Atlas) now read times, dates, temperatures and units clearly: ZED spells them out first. Tested with a speech recognizer, “1:05 PM” and “8 AM” are heard correctly every time (they used to come out as “1.5pm” or “am”).",
             "The briefing and routines talk like a person: “Good afternoon, sir. It's Wednesday, November 11th, 1:05 PM. Right now it's 29 degrees with light drizzle, but it feels like 35… You have one event today: Clients meeting at 8 AM.” No more symbols, brackets or lists read aloud.",

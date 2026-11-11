@@ -65,15 +65,17 @@ object ModelCatalog {
     val models = listOf(
         CatalogModel(
             id = "gemma-4-e2b-it-gpu", name = "Gemma 4 E2B · GPU",
-            description = "Google's best small model, built for the phone's graphics chip. Smart, natural conversation and good at following instructions; replies start quickly on phones with a supported GPU. The best everyday choice for most mid-range and better phones.",
+            description = "Google's best small model, built for the phone's graphics chip. Smart, natural conversation, good at following instructions, and it can look at photos (“what is this?”) right on your phone. Replies start quickly on phones with a supported GPU. The best everyday choice for most mid-range and better phones.",
             repo = "litert-community/gemma-4-E2B-it-litert-lm", fileName = "gemma-4-E2B-it-gpu.litertlm",
-            sizeBytes = 2_008_432_640, sha256 = "a53a59001894c58e6bdb5b9b227709f91a2e3e556baa7d85acf9c55402ba5cf5",
+            // Mobile GPU build with vision and audio encoders (checked in the file's section table). The
+            // repo's earlier "-gpu" file (2,008,432,640 bytes) was the text-only web build, now named "-web".
+            sizeBytes = 2_340_870_772, sha256 = "d3cfec6ae2e027a994e51366d44dbf522ec7531a4a35fbbfcd3e9cc9b927afc1",
             license = "Apache-2.0", minRamBytes = 4 * GB, recommendedBackend = "GPU", contextTokens = 32768,
             bestFor = listOf("Everyday chat", "Actions", "Multilingual"), quality = 4, speed = 4, verified = true, vision = true,
         ),
         CatalogModel(
             id = "gemma-4-e2b-it", name = "Gemma 4 E2B · CPU",
-            description = "The same Gemma 4 E2B model packaged for the processor. Use it when the GPU build doesn't start on your phone; same intelligence, a bit slower.",
+            description = "The same Gemma 4 E2B model packaged for the processor, including photo understanding. Use it when the GPU build doesn't start on your phone; same intelligence, a bit slower.",
             repo = "litert-community/gemma-4-E2B-it-litert-lm", fileName = "gemma-4-E2B-it.litertlm",
             sizeBytes = 2_588_147_712, sha256 = "181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c",
             license = "Apache-2.0", minRamBytes = 4 * GB, recommendedBackend = "CPU", contextTokens = 32768,
@@ -81,9 +83,9 @@ object ModelCatalog {
         ),
         CatalogModel(
             id = "gemma-4-e4b-it-gpu", name = "Gemma 4 E4B · GPU",
-            description = "Gemma 4's bigger sibling: noticeably better at explanations, writing and tricky questions. Needs a high-end phone with 8 GB+ RAM; slower to reply than E2B.",
+            description = "Gemma 4's bigger sibling: noticeably better at explanations, writing, tricky questions and describing photos. Needs a high-end phone with 8 GB+ RAM; slower to reply than E2B.",
             repo = "litert-community/gemma-4-E4B-it-litert-lm", fileName = "gemma-4-E4B-it-gpu.litertlm",
-            sizeBytes = 2_969_059_328, sha256 = "4912bb5a9c30993c51a7711f763212077458529312175df0573a78323a2bb7ff",
+            sizeBytes = 3_310_938_740, sha256 = "ea168f5a601b543e02712f9381f26b06ddc7d4cbe2406410387c82d69b995a60",
             license = "Apache-2.0", minRamBytes = 7 * GB, recommendedBackend = "GPU", contextTokens = 32768,
             bestFor = listOf("Best quality", "Writing", "Explanations"), quality = 5, speed = 2, vision = true,
         ),
