@@ -101,7 +101,7 @@ class OrchestratorTest {
         // The second request carries the whole conversation as context.
         val turns = fake.requests[1].turns.map { it.content }
         assertTrue(turns.containsAll(listOf("Hey, can we chat about geography?", "Hello! How can I help?", "What's the capital of France?")))
-        assertTrue(fake.requests[1].system.contains("ZENITH"))
+        assertTrue(fake.requests[1].system.contains("ZED"))
         // Casual chat uses the lean prompt without the tool list.
         assertTrue(!fake.requests[1].system.contains("zenith-tool"))
     }

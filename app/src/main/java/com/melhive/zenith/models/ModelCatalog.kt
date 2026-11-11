@@ -191,10 +191,12 @@ object ModelCatalog {
      */
     fun recommend(d: DeviceProfile): CatalogModel? {
         val candidates = models.filter { !it.reasoning }.map { it to assess(it, d) }.filter { it.second.fit == Fit.GOOD }
+        // Mid-range phones: replies must stay quick, so speed counts a lot. Phones with plenty of memory: quality first.
+        val flagship = d.ramGb >= 10
         val scored = candidates.map { (m, _) ->
             val gpuBonus = if (m.isGpuBuild && d.gpuLikely) 0.6 else 0.0
-            val speedWeight = if (d.ramGb < 10) 0.7 else 0.35
-            m to (m.quality + m.speed * speedWeight + gpuBonus + if (m.verified) 0.3 else 0.0)
+            val score = if (flagship) m.quality * 2.0 + m.speed * 0.3 else m.quality + m.speed * 0.7
+            m to (score + gpuBonus + if (m.verified) 0.3 else 0.0)
         }
         return scored.maxByOrNull { it.second }?.first
     }
