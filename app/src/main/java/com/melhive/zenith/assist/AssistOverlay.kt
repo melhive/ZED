@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -77,6 +78,8 @@ import com.melhive.zenith.ZenithApp
 import com.melhive.zenith.android.PermissionCatalog
 import com.melhive.zenith.intelligence.ImageInput
 import com.melhive.zenith.ui.components.ZenithOrb
+import com.melhive.zenith.ui.components.JarvisHud
+import com.melhive.zenith.ui.components.hudColor
 import com.melhive.zenith.ui.theme.ZenithColors
 import com.melhive.zenith.ui.theme.ZenithTheme
 import com.melhive.zenith.voice.LiveUiState
@@ -86,7 +89,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * The assistant overlay: opened by the assist gesture, "Hey Zenith" or the
+ * The assistant overlay: opened by the assist gesture, "Hey Zed" or the
  * tile. It floats over whatever app is open — the orb inside a HUD of moving
  * rings, a live transcript and LIVE's controls — and closes back to that app.
  */
@@ -148,38 +151,43 @@ private fun AssistOverlay(onClose: () -> Unit, onOpenApp: () -> Unit) {
     }
 
     Box(Modifier.fillMaxSize()) {
-        // Dim the app behind, more toward the bottom; tapping the clear area closes.
+        // Dim the app behind; tapping the empty area closes.
         Box(
             Modifier.fillMaxSize()
-                .background(Brush.verticalGradient(0f to Color.Transparent, 0.35f to Color(0x8805070D), 1f to Color(0xF205070D)))
+                .background(Brush.radialGradient(listOf(Color(0xE6070B16), Color(0xF205070D))))
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClose),
         )
-        AnimatedVisibility(shown, enter = slideInVertically(tween(420)) { it / 2 }, modifier = Modifier.align(Alignment.BottomCenter)) {
+        AnimatedVisibility(shown, enter = androidx.compose.animation.scaleIn(tween(420), initialScale = 0.85f), modifier = Modifier.fillMaxSize()) {
             Column(
-                Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(horizontal = 16.dp, vertical = 12.dp)
-                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
+                Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Box(Modifier.size(300.dp).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { live.tapOrb() }, contentAlignment = Alignment.Center) {
-                    JarvisHud(state, Modifier.fillMaxSize())
-                    ZenithOrb(state.orb, micLevel = state.micLevel, speechPulse = state.speechPulse, size = 150.dp, glow = true)
+                Text("ZED", style = MaterialTheme.typography.titleMedium, color = ZenithColors.Cyan, letterSpacing = 8.sp, modifier = Modifier.padding(top = 8.dp))
+                Spacer(Modifier.weight(1f))
+                // The orb in the middle of the screen, as large as the screen allows.
+                androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    val hud = minOf(maxWidth * 0.88f, 380.dp)
+                    Box(Modifier.size(hud).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { live.tapOrb() }, contentAlignment = Alignment.Center) {
+                        JarvisHud(state, Modifier.fillMaxSize())
+                        ZenithOrb(state.orb, micLevel = state.micLevel, speechPulse = state.speechPulse, size = hud * 0.58f, glow = true)
+                    }
                 }
                 Text(
                     (state.statusDetail?.takeIf { state.orb == OrbState.ERROR || state.orb == OrbState.EXECUTING } ?: state.orb.label).uppercase(),
-                    style = MaterialTheme.typography.labelMedium, color = hudColor(state.orb), letterSpacing = 3.sp,
+                    style = MaterialTheme.typography.labelLarge, color = hudColor(state.orb), letterSpacing = 4.sp, textAlign = TextAlign.Center,
                 )
                 val lastUser = state.partial.ifBlank { state.transcript.lastOrNull { it.fromUser }?.text.orEmpty() }
-                val lastZenith = state.transcript.lastOrNull { !it.fromUser }?.text.orEmpty()
+                val lastZed = state.transcript.lastOrNull { !it.fromUser }?.text.orEmpty()
                 if (lastUser.isNotBlank()) Text("“$lastUser”", style = MaterialTheme.typography.bodyMedium, color = ZenithColors.Muted, textAlign = TextAlign.Center,
                     maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
-                if (lastZenith.isNotBlank() && (state.transcript.lastOrNull()?.fromUser == false)) Text(lastZenith, style = MaterialTheme.typography.bodyLarge, color = ZenithColors.Text,
-                    textAlign = TextAlign.Center, maxLines = 5, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+                if (lastZed.isNotBlank() && (state.transcript.lastOrNull()?.fromUser == false)) Text(lastZed, style = MaterialTheme.typography.bodyLarge, color = ZenithColors.Text,
+                    textAlign = TextAlign.Center, maxLines = 4, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+                Spacer(Modifier.weight(1f))
                 if (typing) OutlinedTextField(
-                    value = typed, onValueChange = { typed = it }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    placeholder = { Text("Type to ZENITH") },
+                    value = typed, onValueChange = { typed = it }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    placeholder = { Text("Type to ZED") },
                     trailingIcon = { IconButton(onClick = { live.submitText(typed); typed = ""; typing = false }) { Icon(Icons.AutoMirrored.Outlined.Send, "Send") } },
                 )
-                Spacer(Modifier.size(12.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                     HudButton(if (state.micMuted) Icons.Outlined.MicOff else Icons.Outlined.Mic, if (state.micMuted) "Unmute" else "Mute", live::toggleMute)
                     HudButton(if (state.speakerOn) Icons.AutoMirrored.Outlined.VolumeUp else Icons.AutoMirrored.Outlined.VolumeOff, "Voice replies", live::toggleSpeaker)
@@ -188,7 +196,7 @@ private fun AssistOverlay(onClose: () -> Unit, onOpenApp: () -> Unit) {
                     }
                     HudButton(Icons.Outlined.Keyboard, "Type") { typing = !typing }
                     HudButton(Icons.Outlined.StopCircle, "Stop", live::cancelRequest)
-                    HudButton(Icons.Outlined.OpenInFull, "Open ZENITH", onOpenApp)
+                    HudButton(Icons.Outlined.OpenInFull, "Open ZED", onOpenApp)
                     IconButton(onClick = onClose, modifier = Modifier.size(52.dp),
                         colors = IconButtonDefaults.iconButtonColors(containerColor = ZenithColors.Red.copy(alpha = 0.85f), contentColor = Color.White)) {
                         Icon(Icons.Outlined.Close, "Close")
@@ -204,68 +212,5 @@ private fun HudButton(icon: ImageVector, description: String, onClick: () -> Uni
     IconButton(onClick = onClick, modifier = Modifier.size(46.dp),
         colors = IconButtonDefaults.iconButtonColors(containerColor = ZenithColors.Cyan.copy(alpha = 0.12f), contentColor = ZenithColors.Cyan)) {
         Icon(icon, description)
-    }
-}
-
-private fun hudColor(o: OrbState): Color = when (o) {
-    OrbState.LISTENING -> ZenithColors.Cyan
-    OrbState.THINKING, OrbState.SEARCHING, OrbState.RESEARCHING -> ZenithColors.Violet
-    OrbState.SPEAKING -> ZenithColors.Teal
-    OrbState.EXECUTING -> ZenithColors.Amber
-    OrbState.ERROR -> ZenithColors.Red
-    else -> ZenithColors.Cyan
-}
-
-/** Arc-reactor style rings around the orb: rotating tick ring, counter-rotating arcs, a scanner while thinking. */
-@Composable
-fun JarvisHud(state: LiveUiState, modifier: Modifier = Modifier) {
-    val t = rememberInfiniteTransition(label = "hud")
-    val slow by t.animateFloat(0f, 360f, infiniteRepeatable(tween(24_000, easing = LinearEasing)), label = "slow")
-    val fast by t.animateFloat(360f, 0f, infiniteRepeatable(tween(7_000, easing = LinearEasing)), label = "fast")
-    val scan by t.animateFloat(0f, 360f, infiniteRepeatable(tween(1_600, easing = LinearEasing)), label = "scan")
-    val breathe by t.animateFloat(0.85f, 1f, infiniteRepeatable(tween(1_400), RepeatMode.Reverse), label = "breathe")
-    val color by animateColorAsState(hudColor(state.orb), tween(400), label = "color")
-    val energy by animateFloatAsState(
-        when (state.orb) { OrbState.LISTENING -> 0.35f + state.micLevel; OrbState.SPEAKING -> 0.8f + (state.speechPulse % 2) * 0.2f; else -> 0.4f },
-        tween(180), label = "energy",
-    )
-    val thinking = state.orb in setOf(OrbState.THINKING, OrbState.SEARCHING, OrbState.RESEARCHING, OrbState.EXECUTING)
-
-    Canvas(modifier) {
-        val c = Offset(size.width / 2, size.height / 2)
-        val r = size.minDimension / 2
-        // Outer dashed ring.
-        drawCircle(color.copy(alpha = 0.25f), r * 0.98f, c, style = Stroke(1.5f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 10f))))
-        // Rotating tick ring.
-        rotate(slow, c) {
-            for (i in 0 until 72) {
-                val a = Math.toRadians(i * 5.0)
-                val long = i % 6 == 0
-                val inner = r * (if (long) 0.80f else 0.84f)
-                val outer = r * 0.88f
-                drawLine(color.copy(alpha = if (long) 0.8f else 0.35f), Offset(c.x + inner * cos(a).toFloat(), c.y + inner * sin(a).toFloat()),
-                    Offset(c.x + outer * cos(a).toFloat(), c.y + outer * sin(a).toFloat()), strokeWidth = if (long) 2.5f else 1.2f)
-            }
-        }
-        // Counter-rotating arc segments; thicker with voice energy.
-        val arcR = r * 0.72f
-        rotate(fast, c) {
-            for (k in 0 until 3) drawArc(
-                color.copy(alpha = 0.55f * breathe), startAngle = k * 120f, sweepAngle = 70f, useCenter = false,
-                topLeft = Offset(c.x - arcR, c.y - arcR), size = Size(arcR * 2, arcR * 2), style = Stroke(3f + 9f * energy, cap = StrokeCap.Round),
-            )
-        }
-        // Inner thin ring.
-        drawCircle(color.copy(alpha = 0.4f), r * 0.62f, c, style = Stroke(1.2f))
-        // Scanner sweep while working.
-        if (thinking) rotate(scan, c) {
-            drawArc(Brush.sweepGradient(listOf(Color.Transparent, color.copy(alpha = 0.45f)), c), 0f, 60f, true,
-                topLeft = Offset(c.x - r * 0.9f, c.y - r * 0.9f), size = Size(r * 1.8f, r * 1.8f))
-        }
-        // Small markers at the cardinal points.
-        for (i in 0 until 4) {
-            val a = Math.toRadians(i * 90.0 + 45)
-            drawCircle(color.copy(alpha = 0.9f), 3.5f, Offset(c.x + r * 0.94f * cos(a).toFloat(), c.y + r * 0.94f * sin(a).toFloat()))
-        }
     }
 }

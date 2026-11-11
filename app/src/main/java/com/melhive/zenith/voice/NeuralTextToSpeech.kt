@@ -138,7 +138,7 @@ class NeuralTextToSpeech(
                     numThreads = threads,
                 )
                 VoiceEngineKind.KOKORO -> OfflineTtsModelConfig(
-                    // No lexicon here: ZENITH phonemizes the text itself and passes phonemes.
+                    // No lexicon here: ZED phonemizes the text itself and passes phonemes.
                     kokoro = OfflineTtsKokoroModelConfig(model = file("model.int8.onnx"), voices = file("voices.bin"), tokens = file("tokens.txt")),
                     numThreads = threads,
                 )
@@ -314,7 +314,7 @@ class NeuralTextToSpeech(
     override fun isSpeaking(): Boolean = pending.isNotEmpty()
 
     override fun info(): VoiceInfo? = if (!ready.isCompleted) null else VoiceInfo(
-        engine = "ZENITH neural · ${pack.name}" + if (loadError != null) " (failed: $loadError)" else " (loaded in ${loadMillis} ms)",
+        engine = "ZED neural · ${pack.name}" + if (loadError != null) " (failed: $loadError)" else " (loaded in ${loadMillis} ms)",
         language = if (pack.kind == VoiceEngineKind.KOKORO) (if (voice.accent == "British") "en-GB" else "en-US") else VoiceCatalog.supertonicLanguage(languageTag),
         offlineVoiceAvailable = true,
         voiceName = "${voice.name} (${voice.gender.label}, ${voice.accent})",

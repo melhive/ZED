@@ -95,10 +95,10 @@ fun FilesScreen(onBack: () -> Unit) {
         notice?.let { n -> item { ZenithCard(accent = ZenithColors.Amber) { Text(n); TextButton(onClick = { notice = null }) { Text("Dismiss") } } } }
         if (path == null) {
             item {
-                Text("ZENITH can only see folders you pick here. It has no access to the rest of your storage and never needs root.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
+                Text("ZED can only see folders you pick here. It has no access to the rest of your storage and never needs root.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
             }
             item { Button(onClick = { treeLauncher.launch(null) }, modifier = Modifier.fillMaxWidth()) { Text("Grant folder access") } }
-            if (grants.isEmpty()) item { EmptyState("No folders granted", "Grant Download or Documents to let ZENITH manage files there.") }
+            if (grants.isEmpty()) item { EmptyState("No folders granted", "Grant Download or Documents to let ZED manage files there.") }
             items(grants, key = { it.uri }) { g ->
                 ZenithCard(onClick = { path = g.displayName }) {
                     IconLabel(Icons.Outlined.Folder, g.displayName, "Granted ${formatTime(g.grantedAt)}") {
@@ -119,7 +119,7 @@ fun FilesScreen(onBack: () -> Unit) {
             items(items, key = { it.path }) { f ->
                 ZenithCard(onClick = {
                     val full = PathPolicy.join(path!!, f.name)
-                    if (f.isDirectory) path = full else if (PathPolicy.isTextFile(f.name)) run("file.read", mapOf("path" to full)) else notice = "${f.name} is not a text document ZENITH can open."
+                    if (f.isDirectory) path = full else if (PathPolicy.isTextFile(f.name)) run("file.read", mapOf("path" to full)) else notice = "${f.name} is not a text document ZED can open."
                 }) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconLabel(

@@ -10,7 +10,7 @@ import kotlin.math.sqrt
  * - Speech starts after [startFrames] consecutive frames above floor + [marginDb].
  * - Speech ends (endpoint) after [hangoverFrames] consecutive quiet frames.
  *
- * Used for barge-in: while ZENITH speaks, the mic is monitored with echo
+ * Used for barge-in: while ZED speaks, the mic is monitored with echo
  * cancellation; when user speech starts, playback is stopped.
  */
 class VoiceActivityDetector(

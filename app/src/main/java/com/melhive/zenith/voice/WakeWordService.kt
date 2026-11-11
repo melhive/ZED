@@ -43,12 +43,12 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 
 /**
- * "Hey Zenith": listens on-device for the wake word only (sherpa-onnx keyword
+ * "Hey Zed": listens on-device for the wake word only (sherpa-onnx keyword
  * spotting; no audio leaves the phone), as a foreground service with a visible
- * notification. On detection it opens ZENITH LIVE — or, when Android doesn't
+ * notification. On detection it opens ZED LIVE — or, when Android doesn't
  * allow opening the app from the background, answers hands-free: it listens
  * for the request, speaks the answer and posts it as a notification.
- * Paused while ZENITH LIVE has the microphone.
+ * Paused while ZED LIVE has the microphone.
  */
 class WakeWordService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + kotlinx.coroutines.CoroutineExceptionHandler { _, e ->
@@ -65,8 +65,8 @@ class WakeWordService : Service() {
             stopSelf(); return START_NOT_STICKY
         }
         val ok = runCatching {
-            if (Build.VERSION.SDK_INT >= 30) startForeground(NOTIFICATION_ID, notification("Listening for “Hey Zenith”"), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
-            else startForeground(NOTIFICATION_ID, notification("Listening for “Hey Zenith”"))
+            if (Build.VERSION.SDK_INT >= 30) startForeground(NOTIFICATION_ID, notification("Listening for “Hey Zed”"), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+            else startForeground(NOTIFICATION_ID, notification("Listening for “Hey Zed”"))
         }
         if (ok.isFailure) { com.melhive.zenith.android.CrashReporter.recordNonFatal("wake word start", ok.exceptionOrNull()!!); stopSelf(); return START_NOT_STICKY }
         if (!running) start()
@@ -77,7 +77,7 @@ class WakeWordService : Service() {
         val stop = PendingIntent.getService(this, 1, Intent(this, WakeWordService::class.java).setAction(ACTION_STOP), PendingIntent.FLAG_IMMUTABLE)
         return NotificationCompat.Builder(this, Notifications.CHANNEL_TASKS)
             .setSmallIcon(R.drawable.ic_stat_zenith)
-            .setContentTitle("ZENITH")
+            .setContentTitle("ZED")
             .setContentText(text)
             .setOngoing(true)
             .setSilent(true)
@@ -167,9 +167,9 @@ class WakeWordService : Service() {
         val heard = withContext(Dispatchers.Main) { listenOnce() }
         if (heard.isNullOrBlank()) { ZenithSounds.play(this, style, start = false); return }
         Notifications.post(this, Notifications.CHANNEL_TASKS, NOTIFICATION_ID + 1, "You: $heard", "Thinking…", "live")
-        val conv = c.conversations.create("Hey Zenith")
+        val conv = c.conversations.create("Hey Zed")
         val reply = c.orchestrator.respond(conv, heard, voice = true)
-        Notifications.post(this, Notifications.CHANNEL_TASKS, NOTIFICATION_ID + 1, "ZENITH", reply.text, "chat")
+        Notifications.post(this, Notifications.CHANNEL_TASKS, NOTIFICATION_ID + 1, "ZED", reply.text, "chat")
         if (c.settings.current().voiceResponses && c.voice.awaitReady()) {
             c.voice.speak(reply.text, flush = true)
             delay(500)
@@ -208,17 +208,18 @@ class WakeWordService : Service() {
         private const val NOTIFICATION_ID = 65_000
         private const val ACTION_STOP = "com.melhive.zenith.wake.STOP"
         /**
-         * sherpa-onnx keyword format: BPE tokens of the phrase, then @label. Chosen by testing seven spellings
-         * against synthesized "Hey Zenith" (Kokoro 4/4 detected) and 16 near-miss phrases ("its zenith",
-         * "Hey Kenny", "Hey Siri"…): no false alarms at the normal setting. Real voices still need tuning.
+         * sherpa-onnx keyword format: BPE tokens of the phrase, then @label. "Hey Zed" was chosen by testing
+         * spellings with the real engine on synthesized speech (11 clips, several voices) against 30 near-miss
+         * clips ("he said", "Hey Ted", "Hey Ed", "Hey Jed", "hazed", "Hey Zack"…): ▁ Z ED detected 9/11 at
+         * threshold 0.08 with zero false alarms; the ▁ Z E D spelling barely triggers.
          */
-        const val KEYWORDS = "▁HE Y ▁ Z EN I TH @HEY_ZENITH"
-        /** (threshold, boosting score) per sensitivity; normal = zero false alarms in testing. */
+        const val KEYWORDS = "▁HE Y ▁ Z ED @HEY_ZED"
+        /** (threshold, boosting score) per sensitivity; normal had zero false alarms in testing. */
         private val THRESHOLD_LOW = 0.15f to 1.5f
-        private val THRESHOLD_NORMAL = 0.1f to 2.0f
-        private val THRESHOLD_HIGH = 0.08f to 2.5f
+        private val THRESHOLD_NORMAL = 0.08f to 2.5f
+        private val THRESHOLD_HIGH = 0.06f to 3.0f
 
-        /** True while ZENITH LIVE is using the microphone. */
+        /** True while ZED LIVE is using the microphone. */
         val paused = MutableStateFlow(false)
 
         fun start(context: Context) {

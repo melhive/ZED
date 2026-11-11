@@ -4,7 +4,7 @@ import com.melhive.zenith.core.tools.RiskLevel
 import com.melhive.zenith.core.tools.ToolRequest
 import com.melhive.zenith.core.tools.ToolSpec
 
-/** How often ZENITH asks before acting (Settings → Ask before actions). */
+/** How often ZED asks before acting (Settings → Ask before actions). */
 enum class ConfirmMode(val label: String, val description: String) {
     NEVER("Never — just do it", "Everything you ask runs immediately, including deletes and calls."),
     RISKY("Only risky things", "Asks only before deleting, calling, or unlocking and opening doors."),

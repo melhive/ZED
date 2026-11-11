@@ -25,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -134,29 +135,62 @@ fun ModelsScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
             OutlinedButton(onClick = { importLauncher.launch(arrayOf("*/*")) }, enabled = importing == null, modifier = Modifier.fillMaxWidth()) {
                 Text(importing ?: "Import .litertlm file")
             }
-            Text("Models downloaded inside other apps (e.g. AI Edge Gallery) are stored in that app's private storage and cannot be reused; download or import a copy for ZENITH.",
+            Text("Models downloaded inside other apps (e.g. AI Edge Gallery) are stored in that app's private storage and cannot be reused; download or import a copy for ZED.",
                 style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
         }
 
-        item { SectionTitle("Download (verified catalog)") }
-        items(ModelCatalog.models, key = { "cat-" + it.id }) { m ->
-            val report = vm.c.models.assess(m, device)
+        val profile = com.melhive.zenith.models.DeviceProfile(
+            device.totalRamBytes, device.freeStorageBytes, DeviceInfo.performanceCores(), DeviceInfo.soc(), device.arm64,
+        )
+        val recommended = com.melhive.zenith.models.ModelCatalog.recommend(profile)
+        item {
+            ZenithCard(accent = ZenithColors.Cyan) {
+                SectionTitle("Your phone")
+                Text("${device.model} · ${profile.soc}", style = MaterialTheme.typography.titleSmall)
+                Text("${DeviceInfo.formatBytes(device.totalRamBytes)} memory · ${profile.performanceCores} fast CPU cores · GPU ${if (profile.gpuLikely) "supported" else "not supported"} · ${DeviceInfo.formatBytes(device.freeStorageBytes)} free",
+                    style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
+                recommended?.let { r ->
+                    Text("Best match: ${r.name}", style = MaterialTheme.typography.titleMedium, color = ZenithColors.Green, modifier = Modifier.padding(top = 8.dp))
+                    Text("Chosen for your phone's memory and processor: the smartest model that still replies quickly here.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
+                }
+            }
+        }
+        item { SectionTitle("Download a model") }
+        val ranked = com.melhive.zenith.models.ModelCatalog.models.map { it to com.melhive.zenith.models.ModelCatalog.assess(it, profile) }
+            .sortedWith(compareBy({ it.first.id != recommended?.id }, { it.second.fit.rank }, { -it.first.quality }))
+        items(ranked, key = { "cat-" + it.first.id }) { (m, a) ->
+            val isRecommended = m.id == recommended?.id
+            val fit = if (isRecommended) com.melhive.zenith.models.Fit.RECOMMENDED else a.fit
+            val color = when (fit) {
+                com.melhive.zenith.models.Fit.RECOMMENDED, com.melhive.zenith.models.Fit.GOOD -> ZenithColors.Green
+                com.melhive.zenith.models.Fit.SLOW -> ZenithColors.Amber
+                else -> ZenithColors.Red
+            }
             val isInstalled = installed.any { it.id == m.id }
             val taskId = downloads[m.id]
-            ZenithCard(accent = when (report.level) { Compatibility.COMPATIBLE -> ZenithColors.Green; Compatibility.MARGINAL -> ZenithColors.Amber; Compatibility.INCOMPATIBLE -> ZenithColors.Red }) {
-                Row {
+            ZenithCard(accent = color) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(m.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                    StatusPill(report.level.name.lowercase().replaceFirstChar { it.uppercase() }, when (report.level) { Compatibility.COMPATIBLE -> ZenithColors.Green; Compatibility.MARGINAL -> ZenithColors.Amber; Compatibility.INCOMPATIBLE -> ZenithColors.Red })
+                    StatusPill(fit.label, color)
                 }
-                Text(m.description, style = MaterialTheme.typography.bodySmall)
-                Text("${DeviceInfo.formatBytes(m.sizeBytes)} download · recommended RAM ${DeviceInfo.formatBytes(m.minRamBytes)} · ${m.recommendedBackend} · ${m.license} · context ${m.contextTokens} tokens",
+                Text(m.description, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
+                WrapRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 6.dp)) {
+                    m.bestFor.forEach { StatusPill(it, ZenithColors.Violet) }
+                    if (m.reasoning) StatusPill("Thinks first", ZenithColors.Amber)
+                    if (m.verified) StatusPill("Tested with ZED", ZenithColors.Teal)
+                }
+                Row(Modifier.padding(top = 6.dp)) {
+                    Text("Quality ${"●".repeat(m.quality)}${"○".repeat(5 - m.quality)}", style = MaterialTheme.typography.labelMedium, color = ZenithColors.Cyan, modifier = Modifier.weight(1f))
+                    Text("Speed ${"●".repeat(m.speed)}${"○".repeat(5 - m.speed)}", style = MaterialTheme.typography.labelMedium, color = ZenithColors.Cyan)
+                }
+                Text(a.reason, style = MaterialTheme.typography.bodySmall, color = color, modifier = Modifier.padding(top = 4.dp))
+                Text("${DeviceInfo.formatBytes(m.sizeBytes)} download · runs on ${m.recommendedBackend} · ${m.license}",
                     style = MaterialTheme.typography.labelSmall, color = ZenithColors.Muted)
-                report.reasons.forEach { Text("• $it", style = MaterialTheme.typography.labelSmall, color = ZenithColors.Muted) }
                 WrapRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
                     when {
                         isInstalled -> StatusPill("Installed", ZenithColors.Green)
                         taskId != null -> OutlinedButton(onClick = onOpenTasks) { Text("Downloading — view task #$taskId") }
-                        else -> Button(onClick = { vm.download(m) }, enabled = report.level != Compatibility.INCOMPATIBLE) { Text("Download") }
+                        else -> Button(onClick = { vm.download(m) }, enabled = fit != com.melhive.zenith.models.Fit.INCOMPATIBLE && fit != com.melhive.zenith.models.Fit.TOO_BIG) { Text("Download") }
                     }
                     TextButton(onClick = { uri.openUri(m.pageUrl) }) { Text("Model page") }
                 }

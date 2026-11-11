@@ -39,7 +39,7 @@ class SkillRegistry(val catalog: ToolCatalog, skills: List<SkillDescriptor>) {
 
     companion object {
         val DEFAULT_SKILLS = listOf(
-            SkillDescriptor("core.time", "Date & Time", "Tells the current date, time and time zone.", listOf("time.now")),
+            SkillDescriptor("core.time", "Date & Time", "Tells the exact date and time and how long is left on timers, alarms and reminders.", listOf("time.now", "time.left")),
             SkillDescriptor("files.manage", "File Management", "Create, read, list, move, copy, rename and delete files in folders you granted.",
                 listOf("file.create", "folder.create", "file.read", "file.list", "file.move", "file.rename", "file.copy", "file.delete")),
             SkillDescriptor("files.organize", "Document Organizer", "Plans and executes sorting of a folder into category sub-folders as a background task.", listOf("files.organize")),
@@ -50,7 +50,7 @@ class SkillRegistry(val catalog: ToolCatalog, skills: List<SkillDescriptor>) {
             SkillDescriptor("tasks.list", "Task List", "Keeps your personal to-do list.", listOf("todo.add", "todo.list", "todo.complete")),
             SkillDescriptor("memory.personal", "Personal Memory", "Remembers facts only when you ask, and forgets on request.", listOf("memory.remember", "memory.list", "memory.forget")),
             SkillDescriptor("history.search", "Conversation History", "Searches your past conversations.", listOf("history.search")),
-            SkillDescriptor("app.settings", "Settings Control", "Changes ZENITH settings by voice or chat.", listOf("settings.set")),
+            SkillDescriptor("app.settings", "Settings Control", "Changes ZED settings by voice or chat.", listOf("settings.set")),
             SkillDescriptor("automation.workflows", "Workflows", "Runs predefined multi-step workflows.", listOf("workflow.run")),
             SkillDescriptor("phone.comms", "Calls & Messages", "Finds contacts, places calls (always confirmed) and prepares text messages.", listOf("contacts.find", "phone.call", "sms.compose")),
             SkillDescriptor("device.control", "Phone Control", "Flashlight, volume, Do Not Disturb, settings panels, camera and phone status.",

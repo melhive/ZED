@@ -57,7 +57,7 @@ data class RealtimeConfig(
 /**
  * Gemini Live API session (BidiGenerateContent over WebSocket): the model hears
  * the microphone stream directly and answers in speech, with server-side voice
- * activity detection and interruption. Tool calls run through ZENITH's tool
+ * activity detection and interruption. Tool calls run through ZED's tool
  * pipeline (validation, permissions, confirmation) and results are sent back.
  *
  * Echo: on the loudspeaker the microphone is muted while the model speaks (the
@@ -267,7 +267,7 @@ class GeminiLiveSession(
                     var sum = 0.0
                     for (i in 0 until n) { val v = buf[i] / 32768.0; sum += v * v }
                     val level = sqrt(sum / n).toFloat()
-                    // Half duplex on the loudspeaker: while ZENITH talks, send silence so it doesn't hear itself.
+                    // Half duplex on the loudspeaker: while ZED talks, send silence so it doesn't hear itself.
                     val gate = micMuted || (!headphones() && System.currentTimeMillis() < playingUntil + 350)
                     events.onMicLevel(if (gate) 0f else (level * 6).coerceIn(0f, 1f))
                     val bytes = if (gate) silence.copyOf(n * 2) else ByteArray(n * 2).also { b ->
@@ -332,7 +332,7 @@ class GeminiLiveSession(
 
     // ---- controls ----
 
-    /** Stops ZENITH talking; the rest of this answer is skipped. */
+    /** Stops ZED talking; the rest of this answer is skipped. */
     fun interrupt() {
         discardTurn = true
         flushPlayback()

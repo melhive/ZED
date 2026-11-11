@@ -85,8 +85,8 @@ import java.time.format.DateTimeFormatter
 import java.util.Date
 
 /**
- * Home: greeting, an orb that opens ZENITH LIVE (it animates only while
- * ZENITH is working), a useful "next up" line, a direct "Ask ZENITH" box,
+ * Home: greeting, an orb that opens ZED LIVE (it animates only while
+ * ZED is working), a useful "next up" line, a direct "Ask ZED" box,
  * today's summary, quick actions and background work.
  */
 @Composable
@@ -183,7 +183,7 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
         OutlinedTextField(
             value = ask, onValueChange = { ask = it },
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Ask ZENITH anything…") },
+            placeholder = { Text("Ask ZED anything…") },
             singleLine = true,
             shape = RoundedCornerShape(24.dp),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
@@ -195,12 +195,10 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
             colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ZenithColors.Cyan, unfocusedBorderColor = ZenithColors.Outline),
         )
 
-        AllowEverythingCard()
-
         (update as? UpdateState.Available)?.let { u ->
             ZenithCard(accent = ZenithColors.Green, onClick = { uriHandler.openUri(u.info.apkUrl) }) {
                 SectionTitle("Update available")
-                Text("ZENITH ${u.info.versionName} is ready. Download it and tap Install — it replaces this version and keeps your data.", style = MaterialTheme.typography.bodySmall)
+                Text("ZED ${u.info.versionName} is ready. Download it and tap Install — it replaces this version and keeps your data.", style = MaterialTheme.typography.bodySmall)
                 WrapRow {
                     TextButton(onClick = { uriHandler.openUri(u.info.apkUrl) }) { Text("Download update") }
                     TextButton(onClick = { uriHandler.openUri(u.info.pageUrl) }) { Text("What's new") }
@@ -214,9 +212,9 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
                 if (c.models.assess(e2b).level != Compatibility.INCOMPATIBLE) e2b else ModelCatalog.find("qwen3-0.6b")!!
             }
             ZenithCard(accent = ZenithColors.Violet) {
-                SectionTitle("Make ZENITH conversational")
+                SectionTitle("Make ZED conversational")
                 if (modelDownload != null) {
-                    Text("Downloading the on-device model… you can keep using ZENITH.", style = MaterialTheme.typography.bodyMedium)
+                    Text("Downloading the on-device model… you can keep using ZED.", style = MaterialTheme.typography.bodyMedium)
                     RealProgress(modelDownload.progressCurrent, modelDownload.progressTotal, Modifier.padding(vertical = 6.dp), ZenithColors.Violet)
                     Text(listOfNotNull(modelDownload.progressLabel, modelDownload.progressCurrent?.let { cur -> modelDownload.progressTotal?.let { "${DeviceInfo.formatBytes(cur)} / ${DeviceInfo.formatBytes(it)}" } }).joinToString(" · "),
                         style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)

@@ -20,10 +20,10 @@ import kotlinx.coroutines.sync.withLock
 import java.util.Locale
 
 /**
- * The one text-to-speech engine ZENITH speaks with (Chat read-aloud and LIVE).
+ * The one text-to-speech engine ZED speaks with (Chat read-aloud and LIVE).
  * It follows Settings: the selected voice decides the engine (Android system
  * voice or an offline neural voice pack), speed and pitch apply immediately.
- * If a neural voice cannot load, it falls back to the system voice so ZENITH
+ * If a neural voice cannot load, it falls back to the system voice so ZED
  * never goes silent, and [status] explains why.
  */
 class VoiceManager(
@@ -138,7 +138,7 @@ class VoiceManager(
         _status.value = _status.value.copy(detail = detail)
     }
 
-    /** Replaces a failed or crashed neural voice with the phone voice so ZENITH keeps talking. */
+    /** Replaces a failed or crashed neural voice with the phone voice so ZED keeps talking. */
     private suspend fun fallBack(failed: IsolatedNeuralTts, reason: String): TextToSpeechEngine? {
         val replacement = mutex.withLock {
             if (engine !== failed) return@withLock engine

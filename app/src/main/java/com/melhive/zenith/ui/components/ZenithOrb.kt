@@ -54,7 +54,7 @@ private fun secondaryFor(s: OrbState) = when (s) {
 }
 
 /**
- * The ZENITH orb. Every state-specific effect is driven by real inputs:
+ * The ZED orb. Every state-specific effect is driven by real inputs:
  * [micLevel] comes from the recognizer / barge-in monitor RMS, [speechPulse]
  * increments on each TTS word boundary, and [state] follows the assistant
  * pipeline. Only the idle breathing/floating is a free-running animation.
@@ -129,19 +129,42 @@ fun ZenithOrb(
             OrbState.IDLE -> drawCircle(primary.copy(alpha = 0.18f + 0.1f * breathe), r * 1.3f, center, style = Stroke(1.dp.toPx()))
         }
 
-        // Core sphere: layered gradients for depth, rotated "energy" sweep inside.
+        // Orbiting sparks: always alive, faster while working, brighter with the voice.
+        val energy = when (state) { OrbState.LISTENING -> 0.4f + level; OrbState.SPEAKING -> 0.6f + 0.4f * pulse.value; else -> 0.35f }
+        for (i in 0 until 10) {
+            val dir = if (i % 2 == 0) 1f else -0.7f
+            val a = ((spin * dir * (1f + i * 0.07f)) + i * 36f) * PI.toFloat() / 180f
+            val orbit = r * (1.2f + 0.06f * (i % 4))
+            drawCircle(if (i % 3 == 0) secondary else primary, (1.4f + (i % 3) * 0.8f) * density,
+                Offset(center.x + cos(a) * orbit, center.y + sin(a) * orbit), alpha = (0.35f + 0.5f * energy).coerceAtMost(1f))
+        }
+
+        // Arc-reactor core: dark sphere, energy sweep, segmented rotating ring, bright heart.
         drawCircle(Brush.radialGradient(listOf(Color(0xFF0D1426), Color(0xFF03050A)), center, r), r, center)
         rotate(if (state == OrbState.THINKING) spin * 2 else spin, center) {
             drawCircle(
-                Brush.sweepGradient(listOf(primary.copy(alpha = 0.0f), primary.copy(alpha = 0.55f), secondary.copy(alpha = 0.7f), primary.copy(alpha = 0.0f)), center),
-                r * 0.92f, center,
+                Brush.sweepGradient(listOf(primary.copy(alpha = 0.0f), primary.copy(alpha = 0.45f), secondary.copy(alpha = 0.6f), primary.copy(alpha = 0.0f)), center),
+                r * 0.95f, center,
             )
         }
+        val segR = r * 0.66f
+        rotate(-spin * 0.6f, center) {
+            for (k in 0 until 12) drawArc(
+                primary.copy(alpha = 0.55f + 0.35f * energy.coerceAtMost(1f)), k * 30f + 4f, 22f, false,
+                Offset(center.x - segR, center.y - segR), Size(segR * 2, segR * 2), style = Stroke(r * 0.11f, cap = StrokeCap.Butt),
+            )
+        }
+        drawCircle(primary.copy(alpha = 0.5f), r * 0.82f, center, style = Stroke(1.dp.toPx()))
+        drawCircle(secondary.copy(alpha = 0.6f), r * 0.48f, center, style = Stroke(1.2.dp.toPx()))
+        val heart = r * (0.36f + 0.08f * energy.coerceAtMost(1f))
+        drawCircle(Brush.radialGradient(listOf(Color.White, primary.copy(alpha = 0.9f), primary.copy(alpha = 0f)), center, heart * 1.6f), heart * 1.6f, center)
+        drawCircle(Color.White.copy(alpha = 0.95f), heart * 0.42f, center)
+        // Glass highlight and glowing rim.
         drawCircle(
-            Brush.radialGradient(listOf(Color.White.copy(alpha = 0.85f), primary.copy(alpha = 0.6f), Color.Transparent), Offset(center.x - r * 0.25f, center.y - r * 0.3f), r * 0.7f),
-            r * 0.7f, Offset(center.x - r * 0.1f, center.y - r * 0.12f),
+            Brush.radialGradient(listOf(Color.White.copy(alpha = 0.35f), Color.Transparent), Offset(center.x - r * 0.35f, center.y - r * 0.4f), r * 0.55f),
+            r * 0.55f, Offset(center.x - r * 0.3f, center.y - r * 0.35f),
         )
-        drawCircle(primary.copy(alpha = 0.9f), r, center, style = Stroke(1.5.dp.toPx()))
+        drawCircle(Brush.sweepGradient(listOf(primary, secondary, primary), center), r, center, style = Stroke(2.dp.toPx()))
 
         if (state == OrbState.COMPLETED) drawCheck(center, r * 0.45f, done.value)
         if (state == OrbState.ERROR) drawWarning(center, r * 0.42f)

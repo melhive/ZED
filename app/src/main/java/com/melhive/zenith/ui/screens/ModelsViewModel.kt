@@ -54,7 +54,7 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
         val report = c.models.assess(m)
         if (report.level == com.melhive.zenith.models.Compatibility.INCOMPATIBLE) { message.value = "Not downloading: " + report.reasons.joinToString("; "); return@launch }
         val t = c.taskEngine.create(TaskTypes.MODEL_DOWNLOAD, "Download ${m.name}", mapOf("model" to m.id))
-        message.value = "Download started as task #${t.id}. You can keep using ZENITH."
+        message.value = "Download started as task #${t.id}. You can keep using ZED."
     }
 
     fun import(uri: Uri) = viewModelScope.launch {
@@ -117,7 +117,7 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
         val st = provider.status()
         if (!st.ready) { message.value = "Not ready: ${st.detail}"; testing.value = false; return@launch }
         val sb = StringBuilder(); var err: String? = null; var usage: GenerationEvent.Usage? = null
-        provider.generate(GenerationRequest("Reply with one short sentence.", listOf(ChatTurn(Role.USER, "Say hello to ZENITH.")), maxOutputTokens = 256)).collect { e ->
+        provider.generate(GenerationRequest("Reply with one short sentence.", listOf(ChatTurn(Role.USER, "Say hello to ZED.")), maxOutputTokens = 256)).collect { e ->
             when (e) { is GenerationEvent.Delta -> sb.append(e.text); is GenerationEvent.Error -> err = e.message; is GenerationEvent.Usage -> usage = e; else -> Unit }
         }
         message.value = err?.let { "Test failed: $it" } ?: ("Connected ✓ “${sb.toString().trim().take(80)}”" + (usage?.let { u -> " · tokens in ${u.inputTokens ?: "?"} / out ${u.outputTokens ?: "?"}" } ?: ""))

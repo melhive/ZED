@@ -270,7 +270,7 @@ class PhoneControl(private val context: Context) {
 }
 
 /**
- * Keeps recent notifications so ZENITH can answer "what did I miss?". Only
+ * Keeps recent notifications so ZED can answer "what did I miss?". Only
  * active once the user grants notification access; nothing is stored on disk
  * and nothing is read unless the user asks.
  */

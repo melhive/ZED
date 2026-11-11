@@ -56,7 +56,7 @@ object CrashReporter {
         val sw = StringWriter()
         error.printStackTrace(PrintWriter(sw))
         return buildString {
-            appendLine("ZENITH crash report")
+            appendLine("ZED crash report")
             appendLine("Time: ${timestamp()}")
             appendLine("App: ${BuildConfig.APPLICATION_ID} ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
             appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")

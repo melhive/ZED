@@ -54,6 +54,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.melhive.zenith.android.PermissionCatalog
 import com.melhive.zenith.tasks.statusEnum
@@ -94,7 +95,7 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit) {
     fun launchSystemVoice() {
         val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
             .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Speak to ZENITH")
+            .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Speak to ZED")
         runCatching { systemVoice.launch(intent) }.onFailure { typing = true }
     }
     LaunchedEffect(Unit) {
@@ -121,7 +122,7 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit) {
     ) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("ZENITH LIVE", style = MaterialTheme.typography.titleMedium, color = ZenithColors.Muted, modifier = Modifier.weight(1f))
+                Text("ZED LIVE", style = MaterialTheme.typography.titleMedium, color = ZenithColors.Muted, modifier = Modifier.weight(1f))
                 TaskIndicator(activeTasks, onOpenTasks)
                 if (state.orb == OrbState.LISTENING) {
                     Spacer(Modifier.size(8.dp))
@@ -129,26 +130,38 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit) {
                 }
             }
 
-            LazyColumn(state = listState, modifier = Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                items(state.transcript.takeLast(30)) { turn ->
-                    Text(
-                        (if (turn.fromUser) "You: " else "ZENITH: ") + turn.text,
-                        color = if (turn.fromUser) ZenithColors.Text else ZenithColors.Cyan.copy(alpha = 0.9f),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+            // The orb sits in the middle of the screen inside its HUD; the conversation lives below.
+            Spacer(Modifier.weight(1f))
+            androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                val hud = minOf(maxWidth * 0.86f, 340.dp)
+                val interaction = remember { MutableInteractionSource() }
+                Box(Modifier.size(hud).clickable(interactionSource = interaction, indication = null) { live.tapOrb() }, contentAlignment = Alignment.Center) {
+                    com.melhive.zenith.ui.components.JarvisHud(state, Modifier.fillMaxSize())
+                    ZenithOrb(state.orb, micLevel = state.micLevel, speechPulse = state.speechPulse, size = hud * 0.56f, glow = settings?.glow ?: true)
                 }
             }
-
-            val interaction = remember { MutableInteractionSource() }
-            Box(Modifier.clickable(interactionSource = interaction, indication = null) { live.tapOrb() }, contentAlignment = Alignment.Center) {
-                ZenithOrb(state.orb, micLevel = state.micLevel, speechPulse = state.speechPulse, size = 280.dp, glow = settings?.glow ?: true)
-            }
-            Text(state.orb.label, style = MaterialTheme.typography.headlineSmall, color = ZenithColors.Text)
+            Text(state.orb.label.uppercase(), style = MaterialTheme.typography.titleMedium, color = com.melhive.zenith.ui.components.hudColor(state.orb), letterSpacing = 4.sp)
             Text(
                 state.partial.ifEmpty { state.statusDetail ?: hintFor(state.orb) },
                 style = MaterialTheme.typography.bodyMedium, color = ZenithColors.Muted, textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(top = 4.dp), maxLines = 4,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp).padding(top = 4.dp), maxLines = 3,
             )
+            Spacer(Modifier.weight(1f))
+            if (state.transcript.isNotEmpty()) LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxWidth().heightIn(max = 150.dp)
+                    .background(ZenithColors.Surface.copy(alpha = 0.6f), androidx.compose.foundation.shape.CutCornerShape(topEnd = 12.dp, bottomStart = 12.dp))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                items(state.transcript.takeLast(30)) { turn ->
+                    Text(
+                        (if (turn.fromUser) "YOU  " else "ZED  ") + turn.text,
+                        color = if (turn.fromUser) ZenithColors.Text else ZenithColors.Cyan.copy(alpha = 0.9f),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
 
             if (state.orb == OrbState.ERROR || typing) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -159,7 +172,7 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit) {
             if (typing) {
                 OutlinedTextField(
                     value = typed, onValueChange = { typed = it }, singleLine = true, modifier = Modifier.fillMaxWidth().imePadding(),
-                    placeholder = { Text("Type to ZENITH") },
+                    placeholder = { Text("Type to ZED") },
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Send),
                     keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSend = { live.submitText(typed); typed = "" }),
                     trailingIcon = { IconButton(onClick = { live.submitText(typed); typed = "" }) { Icon(Icons.AutoMirrored.Outlined.Send, "Send") } },

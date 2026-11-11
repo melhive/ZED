@@ -47,7 +47,7 @@ class UpdateChecker(private val repo: String = REPO) {
     }
 
     companion object {
-        const val REPO = "melhive/ZENITH"
+        const val REPO = "melhive/ZED"
         const val LATEST_APK = "https://github.com/$REPO/releases/latest/download/zenith.apk"
 
         /** Release tags are "v0.1.<versionCode>". */

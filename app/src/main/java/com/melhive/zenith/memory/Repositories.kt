@@ -86,7 +86,7 @@ class MemoryRepository(private val db: ZenithDatabase) {
         if (clean.isNotEmpty()) remember("My name is $clean", "manual")
     }
 
-    /** The user's name if they told ZENITH ("My name is …"). */
+    /** The user's name if they told ZED ("My name is …"). */
     suspend fun userName(): String? = db.memory().find("my name is").firstNotNullOfOrNull {
         Regex("^my name is (.+)$", RegexOption.IGNORE_CASE).find(it.text.trim())?.groupValues?.get(1)?.trim()?.trimEnd('.')
     }

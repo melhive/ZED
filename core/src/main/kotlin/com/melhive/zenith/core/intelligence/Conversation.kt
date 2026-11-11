@@ -18,7 +18,7 @@ Never claim a device action happened unless a tool result confirms it. If a tool
 
     /** The assistant's identity for a [persona]; [title] is how to address the user ("sir", a name…), if set. */
     fun identity(persona: Persona = Persona.COMPANION, title: String? = null): String = buildString {
-        appendLine("You are ZENITH, the user's personal assistant on their Android phone.")
+        appendLine("You are ZED, the user's personal assistant on their Android phone.")
         appendLine(persona.style.trimIndent())
         appendLine(BASE_RULES.trimIndent())
         if (!title.isNullOrBlank()) append("Address the user as \"${title.trim()}\" now and then, where it sounds natural.")
@@ -73,7 +73,10 @@ Never claim a device action happened unless a tool result confirms it. If a tool
     ): String = buildString {
         appendLine(identity(persona, userTitle))
         if (userName != null) appendLine("The user's name is $userName.")
-        if (nowDescription != null) { appendLine(); appendLine("Current local date-time: $nowDescription") }
+        if (nowDescription != null) {
+            appendLine(); appendLine("Current local date-time: $nowDescription")
+            appendLine("Use this exact time for anything time-related. For countdowns (\"how long until…\", \"how much time is left\") compute the exact difference and say it in hours, minutes and seconds.")
+        }
         if (voiceMode) appendLine("This is a spoken conversation: answer in short natural sentences without markdown, lists or emoji.")
         if (memories.isNotEmpty()) {
             appendLine()
@@ -93,7 +96,7 @@ Never claim a device action happened unless a tool result confirms it. If a tool
             append(toolInstructions(tools, compact))
         } else {
             appendLine()
-            appendLine("If the user asks for a device action (reminders, alarms, files, tasks, memory), tell them to say it directly, e.g. \"remind me to call Ana at 5pm\" — ZENITH handles such commands itself.")
+            appendLine("If the user asks for a device action (reminders, alarms, files, tasks, memory), tell them to say it directly, e.g. \"remind me to call Ana at 5pm\" — ZED handles such commands itself.")
         }
     }
 

@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** Visual/logical state of the ZENITH LIVE session; each maps to an orb animation. */
+/** Visual/logical state of the ZED LIVE session; each maps to an orb animation. */
 enum class OrbState(val label: String) {
     IDLE("Ready"),
     LISTENING("Listening..."),
@@ -110,7 +110,7 @@ class LiveSessionController(
     fun start() {
         if (_state.value.active) return
         if (!PermissionCatalog.isGranted(context, PermissionCatalog.MICROPHONE)) {
-            _state.value = LiveUiState(orb = OrbState.ERROR, error = "Microphone permission is required for ZENITH LIVE.")
+            _state.value = LiveUiState(orb = OrbState.ERROR, error = "Microphone permission is required for ZED LIVE.")
             return
         }
         val s = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -130,7 +130,7 @@ class LiveSessionController(
             bargeInEnabled = cfg.bargeIn
             _state.update { it.copy(speakerOn = cfg.voiceResponses) }
             tts?.setRate(cfg.speechRate)
-            conversationId = conversations.create("ZENITH LIVE session")
+            conversationId = conversations.create("ZED LIVE session")
             if (cfg.liveEngine == LIVE_ENGINE_REALTIME) {
                 val rc = runCatching { realtimeConfig() }.getOrNull()
                 if (rc != null) { startRealtime(rc); return@launch }
@@ -445,7 +445,7 @@ class LiveSessionController(
     }
 
     private fun startBargeIn() {
-        // On the loudspeaker ZENITH would hear itself; talk-over interruption needs headphones. Tap the orb otherwise.
+        // On the loudspeaker ZED would hear itself; talk-over interruption needs headphones. Tap the orb otherwise.
         if (!bargeInEnabled || _state.value.micMuted || focus?.headphonesConnected() != true) return
         val m = monitor ?: return
         m.start(

@@ -47,7 +47,7 @@ object PathPolicy {
     fun name(path: String): String = path.substringAfterLast('/')
     fun join(parent: String, child: String): String = if (parent.isEmpty()) child else "$parent/$child"
 
-    /** Text formats ZENITH reads and indexes. Binary formats are refused by file.read. */
+    /** Text formats ZED reads and indexes. Binary formats are refused by file.read. */
     val TEXT_EXTENSIONS = setOf("txt", "md", "markdown", "csv", "tsv", "json", "xml", "html", "htm", "log", "yaml", "yml", "ini", "kt", "java", "py", "js", "ts", "sh", "sql")
 
     fun isTextFile(name: String): Boolean = name.substringAfterLast('.', "").lowercase() in TEXT_EXTENSIONS

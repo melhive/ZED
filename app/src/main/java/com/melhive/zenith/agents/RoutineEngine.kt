@@ -100,7 +100,7 @@ class RoutineEngine(private val context: Context, private val c: AppContainer) {
 /** Runs a routine from a trigger and posts the result; time-triggered routines reschedule themselves. */
 class RoutineWorker(appContext: Context, params: WorkerParameters) : CoroutineWorker(appContext, params) {
     override suspend fun getForegroundInfo(): androidx.work.ForegroundInfo =
-        androidx.work.ForegroundInfo(61_000, Notifications.progress(applicationContext, "Running routine", "ZENITH", 0, 0))
+        androidx.work.ForegroundInfo(61_000, Notifications.progress(applicationContext, "Running routine", "ZED", 0, 0))
 
     override suspend fun doWork(): Result {
         val c = (applicationContext as ZenithApp).container
@@ -121,7 +121,7 @@ class RoutineWorker(appContext: Context, params: WorkerParameters) : CoroutineWo
 class BriefingWorker(appContext: Context, params: WorkerParameters) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
         val c = (applicationContext as ZenithApp).container
-        val text = runCatching { BriefingComposer(applicationContext, c).compose() }.getOrElse { "Your briefing is ready — open ZENITH to hear it." }
+        val text = runCatching { BriefingComposer(applicationContext, c).compose() }.getOrElse { "Your briefing is ready — open ZED to hear it." }
         Notifications.post(applicationContext, Notifications.CHANNEL_TASKS, 63_000, text.lineSequence().firstOrNull() ?: "Your briefing", text, "live:brief me")
         c.routines.scheduleAll()
         return Result.success()

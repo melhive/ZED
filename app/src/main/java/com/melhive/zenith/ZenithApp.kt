@@ -21,7 +21,7 @@ class ZenithApp : Application() {
         container = AppContainer(this)
         isVoiceProcess = currentProcessName().endsWith(":voice")
         if (isVoiceProcess) return
-        // If ZENITH stopped while the recognizer beep was muted, put the volume back.
+        // If ZED stopped while the recognizer beep was muted, put the volume back.
         runCatching { com.melhive.zenith.voice.BeepSuppressor.restore(this) }
         Notifications.createChannels(this)
         container.appScope.launch {
@@ -45,7 +45,7 @@ class ZenithApp : Application() {
                     if (result is com.melhive.zenith.android.UpdateState.Available) {
                         val prefs = getSharedPreferences("zenith_updates", MODE_PRIVATE)
                         if (prefs.getString("notified", null) != result.info.versionName) {
-                            Notifications.post(this@ZenithApp, Notifications.CHANNEL_TASKS, 64_000, "ZENITH ${result.info.versionName} is available",
+                            Notifications.post(this@ZenithApp, Notifications.CHANNEL_TASKS, 64_000, "ZED ${result.info.versionName} is available",
                                 "Tap to see what's new and download the update.", "whats_new")
                             prefs.edit().putString("notified", result.info.versionName).apply()
                         }
@@ -62,7 +62,7 @@ class ZenithApp : Application() {
         if (isVoiceProcess) return
         if (level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND || level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) {
             container.appScope.launch { runCatching { container.localRuntime.unload() } }
-            // Neural voices hold 100–300 MB; release them only while ZENITH is in the background.
+            // Neural voices hold 100–300 MB; release them only while ZED is in the background.
             if (level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) runCatching { if (!container.voice.isSpeaking()) container.voice.unload() }
         }
     }

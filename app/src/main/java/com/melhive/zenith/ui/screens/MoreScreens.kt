@@ -59,22 +59,43 @@ import kotlinx.coroutines.launch
 @Composable
 fun MoreScreen(onNavigate: (String) -> Unit) {
     data class Entry(val route: String, val icon: ImageVector, val title: String, val subtitle: String)
-    val entries = listOf(
-        Entry(Routes.MEMORY, Icons.Outlined.Memory, "Memory", "Facts, task list, reminders and document index"),
-        Entry(Routes.MODELS, Icons.Outlined.Psychology, "Model Manager", "On-device models and online providers"),
-        Entry(Routes.FILES, Icons.Outlined.Folder, "Files", "Granted folders, browse and organize"),
-        Entry(Routes.SKILLS, Icons.Outlined.AutoAwesome, "Skills", "Capabilities ZENITH can use"),
-        Entry(Routes.SCHEDULE, Icons.Outlined.Memory, "Schedule", "Your calendar events and reminders"),
-        Entry(Routes.WHATS_NEW, Icons.Outlined.NewReleases, "What's new", "This version's features and every previous version"),
-        Entry(Routes.ROUTINES, Icons.Outlined.AutoAwesome, "Routines & briefing", "Good morning, Good night, Focus, Driving and your daily briefing"),
-        Entry(Routes.VOICE, Icons.Outlined.RecordVoiceOver, "Voice", "Natural offline voices, speed and pitch"),
-        Entry(Routes.SETTINGS, Icons.Outlined.Settings, "Settings", "Voice, safety and behaviour"),
-        Entry(Routes.DIAGNOSTICS, Icons.Outlined.Security, "Permissions & Diagnostics", "Permissions, voice engines, audit log"),
+    val groups = listOf(
+        "Assistant" to listOf(
+            Entry(Routes.VOICE, Icons.Outlined.RecordVoiceOver, "Voice", "Voices, Hey Zed, real-time voice, speed and sounds"),
+            Entry(Routes.ROUTINES, Icons.Outlined.AutoAwesome, "Routines & briefing", "Good morning, Good night, Focus, Driving"),
+            Entry(Routes.SKILLS, Icons.Outlined.AutoAwesome, "Skills", "What ZED is allowed to do"),
+        ),
+        "Your data" to listOf(
+            Entry(Routes.SCHEDULE, Icons.Outlined.Memory, "Schedule", "Calendar events and reminders"),
+            Entry(Routes.MEMORY, Icons.Outlined.Memory, "Memory", "Facts, task list, reminders and documents"),
+            Entry(Routes.FILES, Icons.Outlined.Folder, "Files", "Granted folders, browse and organize"),
+        ),
+        "Intelligence" to listOf(
+            Entry(Routes.MODELS, Icons.Outlined.Psychology, "Models & AI", "On-device models matched to your phone, online providers"),
+        ),
+        "System" to listOf(
+            Entry(Routes.SETTINGS, Icons.Outlined.Settings, "Settings", "Personality, actions, smart home, updates"),
+            Entry(Routes.DIAGNOSTICS, Icons.Outlined.Security, "Permissions & Diagnostics", "Permissions, engines, problem reports"),
+            Entry(Routes.WHATS_NEW, Icons.Outlined.NewReleases, "What's new", "Every version's changes"),
+        ),
     )
     ListScreen("More", onBack = null) {
         item { UpdateBanner(onOpen = { onNavigate(Routes.WHATS_NEW) }) }
-        items(entries) { e -> ZenithCard(onClick = { onNavigate(e.route) }) { IconLabel(e.icon, e.title, e.subtitle) } }
-        item { Text("ZENITH ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.labelSmall, color = ZenithColors.Muted, modifier = Modifier.padding(8.dp)) }
+        groups.forEach { (title, entries) ->
+            item(key = "g-$title") { SectionTitle(title) }
+            items(entries, key = { it.route }) { e -> ZenithCard(onClick = { onNavigate(e.route) }) { IconLabel(e.icon, e.title, e.subtitle) } }
+        }
+        item { ZedFooter() }
+    }
+}
+
+/** "ZED · version · MelHive Project" at the bottom of More and Settings. */
+@Composable
+fun ZedFooter() {
+    androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().padding(vertical = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text("ZED", style = MaterialTheme.typography.titleLarge, color = ZenithColors.Cyan, letterSpacing = androidx.compose.ui.unit.TextUnit(10f, androidx.compose.ui.unit.TextUnitType.Sp))
+        Text("Version ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.labelMedium, color = ZenithColors.Muted)
+        Text("MelHive Project", style = MaterialTheme.typography.labelSmall, color = ZenithColors.Muted.copy(alpha = 0.8f), letterSpacing = androidx.compose.ui.unit.TextUnit(2f, androidx.compose.ui.unit.TextUnitType.Sp))
     }
 }
 
@@ -130,7 +151,7 @@ fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
             ZenithCard {
                 SectionTitle("You")
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(name?.let { "ZENITH calls you $it" } ?: "ZENITH doesn't know your name yet", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    Text(name?.let { "ZED calls you $it" } ?: "ZED doesn't know your name yet", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                     TextButton(onClick = { editName = true }) { Text(if (name == null) "Set name" else "Change") }
                 }
             }
@@ -141,13 +162,14 @@ fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
             val userName = facts.firstNotNullOfOrNull { Regex("^my name is (.+)$", RegexOption.IGNORE_CASE).find(it.text.trim())?.groupValues?.get(1) }
             PersonalityCard(settings.persona, settings.userTitle, userName) { persona, title -> scope.launch { c.settings.setPersona(persona); c.settings.setUserTitle(title) } }
         }
+        if (!settings.permissionsCardHidden) item { AllowEverythingCard(onHide = { scope.launch { c.settings.setPermissionsCardHidden(true) } }) }
         item { AssistantShortcutsCard() }
         item { SmartHomeCard(settings.homeAssistantUrl) }
         item {
             ZenithCard {
                 SectionTitle("Voice")
-                SwitchRow("Voice responses", "Speak replies in ZENITH LIVE and after voice input", settings.voiceResponses) { scope.launch { c.settings.setVoiceResponses(it) } }
-                SwitchRow("Interrupt by talking", "With headphones or earbuds, start talking to cut ZENITH off. On the loudspeaker, tap the orb instead.", settings.bargeIn) { scope.launch { c.settings.setBargeIn(it) } }
+                SwitchRow("Voice responses", "Speak replies in ZED LIVE and after voice input", settings.voiceResponses) { scope.launch { c.settings.setVoiceResponses(it) } }
+                SwitchRow("Interrupt by talking", "With headphones or earbuds, start talking to cut ZED off. On the loudspeaker, tap the orb instead.", settings.bargeIn) { scope.launch { c.settings.setBargeIn(it) } }
                 val voiceLabel = when (val sel = com.melhive.zenith.core.voice.VoiceSelection.parse(settings.voiceId)) {
                     com.melhive.zenith.core.voice.VoiceSelection.SystemDefault -> "Phone default voice"
                     is com.melhive.zenith.core.voice.VoiceSelection.System -> "Phone voice"
@@ -188,7 +210,7 @@ fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
             val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
             ZenithCard {
                 SectionTitle("App updates")
-                Text("Installed: ZENITH ${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})", style = MaterialTheme.typography.bodySmall)
+                Text("Installed: ZED ${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})", style = MaterialTheme.typography.bodySmall)
                 Text(
                     when (val u = update) {
                         com.melhive.zenith.android.UpdateState.Unknown -> "Not checked yet"
@@ -199,7 +221,7 @@ fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
                     },
                     style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted,
                 )
-                SwitchRow("Check for updates", "Ask GitHub Releases for a newer version when ZENITH starts", settings.checkUpdates) { scope.launch { c.settings.setCheckUpdates(it) } }
+                SwitchRow("Check for updates", "Ask GitHub Releases for a newer version when ZED starts", settings.checkUpdates) { scope.launch { c.settings.setCheckUpdates(it) } }
                 WrapRow {
                     TextButton(onClick = { scope.launch { c.updates.check() } }) { Text("Check now") }
                     (update as? com.melhive.zenith.android.UpdateState.Available)?.let { u ->
@@ -208,8 +230,8 @@ fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
                     val ctx = LocalContext.current
                     TextButton(onClick = {
                         val send = Intent(Intent.ACTION_SEND).setType("text/plain")
-                            .putExtra(Intent.EXTRA_TEXT, "Install ZENITH on Android: ${com.melhive.zenith.android.UpdateChecker.LATEST_APK}")
-                        ctx.startActivity(Intent.createChooser(send, "Share ZENITH"))
+                            .putExtra(Intent.EXTRA_TEXT, "Install ZED on Android: ${com.melhive.zenith.android.UpdateChecker.LATEST_APK}")
+                        ctx.startActivity(Intent.createChooser(send, "Share ZED"))
                     }) { Text("Share app") }
                 }
             }
@@ -217,6 +239,7 @@ fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
         item {
             ZenithCard(onClick = { onNavigate(Routes.MODELS) }) { IconLabel(Icons.Outlined.Psychology, "Models & providers", "Configure intelligence layers in Model Manager") }
         }
+        item { ZedFooter() }
     }
 }
 
@@ -242,12 +265,12 @@ fun DiagnosticsScreen(onBack: () -> Unit) {
             if (crash != null || errors != null) {
                 ZenithCard(accent = ZenithColors.Red) {
                     SectionTitle("Problem reports")
-                    Text(if (crash != null) "ZENITH crashed last time. Share the report so it can be fixed." else "Some background errors were recorded.", style = MaterialTheme.typography.bodySmall)
+                    Text(if (crash != null) "ZED crashed last time. Share the report so it can be fixed." else "Some background errors were recorded.", style = MaterialTheme.typography.bodySmall)
                     val report = listOfNotNull(crash, errors?.let { "Recent errors:\n$it" }).joinToString("\n\n")
                     Text(report.take(1500), style = MonoStyle, color = ZenithColors.Muted)
                     WrapRow {
                         TextButton(onClick = {
-                            val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_SUBJECT, "ZENITH problem report").putExtra(Intent.EXTRA_TEXT, report)
+                            val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_SUBJECT, "ZED problem report").putExtra(Intent.EXTRA_TEXT, report)
                             context.startActivity(Intent.createChooser(send, "Share report"))
                         }) { Text("Share report") }
                         TextButton(onClick = { com.melhive.zenith.android.CrashReporter.clear(); refresh++ }) { Text("Clear") }
@@ -277,7 +300,7 @@ fun DiagnosticsScreen(onBack: () -> Unit) {
                     Text("What did I miss (notification access)", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                     StatusPill(if (listener) "Allowed" else "Optional", if (listener) ZenithColors.Green else ZenithColors.Muted)
                 }
-                Text("Lets ZENITH read your recent notifications when you ask “what did I miss?”. Nothing is read unless you ask, and nothing is saved.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
+                Text("Lets ZED read your recent notifications when you ask “what did I miss?”. Nothing is read unless you ask, and nothing is saved.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
                 if (!listener) TextButton(onClick = { com.melhive.zenith.android.ZenithNotificationListener.openSettings(context) }) { Text("Allow notification access") }
             }
         }
@@ -288,7 +311,7 @@ fun DiagnosticsScreen(onBack: () -> Unit) {
                     Text("Do Not Disturb control", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                     StatusPill(if (dnd) "Allowed" else "Optional", if (dnd) ZenithColors.Green else ZenithColors.Muted)
                 }
-                Text("Lets ZENITH turn Do Not Disturb on or off for you and in routines like Good night.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
+                Text("Lets ZED turn Do Not Disturb on or off for you and in routines like Good night.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
                 if (!dnd) TextButton(onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) } }) { Text("Allow Do Not Disturb access") }
             }
         }
@@ -351,7 +374,7 @@ private fun PersonalityCard(persona: String, title: String, userName: String?, o
     var customTitle by remember(title) { mutableStateOf(title) }
     ZenithCard(accent = ZenithColors.Violet) {
         SectionTitle("Personality")
-        Text("How ZENITH talks to you. Applies to AI replies in Chat and LIVE.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
+        Text("How ZED talks to you. Applies to AI replies in Chat and LIVE.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
         WrapRow(Modifier.padding(top = 6.dp)) {
             com.melhive.zenith.core.intelligence.Persona.entries.forEach { p ->
                 androidx.compose.material3.FilterChip(selected = p == current, onClick = { onChange(p.name, title) }, label = { Text(p.label) })
@@ -386,21 +409,21 @@ private fun AssistantShortcutsCard() {
         onDispose { lifecycle.lifecycle.removeObserver(obs) }
     }
     ZenithCard(accent = if (isDefault) ZenithColors.Green else ZenithColors.Cyan) {
-        SectionTitle("Open ZENITH from anywhere")
+        SectionTitle("Open ZED from anywhere")
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Default assistant", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-            StatusPill(if (isDefault) "ZENITH" else "Not set", if (isDefault) ZenithColors.Green else ZenithColors.Amber)
+            StatusPill(if (isDefault) "ZED" else "Not set", if (isDefault) ZenithColors.Green else ZenithColors.Amber)
         }
         Text(
-            if (isDefault) "Hold the power or home button (or swipe up from a bottom corner) to talk to ZENITH."
-            else "Make ZENITH your phone's assistant so holding the power or home button opens ZENITH LIVE. In the screen that opens, choose Digital assistant app → ZENITH.",
+            if (isDefault) "Hold the power or home button (or swipe up from a bottom corner) to talk to ZED."
+            else "Make ZED your phone's assistant so holding the power or home button opens ZED LIVE. In the screen that opens, choose Digital assistant app → ZED.",
             style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted,
         )
         WrapRow {
             if (!isDefault) Button(onClick = { com.melhive.zenith.assist.ZenithLaunch.openAssistantSettings(context) }) { Text("Set as assistant") }
             TextButton(onClick = { com.melhive.zenith.assist.ZenithLaunch.requestAddTile(context) { note = it } }) { Text("Add Quick Settings tile") }
         }
-        Text("Widget: long-press your home screen → Widgets → ZENITH.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
+        Text("Widget: long-press your home screen → Widgets → ZED.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
         note?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = ZenithColors.Cyan) }
     }
 }
@@ -440,9 +463,9 @@ private fun SmartHomeCard(savedUrl: String) {
     }
 }
 
-/** One tap to grant every permission ZENITH can use, so nothing interrupts a command later. */
+/** One tap to grant every permission ZED can use, so nothing interrupts a command later. */
 @Composable
-fun AllowEverythingCard(alwaysShow: Boolean = false) {
+fun AllowEverythingCard(onHide: (() -> Unit)? = null) {
     val context = LocalContext.current
     var refresh by remember { mutableIntStateOf(0) }
     val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current
@@ -456,10 +479,11 @@ fun AllowEverythingCard(alwaysShow: Boolean = false) {
     val notif = remember(refresh) { com.melhive.zenith.android.ZenithNotificationListener.hasAccess(context) }
     val dnd = remember(refresh) { com.melhive.zenith.android.PhoneControl(context).hasDndAccess() }
     val overlay = remember(refresh) { Settings.canDrawOverlays(context) }
-    if (!alwaysShow && missing.isEmpty() && notif && dnd && overlay) return
+    // Nothing left to allow: the card disappears by itself.
+    if (missing.isEmpty() && notif && dnd && overlay) return
     ZenithCard(accent = if (missing.isEmpty()) ZenithColors.Green else ZenithColors.Amber) {
-        SectionTitle("Allow everything")
-        Text("Grant ZENITH's permissions once so commands run instantly — no pop-ups when you ask for something.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
+        SectionTitle("Allow everything") { if (onHide != null) TextButton(onClick = onHide) { Text("Hide") } }
+        Text("Grant ZED's permissions once so commands run instantly — no pop-ups when you ask for something.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
         if (missing.isNotEmpty()) Button(onClick = { launcher.launch(missing) }, modifier = Modifier.padding(top = 6.dp)) { Text("Allow all permissions (${missing.size})") }
         else Text("✓ All permissions allowed", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Green)
         WrapRow {

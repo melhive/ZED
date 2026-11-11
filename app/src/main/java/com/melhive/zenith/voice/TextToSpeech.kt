@@ -138,6 +138,8 @@ object SpeechText {
         .replace(Regex("[*_#>]+"), "")
         .replace(Regex("https?://\\S+"), "link")
         .replace(Regex("[📁📄✓○•]"), "")
+        // "3:45 PM" / "9am" → "3:45 P M": every voice spells it out instead of saying the word "am".
+        .replace(Regex("\\b(\\d{1,2}(?::\\d{2}){0,2})\\s*([AaPp])\\.?\\s?[Mm]\\b\\.?")) { "${it.groupValues[1]} ${it.groupValues[2].uppercase()} M" }
         .replace(Regex("\\s+"), " ")
         .trim()
 }

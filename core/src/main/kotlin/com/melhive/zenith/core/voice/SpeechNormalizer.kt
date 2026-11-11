@@ -145,6 +145,14 @@ object SpeechNormalizer {
         // Percentages
         t = Regex("(\\d[\\d,]*(?:\\.\\d+)?)\\s?%").replace(t) { spokenNumber(it.groupValues[1]) + " percent" }
 
+        // Times with seconds: 3:42:17 pm → three forty-two and seventeen seconds p m
+        t = Regex("\\b(\\d{1,2}):(\\d{2}):(\\d{2})(?:\\s?([ap])\\.?\\s?m\\b)?", I).replace(t) {
+            val sec = it.groupValues[3].toInt()
+            hourMinute(it.groupValues[1].toInt(), it.groupValues[2].toInt(), null).removeSuffix(" o'clock").removeSuffix(" hundred") +
+                (if (sec > 0) " and ${NumberWords.cardinal(sec.toLong())} second${if (sec == 1) "" else "s"}" else "") +
+                (it.groupValues[4].takeIf { m -> m.isNotEmpty() }?.let { m -> " ${m.lowercase()} m" } ?: "")
+        }
+
         // Times: 3:45 pm, 3pm, 15:30
         t = Regex("\\b(\\d{1,2}):(\\d{2})\\s?([ap])\\.?\\s?m\\b", I).replace(t) {
             hourMinute(it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3])

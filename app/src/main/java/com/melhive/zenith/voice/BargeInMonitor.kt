@@ -14,12 +14,12 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * Listens to the microphone while ZENITH is speaking and reports when the
+ * Listens to the microphone while ZED is speaking and reports when the
  * user starts talking (barge-in). Uses the VOICE_RECOGNITION source: the
  * VOICE_COMMUNICATION source would switch the phone into call mode, which
- * routes ZENITH's voice through the quiet call path. Because the loudspeaker
+ * routes ZED's voice through the quiet call path. Because the loudspeaker
  * would otherwise trigger it, LIVE only enables barge-in when headphones are
- * connected. Only runs during a visible ZENITH LIVE session.
+ * connected. Only runs during a visible ZED LIVE session.
  *
  * Reliability depends on the device's echo canceller; this requires
  * physical-device validation.
@@ -75,7 +75,7 @@ class BargeInMonitor(private val scope: CoroutineScope) {
     suspend fun stopAndJoin() { job?.let { it.cancel(); it.join() }; job = null }
 
     companion object {
-        /** Barge-in is only reliable with a hardware echo canceller; otherwise ZENITH would hear itself. */
+        /** Barge-in is only reliable with a hardware echo canceller; otherwise ZED would hear itself. */
         fun supported(): Boolean = runCatching { AcousticEchoCanceler.isAvailable() }.getOrDefault(false)
     }
 }

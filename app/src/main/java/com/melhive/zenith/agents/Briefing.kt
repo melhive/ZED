@@ -128,6 +128,17 @@ class CalendarReader(private val context: Context) {
         return out
     }
 
+    /** The next event starting after [now] in the coming week: title and start time. */
+    fun nextEvent(now: Long): Pair<String, Long>? {
+        if (!granted()) return null
+        val uri = CalendarContract.Instances.CONTENT_URI.buildUpon().also { android.content.ContentUris.appendId(it, now); android.content.ContentUris.appendId(it, now + 7 * 86_400_000L) }.build()
+        return context.contentResolver.query(uri, arrayOf(CalendarContract.Instances.TITLE, CalendarContract.Instances.BEGIN, CalendarContract.Instances.ALL_DAY),
+            "${CalendarContract.Instances.BEGIN} > ?", arrayOf(now.toString()), "${CalendarContract.Instances.BEGIN} ASC")?.use { c ->
+            while (c.moveToNext()) { if (c.getInt(2) == 1) continue; return@use (c.getString(0) ?: "(no title)") to c.getLong(1) }
+            null
+        }
+    }
+
     fun describe(day: LocalDate): String {
         if (!granted()) return "I need calendar permission to read your events (More → Permissions & Diagnostics)."
         val label = when (day) { LocalDate.now() -> "today"; LocalDate.now().plusDays(1) -> "tomorrow"; else -> day.toString() }

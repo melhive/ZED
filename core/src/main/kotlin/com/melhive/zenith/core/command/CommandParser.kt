@@ -27,7 +27,7 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
     private val opt = setOf(RegexOption.IGNORE_CASE)
     private fun rx(p: String) = Regex(p, opt)
 
-    private val leadIns = rx("^(?:hey |ok |okay )?(?:zenith[,:]?\\s+)?(?:please\\s+|can you\\s+|could you\\s+|would you\\s+|i want you to\\s+|i need you to\\s+)*")
+    private val leadIns = rx("^(?:hey |ok |okay )?(?:(?:zed|zedd|zet|zenith)[,:]?\\s+)?(?:please\\s+|can you\\s+|could you\\s+|would you\\s+|i want you to\\s+|i need you to\\s+)*")
 
     fun parse(input: String): ParsedCommand {
         var text = input.trim().replace(Regex("\\s+"), " ")
@@ -99,6 +99,11 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         Rule(rx("help|commands|what can you do|what are your commands|show commands")) { ParsedCommand.Help },
 
         Rule(rx("(?:what(?:'s| is) the |tell me the |current )?(?:time|date|day)(?: is it)?(?: now| today)?|what(?:'s| is) today(?:'s date)?|what day is (?:it|today)|what time is it(?: now)?")) { tool("time.now") },
+
+        // Countdowns: exact time left (before reminders).
+        Rule(rx("how much (?:time )?(?:is )?left(?: on (?:my |the )?(.+?))?|how (?:long|much time) (?:is )?(?:left|remaining)(?: (?:on|for|until) (?:my |the )?(.+?))?|time (?:left|remaining)(?: on (?:my |the )?(.+?))?|how long (?:until|till|before) (?:my |the )?(.+?)|when(?:'s| is) my next (reminder|alarm|meeting|event|timer)")) { m ->
+            tool("time.left", "target" to m.groupValues.drop(1).firstOrNull { it.isNotEmpty() })
+        },
 
         // Reminders (before generic delete/cancel).
         Rule(rx("(?:list|show)(?: me)?(?: all)? (?:my )?reminders|what are my reminders|reminders")) { tool("reminder.list") },

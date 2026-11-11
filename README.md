@@ -1,4 +1,6 @@
-# ZENITH
+# ZED
+
+_Formerly ZENITH — renamed in v0.1.15 (the package id stays `com.melhive.zenith`, so updates install over older versions)._
 
 **Think. Learn. Organize. Automate. Execute.**
 

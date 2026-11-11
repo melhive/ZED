@@ -6,7 +6,7 @@ import android.media.AudioFocusRequest
 import android.media.AudioManager
 
 /**
- * Audio focus for ZENITH's speech output. Focus is held only while ZENITH is
+ * Audio focus for ZED's speech output. Focus is held only while ZED is
  * speaking (other audio is ducked), never while listening: the speech
  * recognizer takes transient focus itself, and holding focus during
  * listening made every recognition start look like "focus lost".
@@ -29,14 +29,14 @@ class AudioFocus(context: Context, private val onInterrupted: (reason: String) -
         }
         .build()
 
-    /** Call when ZENITH starts speaking. */
+    /** Call when ZED starts speaking. */
     fun acquire(): Boolean {
         if (held) return true
         held = am.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
         return held
     }
 
-    /** Call when ZENITH stops speaking. */
+    /** Call when ZED stops speaking. */
     fun release() {
         if (!held) return
         am.abandonAudioFocusRequest(request)

@@ -74,7 +74,7 @@ fun TasksScreen(onOpen: (Long) -> Unit) {
     val failed = tasks.filter { it.statusEnum() == TaskStatus.FAILED || it.statusEnum() == TaskStatus.CANCELLED }
 
     var menu by remember { mutableStateOf(false) }
-    ListScreen("Tasks", onBack = null, subtitle = "Background work keeps running while you use ZENITH", actions = {
+    ListScreen("Tasks", onBack = null, subtitle = "Background work keeps running while you use ZED", actions = {
         if (tasks.isNotEmpty()) Box {
             IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, "Task options") }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {

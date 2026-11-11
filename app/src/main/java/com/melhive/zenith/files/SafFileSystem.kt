@@ -26,7 +26,7 @@ data class FileItem(
 
 /**
  * File operations restricted to folders the user granted through the Storage
- * Access Framework (ACTION_OPEN_DOCUMENT_TREE). ZENITH has no broad storage
+ * Access Framework (ACTION_OPEN_DOCUMENT_TREE). ZED has no broad storage
  * permission and cannot reach anything outside these trees.
  *
  * Path format: relative path inside a granted folder. If several folders are

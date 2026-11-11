@@ -23,7 +23,7 @@ import com.melhive.zenith.core.tools.RiskLevel.DESTRUCTIVE
 import com.melhive.zenith.core.tools.RiskLevel.MODIFY
 import com.melhive.zenith.core.tools.RiskLevel.READ_ONLY
 
-/** Registry of every tool ZENITH can execute. Executors live in the Android layer. */
+/** Registry of every tool ZED can execute. Executors live in the Android layer. */
 class ToolCatalog(specs: List<ToolSpec>) {
     private val byName = specs.associateBy { it.name }
 
@@ -42,7 +42,10 @@ class ToolCatalog(specs: List<ToolSpec>) {
 
         val DEFAULT = ToolCatalog(
             listOf(
-                ToolSpec("time.now", "Current date and time", "Returns the device's current date, time and time zone.", emptyList(), READ_ONLY),
+                ToolSpec("time.now", "Current date and time", "Returns the device's current date and exact time (with seconds) and time zone.", emptyList(), READ_ONLY),
+                ToolSpec("time.left", "Time left", "Exact time remaining (hours, minutes, seconds) until the user's timers, alarms set by ZED, reminders and next calendar event.", listOf(
+                    p("target", STRING, "timer, alarm, reminder, meeting, or a name; omit for everything", required = false),
+                ), READ_ONLY),
                 ToolSpec("file.create", "Create file", "Creates a text file inside a granted folder.", listOf(
                     p("path", PATH, "Relative path of the new file, e.g. notes/ideas.txt"),
                     p("content", TEXT, "Initial text content", required = false),
@@ -114,7 +117,7 @@ class ToolCatalog(specs: List<ToolSpec>) {
                 ToolSpec("todo.complete", "Complete task", "Marks a task-list item as done, by id or title.", listOf(
                     p("item", STRING, "Item id or title"),
                 ), MODIFY),
-                ToolSpec("memory.remember", "Remember fact", "Saves a fact you explicitly asked ZENITH to remember.", listOf(
+                ToolSpec("memory.remember", "Remember fact", "Saves a fact you explicitly asked ZED to remember.", listOf(
                     p("fact", STRING, "The fact to remember"),
                 ), MODIFY),
                 ToolSpec("memory.list", "List memories", "Lists remembered facts.", emptyList(), READ_ONLY),

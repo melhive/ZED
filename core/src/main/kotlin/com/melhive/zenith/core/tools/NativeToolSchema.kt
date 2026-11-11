@@ -12,7 +12,7 @@ import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 
 /**
- * Converts ZENITH tool specs into provider function-calling declarations and
+ * Converts ZED tool specs into provider function-calling declarations and
  * converts model-supplied arguments back into the string map the
  * [ToolValidator] checks. Model output stays untrusted: arguments still go
  * through validation, permission checks and confirmation.

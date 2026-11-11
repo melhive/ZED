@@ -1,4 +1,4 @@
-# ZENITH — Development Status
+# ZED (formerly ZENITH) — Development Status
 
 _Last updated: 2026-11-10_
 

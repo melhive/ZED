@@ -28,7 +28,7 @@ object Notifications {
                     description = "Completion and failure of background tasks"
                 },
                 NotificationChannel(CHANNEL_REMINDERS, "Reminders", NotificationManager.IMPORTANCE_HIGH).apply {
-                    description = "Reminders you asked ZENITH to schedule"
+                    description = "Reminders you asked ZED to schedule"
                 },
                 NotificationChannel(CHANNEL_ASSISTANT, "Assistant events", NotificationManager.IMPORTANCE_DEFAULT).apply {
                     description = "Important assistant events"

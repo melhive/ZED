@@ -112,7 +112,7 @@ object VoiceCatalog {
         name = "Kokoro",
         kind = VoiceEngineKind.KOKORO,
         tagline = "Most expressive · 28 English voices",
-        description = "Very lifelike American and British English voices. Needs a fast phone: on budget phones it renders slower than it speaks, so there are pauses between sentences. ZENITH measures this and tells you.",
+        description = "Very lifelike American and British English voices. Needs a fast phone: on budget phones it renders slower than it speaks, so there are pauses between sentences. ZED measures this and tells you.",
         archiveUrl = "$BASE/kokoro-int8-multi-lang-v1_0.tar.bz2",
         archiveRoot = "kokoro-int8-multi-lang-v1_0",
         sizeBytes = 132_353_410L,
@@ -155,15 +155,15 @@ object VoiceCatalog {
     val packs: List<VoicePack> = listOf(SUPERTONIC, KOKORO)
 
     /**
-     * "Hey Zenith" keyword-spotting model (sherpa-onnx streaming zipformer, GigaSpeech English).
+     * "Hey Zed" keyword-spotting model (sherpa-onnx streaming zipformer, GigaSpeech English).
      * The "-mobile" variant crashes in ONNX Runtime (encoder reshape) with sherpa-onnx 2.0.1; this one was verified.
      */
     val WAKE_WORD = VoicePack(
         id = "kws-gigaspeech",
         name = "Wake word model",
         kind = VoiceEngineKind.SYSTEM,
-        tagline = "Hey Zenith",
-        description = "Small on-device model that listens only for “Hey Zenith”.",
+        tagline = "Hey Zed",
+        description = "Small on-device model that listens only for “Hey Zed”.",
         archiveUrl = "https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01.tar.bz2",
         archiveRoot = "sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01",
         sizeBytes = 17_626_723L,

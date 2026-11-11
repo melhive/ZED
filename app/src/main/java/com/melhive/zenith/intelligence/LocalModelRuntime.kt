@@ -62,6 +62,11 @@ class LocalModelRuntime(private val cacheDir: File) {
     private var loadedKey: String? = null
     private var contextTokens: Int = DEFAULT_CONTEXT
     @Volatile private var activeConversation: Conversation? = null
+    /** Whether speculative decoding is active for the loaded model (null until a model loads). */
+    @Volatile var speculativeEnabled: Boolean? = null
+        private set
+    @Volatile var cpuThreads: Int? = null
+        private set
 
     /** The live LiteRT-LM conversation and the user turns it has already seen. */
     private class Session(val key: String, val system: String, val conversation: Conversation, val userTurns: MutableList<String>)
@@ -77,15 +82,23 @@ class LocalModelRuntime(private val cacheDir: File) {
             _state.value = State.Loading(modelId)
             val started = System.currentTimeMillis()
             try {
-                val config = EngineConfig(
+                val threads = com.melhive.zenith.android.DeviceInfo.performanceCores()
+                fun config(speculative: Boolean) = EngineConfig(
                     modelPath = file.absolutePath,
-                    backend = if (options.backend == LocalBackend.GPU) Backend.GPU() else Backend.CPU(),
+                    // CPU: only the fast cores — slow efficiency cores drag every token down on big.LITTLE phones.
+                    backend = if (options.backend == LocalBackend.GPU) Backend.GPU() else Backend.CPU(threads, threads),
                     maxNumTokens = options.contextTokens,
                     cacheDir = cacheDir.absolutePath,
+                    speculativeDecodingConfig = if (speculative) com.google.ai.edge.litertlm.SpeculativeDecodingConfig(com.google.ai.edge.litertlm.SpeculativeDecodingMode.ADAPTIVE) else null,
                 )
-                val e = Engine(config)
-                e.initialize()
+                // Speculative decoding drafts and verifies several tokens per step (same output, faster).
+                // Models without support fail to initialize with it, so retry without.
+                val e = runCatching { Engine(config(speculative = true)).also { it.initialize() } }.getOrElse {
+                    speculativeEnabled = false
+                    Engine(config(speculative = false)).also { it.initialize() }
+                }.also { if (speculativeEnabled == null) speculativeEnabled = true }
                 engine = e; loadedKey = key; contextTokens = options.contextTokens
+                cpuThreads = if (options.backend == LocalBackend.GPU) null else threads
                 _state.value = State.Ready(modelId, options.backend, System.currentTimeMillis() - started, options.contextTokens)
                 e
             } catch (t: Throwable) {
@@ -169,6 +182,8 @@ class LocalModelRuntime(private val cacheDir: File) {
                     initialMessages = history.map { t -> if (t.role == Role.ASSISTANT) Message.model(t.content) else Message.user(t.content) },
                     samplerConfig = SamplerConfig(40, 0.95, 0.7, 0),
                     maxOutputToken = replyBudget,
+                    // No hidden "thinking" pass before answering: much faster replies for everyday requests.
+                    thinkingConfig = com.google.ai.edge.litertlm.ThinkingConfig(false),
                 )
             )
             Session(request.sessionKey ?: "", request.system, conversation, history.filter { it.role == Role.USER }.map { it.content }.toMutableList())

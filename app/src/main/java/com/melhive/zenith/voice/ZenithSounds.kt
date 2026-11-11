@@ -15,7 +15,7 @@ import kotlin.math.pow
 import kotlin.math.sin
 
 /**
- * ZENITH's own LIVE start and stop sounds, synthesized in code (no audio files):
+ * ZED's own LIVE start and stop sounds, synthesized in code (no audio files):
  *  - arc:   a rising power-up sweep with a bright two-tone shimmer / a falling power-down
  *  - pulse: two deep synth pulses, low to high / high to low
  *  - chime: a three-note crystal chime, up / down

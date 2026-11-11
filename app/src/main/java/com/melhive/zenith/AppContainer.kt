@@ -91,12 +91,12 @@ class AppContainer(private val context: Context) {
         LiveSessionController(context, orchestrator, conversations, settings, { AndroidSpeechToText(context) }, { voice.sessionHandle() }, { realtimeConfig() })
     }
 
-    /** Gemini Live settings for ZENITH LIVE, or null when no Gemini key is configured. */
+    /** Gemini Live settings for ZED LIVE, or null when no Gemini key is configured. */
     private suspend fun realtimeConfig(): com.melhive.zenith.voice.RealtimeConfig? {
         val s = settings.current()
         val key = secrets.get(SecretStore.apiKeyName(com.melhive.zenith.settings.OnlineProviderKind.GEMINI)) ?: return null
         val tools = skills.enabledTools(s.enabledSkills).filter { it.name != "web.research" }
-        val now = java.time.ZonedDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("EEEE yyyy-MM-dd'T'HH:mm (VV)"))
+        val now = java.time.ZonedDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("EEEE yyyy-MM-dd'T'HH:mm:ss (h:mm:ss a, VV)", java.util.Locale.ENGLISH))
         val prompt = com.melhive.zenith.core.intelligence.PromptBuilder.systemPrompt(
             tools = emptyList(), nowDescription = now, memories = memory.list(30).map { it.text }, knowledge = emptyList(),
             voiceMode = true, userName = memory.userName(),
@@ -119,13 +119,13 @@ class AppContainer(private val context: Context) {
 
     val updates = com.melhive.zenith.android.UpdateChecker()
 
-    /** Conversation Chat should show next (set by Home's "Ask ZENITH" box). */
+    /** Conversation Chat should show next (set by Home's "Ask ZED" box). */
     val chatFocus = kotlinx.coroutines.flow.MutableStateFlow<Long?>(null)
 
     /** Downloadable offline neural voice packs. */
     val voicePacks by lazy { com.melhive.zenith.voice.VoicePackRepository(context) }
 
-    /** The voice ZENITH speaks with everywhere (system or neural, per Settings → Voice). */
+    /** The voice ZED speaks with everywhere (system or neural, per Settings → Voice). */
     val voice by lazy { com.melhive.zenith.voice.VoiceManager(context, settings, voicePacks, appScope) }
 
     /** Reads chat replies aloud with the selected voice. */

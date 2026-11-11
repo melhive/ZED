@@ -55,7 +55,7 @@ import com.melhive.zenith.voice.SystemVoice
 import com.melhive.zenith.voice.VoiceManager
 import kotlinx.coroutines.launch
 
-/** Choose how ZENITH sounds: offline neural voices, phone voices, speed and pitch. */
+/** Choose how ZED sounds: offline neural voices, phone voices, speed and pitch. */
 @Composable
 fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
     val c = rememberContainer()
@@ -80,7 +80,7 @@ fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
             message = "Something went wrong: ${e.message ?: e.javaClass.simpleName}"
         }
     }
-    val sample = "Hello${name?.let { ", $it" } ?: ""}. I'm ZENITH. It's 7:30, and you have 3 things on your list today."
+    val sample = "Hello${name?.let { ", $it" } ?: ""}. I'm ZED. It's 7:30, and you have 3 things on your list today."
     fun choose(id: String) = safely {
         c.settings.setVoiceId(id)
         message = "Preparing the voice… the first time takes a few seconds."
@@ -91,7 +91,7 @@ fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
         message = if (c.voice.preview(sample)) null else "Speech is unavailable on this phone."
     }
 
-    ListScreen("Voice", onBack = onBack, subtitle = "Choose how ZENITH sounds. Every voice runs on your phone, offline.") {
+    ListScreen("Voice", onBack = onBack, subtitle = "Choose how ZED sounds. Every voice runs on your phone, offline.") {
         item {
             ZenithCard {
                 SectionTitle("Now speaking with")
@@ -140,8 +140,8 @@ fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
             ZenithCard(accent = if (settings.wakeWordEnabled && wakeInstalled) ZenithColors.Green else ZenithColors.Violet) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("“Hey Zenith”", style = MaterialTheme.typography.titleMedium)
-                        Text("Say “Hey Zenith” any time to start talking. Listening happens entirely on the phone — only for the wake word — while a notification is shown. Uses some battery.",
+                        Text("“Hey Zed”", style = MaterialTheme.typography.titleMedium)
+                        Text("Say “Hey Zed” any time to start talking. Listening happens entirely on the phone — only for the wake word — while a notification is shown. Uses some battery.",
                             style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
                     }
                     androidx.compose.material3.Switch(checked = settings.wakeWordEnabled, onCheckedChange = { on ->
@@ -150,7 +150,7 @@ fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
                             if (!on) { com.melhive.zenith.voice.WakeWordService.stop(context); return@safely }
                             if (!wakeInstalled && wakeTask == null) {
                                 c.taskEngine.create(TaskTypes.VOICE_DOWNLOAD, "Download wake word model", mapOf("pack" to com.melhive.zenith.core.voice.VoiceCatalog.WAKE_WORD.id))
-                                message = "Downloading the wake word model (18 MB)… “Hey Zenith” starts when it's ready."
+                                message = "Downloading the wake word model (18 MB)… “Hey Zed” starts when it's ready."
                             } else com.melhive.zenith.voice.WakeWordService.start(context)
                         }
                     })
@@ -167,7 +167,7 @@ fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
                         }
                     }
                     if (!android.provider.Settings.canDrawOverlays(context)) {
-                        Text("To open LIVE when another app is on screen, allow ZENITH to display over other apps. Without it, ZENITH answers hands-free and shows the reply as a notification.",
+                        Text("To open LIVE when another app is on screen, allow ZED to display over other apps. Without it, ZED answers hands-free and shows the reply as a notification.",
                             style = MaterialTheme.typography.bodySmall, color = ZenithColors.Amber, modifier = Modifier.padding(top = 4.dp))
                         TextButton(onClick = {
                             runCatching { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:" + context.packageName))) }
@@ -179,7 +179,7 @@ fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
         item {
             ZenithCard {
                 SectionTitle("LIVE sounds")
-                Text("The sound when ZENITH LIVE opens and closes. Tap one to hear it.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
+                Text("The sound when ZED LIVE opens and closes. Tap one to hear it.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
                 WrapRow(Modifier.padding(top = 6.dp)) {
                     com.melhive.zenith.voice.ZenithSounds.Style.entries.forEach { st ->
                         FilterChip(selected = settings.liveSound == st.id, onClick = {
@@ -219,7 +219,7 @@ fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
                         val need = c.voicePacks.requiredBytes(pack)
                         if (free < need) { message = "Not enough storage: ${DeviceInfo.formatBytes(need)} needed, ${DeviceInfo.formatBytes(free)} free."; return@safely }
                         val t = c.taskEngine.create(TaskTypes.VOICE_DOWNLOAD, "Download ${pack.name} voices", mapOf("pack" to pack.id))
-                        message = "Downloading ${pack.name} as task #${t.id}. You can keep using ZENITH."
+                        message = "Downloading ${pack.name} as task #${t.id}. You can keep using ZED."
                     }
                 },
                 onCancel = { task?.let { t -> safely { c.taskEngine.cancel(t.id) } } },
@@ -394,7 +394,7 @@ private fun RealtimeVoiceCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Real-time voice (Gemini Live)", style = MaterialTheme.typography.titleMedium)
-                Text("ZENITH LIVE talks with you like a phone call: instant replies, natural voice, interrupt any time. Uses the internet and your Gemini API key; your voice is sent to Google.",
+                Text("ZED LIVE talks with you like a phone call: instant replies, natural voice, interrupt any time. Uses the internet and your Gemini API key; your voice is sent to Google.",
                     style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted)
             }
             androidx.compose.material3.Switch(checked = enabled, onCheckedChange = onEnabled, enabled = hasKey || enabled)
@@ -416,7 +416,7 @@ private fun RealtimeVoiceCard(
             }
             found?.let { list -> WrapRow { list.forEach { m -> FilterChip(selected = m == model, onClick = { onModel(m) }, label = { Text(m) }) } } }
             note?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted) }
-            Text("On the loudspeaker ZENITH mutes the mic while it talks (tap the orb to interrupt). With headphones you can just talk over it.",
+            Text("On the loudspeaker ZED mutes the mic while it talks (tap the orb to interrupt). With headphones you can just talk over it.",
                 style = MaterialTheme.typography.labelSmall, color = ZenithColors.Muted)
         }
     }

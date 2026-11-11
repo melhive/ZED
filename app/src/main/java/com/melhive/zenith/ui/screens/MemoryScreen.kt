@@ -70,7 +70,7 @@ fun MemoryScreen(onBack: () -> Unit, initialTab: Int = 0) {
         }
         when (tab) {
             4 -> {
-                item { Text("Your calendar for the next 14 days, plus ZENITH reminders. Say “schedule lunch with Ana tomorrow at noon” to add one.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted) }
+                item { Text("Your calendar for the next 14 days, plus ZED reminders. Say “schedule lunch with Ana tomorrow at noon” to add one.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted) }
                 if (!com.melhive.zenith.agents.CalendarReader(context).granted()) item {
                     ZenithCard(accent = ZenithColors.Amber) {
                         Text("Allow calendar access to see and add events here.", style = MaterialTheme.typography.bodyMedium)
@@ -90,12 +90,12 @@ fun MemoryScreen(onBack: () -> Unit, initialTab: Int = 0) {
                 }
                 val pending = reminders.filter { it.status == "scheduled" && it.triggerAt > System.currentTimeMillis() }
                 if (pending.isNotEmpty()) {
-                    item { Text("ZENITH reminders", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp)) }
+                    item { Text("ZED reminders", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp)) }
                     items(pending, key = { "r-" + it.id }) { r -> ZenithCard { Text(r.text); Text(formatTime(r.triggerAt), style = MaterialTheme.typography.labelSmall, color = ZenithColors.Muted) } }
                 }
             }
             0 -> {
-                item { Text("ZENITH only remembers what you explicitly ask it to (“remember that…”), or what you approve when an AI model requests it.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted) }
+                item { Text("ZED only remembers what you explicitly ask it to (“remember that…”), or what you approve when an AI model requests it.", style = MaterialTheme.typography.bodySmall, color = ZenithColors.Muted) }
                 if (facts.isEmpty()) item { EmptyState("No memories", "Say “remember that my sister's name is Ana”.") }
                 items(facts, key = { it.id }) { f ->
                     ZenithCard {

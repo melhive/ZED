@@ -7,7 +7,7 @@ import android.os.Build
 import android.speech.SpeechRecognizer
 import androidx.core.content.ContextCompat
 
-/** Runtime permissions ZENITH may request, with the reason shown to the user. */
+/** Runtime permissions ZED may request, with the reason shown to the user. */
 data class PermissionInfo(
     val permission: String,
     val title: String,
@@ -18,19 +18,19 @@ data class PermissionInfo(
 object PermissionCatalog {
     val MICROPHONE = PermissionInfo(
         Manifest.permission.RECORD_AUDIO, "Microphone",
-        "Used only while you are in ZENITH LIVE or press the mic button. ZENITH never records in the background.",
+        "Used only while you are in ZED LIVE or press the mic button. ZED never records in the background.",
     )
     val NOTIFICATIONS = PermissionInfo(
         Manifest.permission.POST_NOTIFICATIONS, "Notifications",
-        "Lets ZENITH tell you when background tasks finish or fail, and deliver reminders.", minSdk = 33,
+        "Lets ZED tell you when background tasks finish or fail, and deliver reminders.", minSdk = 33,
     )
     val CONTACTS = PermissionInfo(
         Manifest.permission.READ_CONTACTS, "Contacts",
-        "Lets ZENITH find a number when you say “call Mom” or “text Ana”. Contacts never leave the phone unless an online AI needs the matching name.",
+        "Lets ZED find a number when you say “call Mom” or “text Ana”. Contacts never leave the phone unless an online AI needs the matching name.",
     )
     val CALL_PHONE = PermissionInfo(
         Manifest.permission.CALL_PHONE, "Phone calls",
-        "Optional. Lets ZENITH place a call after you confirm it. Without it, ZENITH opens the dialer and you tap call.",
+        "Optional. Lets ZED place a call after you confirm it. Without it, ZED opens the dialer and you tap call.",
     )
     val CALENDAR = PermissionInfo(
         Manifest.permission.READ_CALENDAR, "Calendar (read)",
@@ -42,7 +42,7 @@ object PermissionCatalog {
     )
     val SMS = PermissionInfo(
         Manifest.permission.SEND_SMS, "Send texts",
-        "Lets “text Ana I'm late” send right away. Without it, ZENITH opens your messaging app for you to press send.",
+        "Lets “text Ana I'm late” send right away. Without it, ZED opens your messaging app for you to press send.",
     )
     val LOCATION = PermissionInfo(
         Manifest.permission.ACCESS_COARSE_LOCATION, "Approximate location",

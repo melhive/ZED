@@ -26,7 +26,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        // The wake word service may only start while ZENITH is on screen (Android 14 microphone rules).
+        // The wake word service may only start while ZED is on screen (Android 14 microphone rules).
         val c = (application as ZenithApp).container
         c.appScope.launch {
             val s = c.settings.current()

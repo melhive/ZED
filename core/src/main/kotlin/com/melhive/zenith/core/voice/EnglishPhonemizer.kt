@@ -164,7 +164,7 @@ class EnglishPhonemizer(private val lexicon: PronunciationLexicon) {
         /** Common words the dictionary lacks or gets wrong for an assistant. */
         private val OVERRIDES = mapOf(
             "wifi" to "wˈIfˌI", "gmail" to "ʤˈi mˌAl", "ai" to "ˌA ˈI", "app" to "ˈæp", "apps" to "ˈæps",
-            "smartphone" to "smˈɑɹtfˌOn", "ok" to "ˌOkˈA", "zenith" to "zˈinɪθ",
+            "smartphone" to "smˈɑɹtfˌOn", "ok" to "ˌOkˈA", "zenith" to "zˈinɪθ", "zed" to "zˈɛd",
         )
         private const val VOWELS = "AIOWYaeiouæɑɐɒɔəɚɛɜɪʊʌᵊᵻ"
         private val CONTRACTIONS = listOf("n't" to "nt", "'s" to "", "'re" to "ɹ", "'ll" to "l", "'ve" to "v", "'d" to "d", "'m" to "m")

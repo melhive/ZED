@@ -1,6 +1,6 @@
 package com.melhive.zenith.core.intelligence
 
-/** How ZENITH talks. The persona shapes the system prompt; facts and safety rules stay the same. */
+/** How ZED talks. The persona shapes the system prompt; facts and safety rules stay the same. */
 enum class Persona(val label: String, val summary: String, val style: String) {
     COMPANION(
         "Companion",

@@ -26,7 +26,7 @@ import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.util.Date
 
-/** Intents that open ZENITH on a given screen. */
+/** Intents that open ZED on a given screen. */
 object ZenithLaunch {
     const val ROUTE_LIVE = "live"
     const val ROUTE_CHAT = "chat"
@@ -46,7 +46,7 @@ object ZenithLaunch {
     fun overlayPending(context: Context, requestCode: Int): PendingIntent =
         PendingIntent.getActivity(context, requestCode, overlayIntent(context), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
-    /** True when ZENITH is the phone's default digital assistant (Android 10+). */
+    /** True when ZED is the phone's default digital assistant (Android 10+). */
     fun isDefaultAssistant(context: Context): Boolean =
         Build.VERSION.SDK_INT >= 29 && runCatching { context.getSystemService(RoleManager::class.java).isRoleHeld(RoleManager.ROLE_ASSISTANT) }.getOrDefault(false)
 
@@ -62,9 +62,9 @@ object ZenithLaunch {
         }
     }
 
-    /** Asks Android 13+ to add the ZENITH LIVE tile to Quick Settings. */
+    /** Asks Android 13+ to add the ZED LIVE tile to Quick Settings. */
     fun requestAddTile(context: Context, onResult: (String) -> Unit) {
-        if (Build.VERSION.SDK_INT < 33) { onResult("Swipe down twice, tap the pencil icon and drag the ZENITH LIVE tile into place."); return }
+        if (Build.VERSION.SDK_INT < 33) { onResult("Swipe down twice, tap the pencil icon and drag the ZED LIVE tile into place."); return }
         runCatching {
             context.getSystemService(StatusBarManager::class.java).requestAddTileService(
                 ComponentName(context, LiveTileService::class.java),
@@ -84,8 +84,8 @@ object ZenithLaunch {
 
 /**
  * Handles the system assist gesture (long-press power/home or swipe from a corner)
- * when ZENITH is the default digital assistant, and voice-command buttons on
- * headsets: opens ZENITH LIVE, which starts listening immediately.
+ * when ZED is the default digital assistant, and voice-command buttons on
+ * headsets: opens ZED LIVE, which starts listening immediately.
  */
 class AssistActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -96,7 +96,7 @@ class AssistActivity : Activity() {
     }
 }
 
-/** Quick Settings tile: one tap starts ZENITH LIVE. */
+/** Quick Settings tile: one tap starts ZED LIVE. */
 class LiveTileService : TileService() {
     override fun onStartListening() {
         super.onStartListening()
@@ -117,7 +117,7 @@ class LiveTileService : TileService() {
     }
 }
 
-/** Home-screen widget: talk or type to ZENITH, with the next reminder and open tasks. */
+/** Home-screen widget: talk or type to ZED, with the next reminder and open tasks. */
 class ZenithWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
         render(context, manager, ids, null)

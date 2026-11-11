@@ -126,7 +126,7 @@ fun ChatScreen(initialConversationId: Long?, onOpenLive: () -> Unit, onOpenModel
             }
             IconButton(onClick = { showHistory = true }) { Icon(Icons.Outlined.History, "Conversations") }
             IconButton(onClick = vm::newConversation) { Icon(Icons.Outlined.Add, "New conversation") }
-            IconButton(onClick = onOpenLive) { Icon(Icons.Outlined.GraphicEq, "ZENITH LIVE") }
+            IconButton(onClick = onOpenLive) { Icon(Icons.Outlined.GraphicEq, "ZED LIVE") }
         }
 
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -193,7 +193,7 @@ fun ChatScreen(initialConversationId: Long?, onOpenLive: () -> Unit, onOpenModel
                 value = if (listening) partial.ifEmpty { "Listening…" } else input,
                 onValueChange = { if (!listening) input = it },
                 modifier = Modifier.weight(1f),
-                placeholder = { Text("Message ZENITH") },
+                placeholder = { Text("Message ZED") },
                 maxLines = 6,
                 shape = RoundedCornerShape(20.dp),
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ZenithColors.Cyan, unfocusedBorderColor = ZenithColors.Outline),

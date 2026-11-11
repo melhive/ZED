@@ -221,7 +221,28 @@ fun registerExecutors(tm: ToolManager, c: AppContainer, context: Context) {
 
     tm.register("time.now") { _, _ ->
         val now = java.time.ZonedDateTime.now()
-        ok(now.format(DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy, HH:mm")) + " (${now.zone.id})")
+        ok("It's " + now.format(DateTimeFormatter.ofPattern("h:mm:ss a", java.util.Locale.ENGLISH)) + " on " +
+            now.format(DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", java.util.Locale.ENGLISH)) + " (${now.zone.id}).")
+    }
+    tm.register("time.left") { a, _ ->
+        val now = System.currentTimeMillis()
+        val target = a.stringOrNull("target")?.lowercase()?.trim()
+        fun left(at: Long) = com.melhive.zenith.core.time.Durations.describe((at - now) / 1000)
+        fun clock(at: Long) = java.time.Instant.ofEpochMilli(at).atZone(java.time.ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("h:mm:ss a", java.util.Locale.ENGLISH))
+        fun wants(kind: String, label: String = "") = target == null || target.contains(kind) || (label.isNotBlank() && label.lowercase().contains(target))
+        val lines = mutableListOf<String>()
+        com.melhive.zenith.android.Countdowns(context).active(now).forEach { e ->
+            if (wants(e.kind, e.label)) lines += "${e.kind.replaceFirstChar { it.uppercase() }}${if (e.label.isNotBlank()) " “${e.label}”" else ""}: ${left(e.endAt)} left (at ${clock(e.endAt)})"
+        }
+        c.db.reminders().scheduled().filter { it.triggerAt > now }.take(5).forEach { r ->
+            if (wants("reminder", r.text)) lines += "Reminder “${r.text}”: ${left(r.triggerAt)} (at ${clock(r.triggerAt)})"
+        }
+        if (target == null || listOf("meeting", "event", "calendar", "appointment").any { target.contains(it) }) {
+            val cal = com.melhive.zenith.agents.CalendarReader(context)
+            if (cal.granted()) cal.nextEvent(now)?.let { (title, at) -> lines += "Next event “$title”: ${left(at)} (at ${clock(at)})" }
+        }
+        if (lines.isEmpty()) ok(if (target == null) "Nothing is counting down right now: no timers, alarms or reminders from ZED." else "I don't have a $target counting down.")
+        else ok("Right now it's ${clock(now)}.\n" + lines.joinToString("\n"))
     }
 
     // ---- Files ----
@@ -271,13 +292,24 @@ fun registerExecutors(tm: ToolManager, c: AppContainer, context: Context) {
     // ---- Clock and calendar ----
     tm.register("alarm.set") { a, _ ->
         when (val r = intents.setAlarm(a.int("hour").toInt(), a.int("minute").toInt(), a.stringOrNull("label"))) {
-            SystemIntents.Result.Launched -> ok("Alarm request sent to your clock app for %02d:%02d.".format(a.int("hour"), a.int("minute")))
+            SystemIntents.Result.Launched -> {
+                val h = a.int("hour").toInt(); val m = a.int("minute").toInt()
+                var at = java.time.LocalDate.now().atTime(h, m)
+                if (!at.isAfter(LocalDateTime.now())) at = at.plusDays(1)
+                val atMs = at.epochMillis()
+                com.melhive.zenith.android.Countdowns(context).add("alarm", a.stringOrNull("label").orEmpty(), atMs)
+                ok("Alarm set for ${at.format(DateTimeFormatter.ofPattern("h:mm a", java.util.Locale.ENGLISH))} — that's in ${com.melhive.zenith.core.time.Durations.describe((atMs - System.currentTimeMillis()) / 1000, withSeconds = false)}.")
+            }
             is SystemIntents.Result.Unavailable -> fail(r.reason)
         }
     }
     tm.register("timer.set") { a, _ ->
         when (val r = intents.setTimer(a.int("seconds").toInt(), a.stringOrNull("label"))) {
-            SystemIntents.Result.Launched -> ok("Timer request sent to your clock app (${a.int("seconds")} seconds).")
+            SystemIntents.Result.Launched -> {
+                val secs = a.int("seconds")
+                com.melhive.zenith.android.Countdowns(context).add("timer", a.stringOrNull("label").orEmpty(), System.currentTimeMillis() + secs * 1000)
+                ok("Timer started for ${com.melhive.zenith.core.time.Durations.describe(secs)}.")
+            }
             is SystemIntents.Result.Unavailable -> fail(r.reason)
         }
     }
@@ -310,7 +342,10 @@ fun registerExecutors(tm: ToolManager, c: AppContainer, context: Context) {
     tm.register("reminder.list") { _, _ ->
         val list = c.db.reminders().scheduled()
         if (list.isEmpty()) ok("You have no upcoming reminders.")
-        else ok("Upcoming reminders:\n" + list.joinToString("\n") { "#${it.id} · ${it.triggerAt.prettyMillis()} · ${it.text}" })
+        else {
+            val now = System.currentTimeMillis()
+            ok("Upcoming reminders:\n" + list.joinToString("\n") { "#${it.id} · ${it.triggerAt.prettyMillis()} (in ${com.melhive.zenith.core.time.Durations.describe((it.triggerAt - now) / 1000)}) · ${it.text}" })
+        }
     }
     tm.register("reminder.cancel") { a, _ ->
         if (c.reminderScheduler.cancelReminder(a.int("id"))) ok("Reminder #${a.int("id")} cancelled.")

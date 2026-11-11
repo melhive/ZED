@@ -41,7 +41,7 @@ class SmallTalk(private val random: Random = Random.Default) {
     private fun Context.name(prefix: String = ", ") = (addressAs?.takeIf { it.isNotBlank() } ?: userName)?.let { "$prefix$it" } ?: ""
 
     private val opt = setOf(RegexOption.IGNORE_CASE)
-    private fun rx(p: String) = Regex("^(?:hey |oh |ok |okay |well |so |um+ )?(?:zenith[,!]?\\s*)?(?:$p)(?:[,!]?\\s*(?:zenith|buddy|friend|mate|bro))?[.!?]*$", opt)
+    private fun rx(p: String) = Regex("^(?:hey |oh |ok |okay |well |so |um+ )?(?:(?:zed|zedd|zenith)[,!]?\\s*)?(?:$p)(?:[,!]?\\s*(?:zed|zedd|zenith|buddy|friend|mate|bro))?[.!?]*$", opt)
 
     private val greeting = rx("hi+|hello+|hey+|hiya|howdy|yo|greetings|good (?:morning|afternoon|evening|day)|morning|evening|sup|what'?s up|wass?up|hey there|hi there|hello there")
     private val howAreYou = rx("how are you(?: doing| today| feeling)?|how'?s it going|how do you do|are you (?:ok|okay|alright|good)|how have you been|how'?s your day(?: going)?|how are things")
@@ -172,7 +172,7 @@ class SmallTalk(private val random: Random = Random.Default) {
                 else -> pick("Me? I'm just happy to help.", "I'm doing fine, thanks!")
             }
             whatDoing.matches(t) -> pick("Just here, keeping an eye on your reminders and tasks. What are you up to?", "Waiting for your next idea. What's up?", "Organizing bits and bytes. How about you?")
-            whoAreYou.matches(t) -> { lastTopic = Topic.IDENTITY; "I'm ZENITH, your personal assistant on this phone. I can chat, set reminders and alarms, manage files and your task list, remember things for you, and do quick math and conversions. " +
+            whoAreYou.matches(t) -> { lastTopic = Topic.IDENTITY; "I'm ZED, your personal assistant on this phone. I can chat, set reminders and alarms, manage files and your task list, remember things for you, and do quick math and conversions. " +
                 if (ctx.modelConfiguredButUnavailable) "My AI model isn't reachable right now, so I'm in my lighter native mode." else "With an AI model installed I can hold much deeper conversations." }
             whoMadeYou.matches(t) -> "I was built as a native Android app — Kotlin and Jetpack Compose — and I run right here on your phone."
             age.matches(t) -> "I'm quite new — born in November 2026. Young, but learning fast."

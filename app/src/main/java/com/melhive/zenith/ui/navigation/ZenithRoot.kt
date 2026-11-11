@@ -24,6 +24,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.drawBehind
+import com.melhive.zenith.ui.components.hudBackground
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -111,14 +118,20 @@ fun ZenithRoot(requestedRoute: String?, onRouteConsumed: () -> Unit) {
         containerColor = ZenithColors.Background,
         bottomBar = {
             if (route != Routes.LIVE && !imeVisible) {
-                NavigationBar(containerColor = ZenithColors.Surface) {
+                NavigationBar(
+                    containerColor = ZenithColors.Surface.copy(alpha = 0.97f),
+                    modifier = Modifier.drawBehind {
+                        drawLine(Brush.horizontalGradient(listOf(Color.Transparent, ZenithColors.Cyan.copy(alpha = 0.6f), Color.Transparent)),
+                            androidx.compose.ui.geometry.Offset(0f, 0f), androidx.compose.ui.geometry.Offset(size.width, 0f), 1.5.dp.toPx())
+                    },
+                ) {
                     tabs.forEach { tab ->
                         val selected = route?.substringBefore('?') == tab.route
                         NavigationBarItem(
                             selected = selected,
                             onClick = { nav.navigateTab(tab.route) },
                             icon = { Icon(tab.icon, tab.label) },
-                            label = { Text(tab.label) },
+                            label = { Text(tab.label.uppercase(), letterSpacing = 1.5.sp, style = MaterialTheme.typography.labelSmall) },
                             colors = NavigationBarItemDefaults.colors(indicatorColor = ZenithColors.Cyan.copy(alpha = 0.15f), selectedIconColor = ZenithColors.Cyan, selectedTextColor = ZenithColors.Cyan),
                         )
                     }
@@ -187,13 +200,13 @@ private fun androidx.navigation.NavGraphBuilder.screen(
     arguments: List<androidx.navigation.NamedNavArgument> = emptyList(),
     content: @Composable (androidx.navigation.NavBackStackEntry) -> Unit,
 ) = composable(route, arguments) { entry ->
-    Box(Modifier.fillMaxSize().background(ZenithColors.Background)) { content(entry) }
+    Box(Modifier.fillMaxSize().hudBackground()) { content(entry) }
 }
 
 /**
  * Screen motion without fades: pushed screens glide in from the right while the
  * previous one drifts a little to the left (and back on Back); tab switches
- * slide in the tab's direction; ZENITH LIVE rises from the bottom.
+ * slide in the tab's direction; ZED LIVE rises from the bottom.
  */
 private object NavMotion {
     private val emphasized = androidx.compose.animation.core.CubicBezierEasing(0.2f, 0f, 0f, 1f)

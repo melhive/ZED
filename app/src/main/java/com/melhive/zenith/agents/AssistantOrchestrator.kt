@@ -224,7 +224,9 @@ class AssistantOrchestrator(
         // Casual conversation gets a lean, persona-focused prompt; the tool list is included only when the
         // message looks like a device request (more room for the conversation, more natural replies).
         val nativeTools = !isLocal && provider.supportsNativeTools
-        val useTools = nativeTools || (!tinyContext && PromptBuilder.looksLikeAction(userText))
+        // On-device models get the same (compact) instructions every turn, so the runtime keeps its cached
+        // conversation instead of re-reading the whole history whenever a message switches between chat and actions.
+        val useTools = nativeTools || (if (isLocal) !tinyContext else PromptBuilder.looksLikeAction(userText))
         val toolSpecs = if (!useTools) emptyList() else skills.enabledTools(s.enabledSkills).filter { it.name != "web.research" || researchAvailable }
         val userName = memory.userName()
         val memories = memory.list(if (tinyContext) 5 else 30).map { it.text }
@@ -242,7 +244,7 @@ class AssistantOrchestrator(
                 setPhase(AssistantPhase.SEARCHING, "documents", conversationId)
                 runCatching { knowledge.search(lastUser, 3) }.getOrDefault(emptyList()).map { "${it.docPath}: ${it.text.take(if (isLocal) 400 else 700)}" }
             } else emptyList()
-            val now = ZonedDateTime.now().format(DateTimeFormatter.ofPattern("EEEE yyyy-MM-dd'T'HH:mm (VV)"))
+            val now = ZonedDateTime.now().format(DateTimeFormatter.ofPattern("EEEE yyyy-MM-dd'T'HH:mm:ss (h:mm:ss a, VV)", java.util.Locale.ENGLISH))
             // On-device: keep the system prompt stable so the runtime can reuse its session; time and
             // document excerpts travel with the newest user message instead.
             val system = PromptBuilder.systemPrompt(
@@ -315,7 +317,7 @@ class AssistantOrchestrator(
             setPhase(AssistantPhase.SEARCHING, "documents", conversationId)
             runCatching { knowledge.search(lastUser, 3) }.getOrDefault(emptyList()).map { "${it.docPath}: ${it.text.take(700)}" }
         } else emptyList()
-        val now = ZonedDateTime.now().format(DateTimeFormatter.ofPattern("EEEE yyyy-MM-dd'T'HH:mm (VV)"))
+        val now = ZonedDateTime.now().format(DateTimeFormatter.ofPattern("EEEE yyyy-MM-dd'T'HH:mm:ss (h:mm:ss a, VV)", java.util.Locale.ENGLISH))
         val system = PromptBuilder.systemPrompt(
             tools = emptyList(), nowDescription = now, memories = memories, knowledge = knowledgeSnippets, voiceMode = voice,
             userName = userName, persona = com.melhive.zenith.core.intelligence.Persona.parse(s.persona),

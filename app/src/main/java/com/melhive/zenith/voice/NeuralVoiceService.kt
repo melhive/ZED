@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger
 /**
  * Runs neural speech synthesis in its own process (`:voice`). The speech
  * engine is native code; if it ever crashes, only this process dies — the
- * ZENITH app stays open, notices the disconnect, and switches to the phone
+ * ZED app stays open, notices the disconnect, and switches to the phone
  * voice. Talks to [IsolatedNeuralTts] with [Messenger] messages.
  */
 class NeuralVoiceService : Service() {
@@ -259,7 +259,7 @@ class IsolatedNeuralTts(
     override fun isSpeaking(): Boolean = pending.isNotEmpty()
 
     override fun info(): VoiceInfo? = if (!ready.isCompleted) null else VoiceInfo(
-        engine = "ZENITH neural · ${pack.name}" + if (loadError != null) " (failed: $loadError)" else " (loaded in $loadMillis ms, separate process)",
+        engine = "ZED neural · ${pack.name}" + if (loadError != null) " (failed: $loadError)" else " (loaded in $loadMillis ms, separate process)",
         language = if (voice.accent == "British") "en-GB" else if (voice.accent == "American") "en-US" else VoiceCatalog.supertonicLanguage(languageTag),
         offlineVoiceAvailable = true,
         voiceName = "${voice.name} (${voice.gender.label}, ${voice.accent})",
