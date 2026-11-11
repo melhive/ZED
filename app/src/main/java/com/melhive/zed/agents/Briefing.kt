@@ -94,7 +94,8 @@ class CalendarReader(private val context: Context) {
 
     fun events(day: LocalDate): List<String> = dayEvents(day).map { e ->
         val loc = e.location?.let { " at $it" } ?: ""
-        if (e.start == null) "All day: ${e.title}$loc" else "${com.melhive.zed.core.briefing.BriefingText.clock(e.start)}: ${e.title}$loc"
+        val start = e.start
+        if (start == null) "All day: ${e.title}$loc" else "${com.melhive.zed.core.briefing.BriefingText.clock(start)}: ${e.title}$loc"
     }
 
     fun dayEvents(day: LocalDate): List<com.melhive.zed.core.briefing.DayEvent> {
