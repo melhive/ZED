@@ -76,7 +76,7 @@ fun MoreScreen(onNavigate: (String) -> Unit) {
             Entry(Routes.BACKUP, Icons.Outlined.SettingsBackupRestore, "Backup & restore", "Save everything to a file, or move ZED to another phone"),
         ),
         "Intelligence" to listOf(
-            Entry(Routes.MODELS, Icons.Outlined.Psychology, "Models & AI", "On-device models matched to your phone, online providers"),
+            Entry(Routes.MODELS, Icons.Outlined.Psychology, "Models & AI", "Gemma and other on-device models matched to your phone"),
         ),
         "System" to listOf(
             Entry(Routes.SETTINGS, Icons.Outlined.Settings, "Settings", "Personality, actions, smart home, updates"),
@@ -319,6 +319,7 @@ fun DiagnosticsScreen(onBack: () -> Unit) {
             }
         }
         item { SpeedTestCard() }
+        item { BackgroundJobsCard() }
         item { SectionTitle("Permissions") }
         items(PermissionCatalog.ALL.filter { PermissionCatalog.applicable(it) }) { p ->
             val granted = remember(refresh) { PermissionCatalog.isGranted(context, p) }
@@ -406,6 +407,32 @@ fun DiagnosticsScreen(onBack: () -> Unit) {
             Text("${formatTime(a.timestamp)} ${a.outcome.uppercase()} ${a.tool} [${a.origin.lowercase()}] ${a.argsSummary} → ${a.detail}", style = MonoStyle,
                 color = when (a.outcome) { "executed" -> ZedColors.Text; "failed", "invalid" -> ZedColors.Red; else -> ZedColors.Amber })
         }
+    }
+}
+
+/** What ZED has scheduled in the background, and when each job next runs (to check it isn't busy all day). */
+@Composable
+private fun BackgroundJobsCard() {
+    val context = LocalContext.current
+    val jobs by produceState<List<Pair<String, String>>>(emptyList()) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val wm = androidx.work.WorkManager.getInstance(context)
+            val stamp = java.text.SimpleDateFormat("EEE HH:mm", java.util.Locale.getDefault())
+            listOf(
+                "zed-learning" to "Learning (while charging)", "zed-hints-planner" to "Hint planner (every 3 h)", "zed-hints-at" to "Leave-now check",
+                "zed-pending-requests" to "Offline requests", "zed-auto-backup" to "Weekly backup", com.melhive.zed.agents.BriefingWorker.NAME to "Morning briefing",
+            ).mapNotNull { (name, label) ->
+                val info = runCatching { wm.getWorkInfosForUniqueWork(name).get() }.getOrNull()?.firstOrNull { !it.state.isFinished } ?: return@mapNotNull null
+                val next = info.nextScheduleTimeMillis.takeIf { it in 1 until Long.MAX_VALUE }?.let { " · next ${stamp.format(java.util.Date(it))}" }.orEmpty()
+                label to (info.state.name.lowercase().replaceFirstChar { it.uppercase() } + next)
+            }
+        }
+    }
+    ZedCard {
+        SectionTitle("Background jobs")
+        if (jobs.isEmpty()) Text("Nothing scheduled right now.", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
+        jobs.forEach { (label, state) -> Text("$label — $state", style = MonoStyle, color = ZedColors.Muted) }
+        Text("Learning and dreaming use the AI model only while charging (or when it's already loaded); hints wake the phone only before an event that has a place.", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted, modifier = Modifier.padding(top = 4.dp))
     }
 }
 

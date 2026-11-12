@@ -119,10 +119,10 @@ class CalendarReader(private val context: Context) {
         return out
     }
 
-    /** The next timed event in the coming two hours that has a place: title, start and location. */
-    fun nextEventWithPlace(now: Long): Triple<String, Long, String>? {
+    /** The next timed event in the coming [hours] hours that has a place: title, start and location. */
+    fun nextEventWithPlace(now: Long, hours: Int = 2): Triple<String, Long, String>? {
         if (!granted()) return null
-        val uri = CalendarContract.Instances.CONTENT_URI.buildUpon().also { android.content.ContentUris.appendId(it, now); android.content.ContentUris.appendId(it, now + 2 * 3_600_000L) }.build()
+        val uri = CalendarContract.Instances.CONTENT_URI.buildUpon().also { android.content.ContentUris.appendId(it, now); android.content.ContentUris.appendId(it, now + hours * 3_600_000L) }.build()
         return context.contentResolver.query(uri, arrayOf(CalendarContract.Instances.TITLE, CalendarContract.Instances.BEGIN, CalendarContract.Instances.ALL_DAY, CalendarContract.Instances.EVENT_LOCATION),
             "${CalendarContract.Instances.BEGIN} > ?", arrayOf(now.toString()), "${CalendarContract.Instances.BEGIN} ASC")?.use { c ->
             while (c.moveToNext()) {
@@ -198,6 +198,34 @@ class CalendarWriter(private val context: Context) {
         val all = mutableListOf<Triple<Target, Boolean, String>>()
         c.use { while (it.moveToNext()) all += Triple(Target(it.getLong(0), it.getString(1) ?: "Calendar"), it.getInt(2) == 1, it.getString(3).orEmpty()) }
         return (all.firstOrNull { it.second } ?: all.firstOrNull { it.third == "com.google" } ?: all.firstOrNull())?.first
+    }
+
+    /** Upcoming events in the next [days] days, for finding the one to move. */
+    fun upcoming(now: Long, days: Int = 60): List<com.melhive.zed.core.understanding.CalendarMove.Event> {
+        if (!granted()) return emptyList()
+        val zone = ZoneId.systemDefault()
+        val uri = CalendarContract.Instances.CONTENT_URI.buildUpon().also { android.content.ContentUris.appendId(it, now - 3_600_000L); android.content.ContentUris.appendId(it, now + days * 86_400_000L) }.build()
+        val out = mutableListOf<com.melhive.zed.core.understanding.CalendarMove.Event>()
+        context.contentResolver.query(uri, arrayOf(CalendarContract.Instances.EVENT_ID, CalendarContract.Instances.TITLE, CalendarContract.Instances.BEGIN, CalendarContract.Instances.END,
+            CalendarContract.Instances.ALL_DAY, CalendarContract.Instances.RRULE), null, null, "${CalendarContract.Instances.BEGIN} ASC")?.use { c ->
+            while (c.moveToNext()) {
+                if (c.getInt(4) == 1) continue
+                fun t(ms: Long) = java.time.Instant.ofEpochMilli(ms).atZone(zone).toLocalDateTime()
+                out += com.melhive.zed.core.understanding.CalendarMove.Event(c.getLong(0), c.getString(1) ?: "(no title)", t(c.getLong(2)), t(c.getLong(3)), recurring = !c.getString(5).isNullOrBlank())
+            }
+        }
+        return out
+    }
+
+    /** Moves an event to [start], keeping its length. Returns false when the calendar refused. */
+    fun move(event: com.melhive.zed.core.understanding.CalendarMove.Event, start: java.time.LocalDateTime): Boolean {
+        val zone = ZoneId.systemDefault()
+        val length = java.time.Duration.between(event.start, event.end)
+        val values = android.content.ContentValues().apply {
+            put(CalendarContract.Events.DTSTART, start.atZone(zone).toInstant().toEpochMilli())
+            put(CalendarContract.Events.DTEND, start.plus(length).atZone(zone).toInstant().toEpochMilli())
+        }
+        return context.contentResolver.update(android.content.ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, event.id), values, null, null) > 0
     }
 
     /** Inserts the event and a 10-minute reminder; returns the new event id. */

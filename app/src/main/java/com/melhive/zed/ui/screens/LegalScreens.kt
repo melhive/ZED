@@ -31,13 +31,12 @@ private val TERMS = LegalDoc(
             "Don't rely on ZED while driving or in situations where a distraction or a wrong answer could cause harm.",
         ),
         "3. AI answers can be wrong" to listOf(
-            "ZED's answers come from AI models (on your phone or from online providers you configure) and from built-in rules. AI can make mistakes, misunderstand speech or give outdated information.",
+            "ZED's answers come from an AI model running on your phone (Gemma) and from built-in rules. AI can make mistakes, misunderstand speech or give outdated information.",
             "ZED is not a substitute for professional medical, legal, financial or safety advice. Always verify important information.",
             "Emergency calls should be made with your phone's dialer, not through ZED.",
         ),
         "4. Third-party services" to listOf(
-            "Some features use services from other companies, under their own terms: online AI providers you add a key for (Google Gemini, OpenAI, Anthropic Claude or a compatible endpoint), Google's speech services, Open-Meteo weather, Hugging Face and GitHub for downloads, and your own Home Assistant server.",
-            "You are responsible for any costs from your API keys and for following those providers' terms.",
+            "Some features use services from other companies, under their own terms: web search (DuckDuckGo, Bing, Wikipedia) when you ask ZED to look something up, Google's speech services, Open-Meteo weather, Hugging Face and GitHub for downloads, and your own Home Assistant server.",
         ),
         "5. Models and voices" to listOf(
             "Downloadable AI models and voices are made by their respective authors and are provided under their own licenses (shown in the app next to each download, e.g. Apache-2.0, MIT or the LFM Open License).",
@@ -59,12 +58,12 @@ private val PRIVACY = LegalDoc(
     sections = listOf(
         "Stored only on your phone" to listOf(
             "Conversations, memories, your task list, reminders, routines, settings and the document index are stored in ZED's private storage on your phone. Android app backups are turned off for ZED.",
-            "API keys and your Home Assistant token are encrypted with the Android Keystore.",
+            "Your Home Assistant token is encrypted with the Android Keystore.",
             "Problem reports (crash details) are saved on the phone and are only shared if you tap Share report yourself.",
             "Uninstalling ZED deletes all of this. You can also clear memories and conversations in the app.",
         ),
         "When something leaves your phone" to listOf(
-            "Online AI: if you add a key for Google Gemini, OpenAI, Anthropic Claude or a compatible endpoint, your messages, relevant memories, document excerpts, tool results and any photo you attach are sent to that provider to produce answers. Their privacy policies apply.",
+            "No online AI: your messages, memories, documents and photos are answered by the model on your phone and are never sent to an AI service. Web research sends only the search question to the search service.",
             "Real-time voice (Gemini Live): when enabled, your microphone audio during ZED LIVE is streamed to Google.",
             "Speech recognition: standard voice input uses your phone's speech service (often Google's), which may process audio on the device or online depending on your phone.",
             "Weather: your city name or approximate location is sent to Open-Meteo to get the forecast.",
@@ -79,7 +78,7 @@ private val PRIVACY = LegalDoc(
             "Notifications access (optional): to answer “what did I miss?”. Notifications are kept in memory only, read only when you ask, and never saved.",
             "Location (optional): city-level, only for weather.",
             "Bluetooth (optional): to start a routine when a chosen device, such as your car, connects.",
-            "Camera: ZED opens your camera app only when you ask “what am I looking at?”; the photo is sent to your online AI provider.",
+            "Camera: ZED opens your camera app only when you ask “what am I looking at?”; the photo is looked at by the model on your phone.",
         ),
         "Children" to listOf("ZED is not directed at children under 13."),
         "Changes" to listOf("This policy may change with app updates; the date above shows the latest version."),

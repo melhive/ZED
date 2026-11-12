@@ -39,7 +39,6 @@ class AndroidCapabilityChecker(private val context: Context, private val c: AppC
         Capability.NOTIFICATIONS -> Notifications.canPost(context)
         Capability.MICROPHONE -> PermissionCatalog.isGranted(context, PermissionCatalog.MICROPHONE)
         Capability.NETWORK -> DeviceInfo.snapshot(context).online
-        Capability.ONLINE_AI -> this.c.providers.research() != null
         Capability.CLOCK_APP -> intents.canSetAlarms()
         // Events are written directly with calendar access; the editor fallback is tried at run time.
         Capability.CALENDAR_APP -> true
@@ -55,7 +54,6 @@ class AndroidCapabilityChecker(private val context: Context, private val c: AppC
         Capability.NOTIFICATIONS -> "notification permission (enable it in Permissions & Diagnostics)"
         Capability.MICROPHONE -> "microphone permission"
         Capability.NETWORK -> "an internet connection"
-        Capability.ONLINE_AI -> "an online AI provider with web search (Gemini, OpenAI or Claude) configured in Model Manager"
         Capability.CLOCK_APP -> "a clock app that accepts alarm requests"
         Capability.CALENDAR_APP -> "a calendar app"
         Capability.CONTACTS -> "contacts permission (allow it in More → Permissions & Diagnostics)"
@@ -81,6 +79,11 @@ object DefaultConfirmationText : ConfirmationText {
         "calendar.create" -> "Add “${args.string("title")}” to your calendar at ${args.dateTime("start").pretty()}?"
         "reminder.create" -> "Remind you “${args.string("text")}” at ${args.dateTime("at").pretty()}?"
         "reminder.cancel" -> "Cancel reminder #${args.int("id")}?"
+        "calendar.move" -> "Move “${args.string("query")}” to " + when {
+            args.boolOrNull("keep_day") == true -> args.dateTime("at").format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)) + " the same day"
+            args.boolOrNull("keep_time") == true -> args.dateTime("at").format(DateTimeFormatter.ofPattern("EEEE, MMMM d", java.util.Locale.ENGLISH)) + " at the same time"
+            else -> args.dateTime("at").pretty()
+        } + "?"
         "reminder.reschedule" -> "Move reminder #${args.int("id")} to ${args.dateTime("at").pretty()}?"
         "todo.add" -> "Add “${args.string("title")}” to your task list?"
         "todo.complete" -> "Mark “${args.string("item")}” as done?"
@@ -341,6 +344,20 @@ fun registerExecutors(tm: ToolManager, c: AppContainer, context: Context) {
             SystemIntents.Result.Launched -> ok("Opened your calendar with “${a.string("title")}” on ${start.pretty()} — tap Save there. To add events directly next time, allow calendar access (Settings → Allow everything).")
             is SystemIntents.Result.Unavailable -> fail(if (writer.granted()) "I couldn't find a calendar to write to. Add a Google account calendar on this phone." else "Allow calendar access (Settings → Allow everything) so I can add events directly.")
         }
+    }
+
+    tm.register("calendar.move") { a, _ ->
+        val writer = com.melhive.zed.agents.CalendarWriter(context)
+        if (!writer.granted()) return@register fail("Allow calendar access (Settings → Allow everything) so I can move events.")
+        val now = LocalDateTime.now()
+        val query = a.string("query")
+        val event = com.melhive.zed.core.understanding.CalendarMove.pick(writer.upcoming(System.currentTimeMillis()), query, a.dateTimeOrNull("from"), now)
+            ?: return@register fail("I couldn't find an upcoming event matching “$query” in the next two months.")
+        if (event.recurring) return@register fail("“${event.title}” repeats — moving it here would move every one. Change it in your calendar app.")
+        val start = com.melhive.zed.core.understanding.CalendarMove.newStart(event, a.dateTime("at"), a.boolOrNull("keep_day") == true, a.boolOrNull("keep_time") == true)
+        if (!start.isAfter(now)) return@register fail("That time (${start.pretty()}) has already passed.")
+        if (!writer.move(event, start)) return@register fail("Your calendar didn't accept the change. Open “${event.title}” in your calendar app to move it.")
+        ok("Moved “${event.title}” to ${start.format(DateTimeFormatter.ofPattern("EEEE, MMMM d", java.util.Locale.ENGLISH))} at ${start.format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))}.")
     }
 
     // ---- Reminders ----

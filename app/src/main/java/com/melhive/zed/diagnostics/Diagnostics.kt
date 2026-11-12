@@ -213,7 +213,7 @@ object ReplyReport {
                     else -> "not loaded"
                 }
             }")
-            appendLine("Personality ${s.persona} · ask before actions ${s.confirmMode} · voice ${s.voiceId} · LIVE engine ${s.liveEngine}")
+            appendLine("Personality ${s.persona} · ask before actions ${s.confirmMode} · voice ${s.voiceId}")
             c.speedTest.history().lastOrNull()?.let { appendLine("Last speed test: ${it.summary()} (ZED ${it.version})") }
             appendLine()
             appendLine("=== The exchange ===")

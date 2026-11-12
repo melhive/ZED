@@ -148,6 +148,15 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
             tool("calendar.create", "title" to split.first, "start" to split.second.toString(), "end" to end.toString())
         },
 
+        // Moving an event: "move my meeting with Ana to 4", "reschedule the dentist to Friday at 10".
+        Rule(rx("(?:move|reschedule|push|shift|change) (?:my |the )?(.+?) (?:to|until|till|for) (.+)")) { m ->
+            val what = m.groupValues[1].trim()
+            // Files, reminders, alarms and pronouns go elsewhere (file moves, or the conversation's follow-ups).
+            if (Regex("[./\\\\]").containsMatchIn(what) || Regex("^(?:it|that|this|reminders?|alarms?|timers?|file|folder|volume)\\b|\\b(?:volume|thermostat|temperature|ac|aircon|air conditioner|heating|lights?|lamps?|brightness|speech rate|fan)$", RegexOption.IGNORE_CASE).containsMatchIn(what)) return@Rule null
+            val args = com.melhive.zed.core.understanding.CalendarMove.arguments(m.groupValues[2], clock()) ?: return@Rule null
+            ParsedCommand.Tool(ToolRequest("calendar.move", mapOf("query" to clean(what)) + args, ToolRequest.Origin.NATIVE))
+        },
+
         // Task list (todo).
         Rule(rx("(?:list|show)(?: me)? (?:my )?(?:tasks|todos|to-dos|todo list|to-do list|task list)|what are my (?:tasks|todos)|(?:my )?(?:todo|to-do|task) list")) { tool("todo.list") },
         Rule(rx("add (.+?) to (?:my )?(?:task|todo|to-do) list")) { m -> tool("todo.add", "title" to m.groupValues[1]) },
@@ -305,7 +314,7 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
             |• History — “search history for budget”
             |• Workflows — “good morning” (morning briefing), “run workflow organize downloads”
             |• Settings — “turn off voice responses”, “set speech rate to 1.2”
-            |• Research — “research …” (needs an online AI provider)
+            |• Research — “research …” (searches the web; only your question leaves the phone)
         """.trimMargin()
     }
 }

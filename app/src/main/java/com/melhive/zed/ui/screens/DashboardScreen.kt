@@ -233,11 +233,11 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
                         style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
                 } else {
                     Text("I already handle commands, calculations and small talk. For real conversations add an AI brain:", style = MaterialTheme.typography.bodyMedium)
-                    Text("• On-device: ${recommended.name}, ${DeviceInfo.formatBytes(recommended.sizeBytes)} download, private and offline.\n• Online: Gemini, OpenAI or Claude with your API key — fastest.",
+                    Text("${recommended.name}: ${DeviceInfo.formatBytes(recommended.sizeBytes)} download. It runs entirely on your phone — private, and it works offline.",
                         style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
                     WrapRow {
                         TextButton(onClick = { scope.launch { c.taskEngine.create(TaskTypes.MODEL_DOWNLOAD, "Download ${recommended.name}", mapOf("model" to recommended.id)) } }) { Text("Download on-device model") }
-                        TextButton(onClick = { onNavigate(Routes.MODELS) }) { Text("Use online AI") }
+                        TextButton(onClick = { onNavigate(Routes.MODELS) }) { Text("See models") }
                     }
                 }
             }
@@ -310,7 +310,7 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
 
         // AI status chip
         Row(Modifier.fillMaxWidth().clickable { onNavigate(Routes.MODELS) }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            val color = when (settings?.mode) { IntelligenceMode.LOCAL -> ZedColors.Teal; IntelligenceMode.ONLINE -> ZedColors.Violet; IntelligenceMode.NATIVE_ONLY -> ZedColors.Muted; else -> ZedColors.Cyan }
+            val color = when (settings?.mode) { IntelligenceMode.LOCAL -> ZedColors.Teal; IntelligenceMode.NATIVE_ONLY -> ZedColors.Muted; else -> ZedColors.Cyan }
             StatusPill(intelligence, color, Modifier.weight(1f, fill = false))
         }
         Spacer(Modifier.height(8.dp))

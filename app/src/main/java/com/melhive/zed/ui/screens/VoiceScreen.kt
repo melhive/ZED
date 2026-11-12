@@ -117,21 +117,6 @@ fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
         }
 
         item {
-            val configured by c.secrets.configured.collectAsStateWithLifecycle()
-            RealtimeVoiceCard(
-                enabled = settings.liveEngine == com.melhive.zed.voice.LiveSessionController.LIVE_ENGINE_REALTIME,
-                hasKey = com.melhive.zed.security.SecretStore.apiKeyName(com.melhive.zed.settings.OnlineProviderKind.GEMINI) in configured,
-                voice = settings.liveVoice, model = settings.liveModel,
-                onEnabled = { on -> safely { c.settings.setLiveEngine(if (on) com.melhive.zed.voice.LiveSessionController.LIVE_ENGINE_REALTIME else com.melhive.zed.voice.LiveSessionController.LIVE_ENGINE_STANDARD) } },
-                onVoice = { v -> safely { c.settings.setLiveVoice(v) } },
-                onModel = { m -> safely { c.settings.setLiveModel(m) } },
-                listModels = {
-                    val key = c.secrets.get(com.melhive.zed.security.SecretStore.apiKeyName(com.melhive.zed.settings.OnlineProviderKind.GEMINI))
-                    com.melhive.zed.intelligence.providers.GeminiProvider("", { key }).listLiveModels()
-                },
-            )
-        }
-        item {
             val wakeInstalled = com.melhive.zed.core.voice.VoiceCatalog.WAKE_WORD.id in installed
             LaunchedEffect(wakeInstalled, settings.wakeWordEnabled) {
                 if (wakeInstalled && settings.wakeWordEnabled) com.melhive.zed.voice.WakeWordService.start(context)
@@ -378,46 +363,5 @@ private fun VoiceRow(title: String, subtitle: String, selected: Boolean, feature
         }
         if (selected) Icon(Icons.Outlined.CheckCircle, "Selected", tint = ZedColors.Cyan)
         else Text("Tap to hear", style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted)
-    }
-}
-
-@Composable
-private fun RealtimeVoiceCard(
-    enabled: Boolean, hasKey: Boolean, voice: String, model: String,
-    onEnabled: (Boolean) -> Unit, onVoice: (String) -> Unit, onModel: (String) -> Unit,
-    listModels: suspend () -> Result<List<String>>,
-) {
-    val scope = rememberCoroutineScope()
-    var found by remember { mutableStateOf<List<String>?>(null) }
-    var note by remember { mutableStateOf<String?>(null) }
-    ZedCard(accent = if (enabled && hasKey) ZedColors.Green else ZedColors.Violet) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Real-time voice (Gemini Live)", style = MaterialTheme.typography.titleMedium)
-                Text("ZED LIVE talks with you like a phone call: instant replies, natural voice, interrupt any time. Uses the internet and your Gemini API key; your voice is sent to Google.",
-                    style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
-            }
-            androidx.compose.material3.Switch(checked = enabled, onCheckedChange = onEnabled, enabled = hasKey || enabled)
-        }
-        if (!hasKey) Text("Add a Google Gemini API key in Model Manager to use this.", style = MaterialTheme.typography.bodySmall, color = ZedColors.Amber)
-        if (enabled) {
-            Text("Voice", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
-            WrapRow { com.melhive.zed.voice.GeminiLiveSession.VOICES.forEach { v -> FilterChip(selected = v == voice, onClick = { onVoice(v) }, label = { Text(v) }) } }
-            Text("Model: ${model.ifBlank { com.melhive.zed.voice.GeminiLiveSession.DEFAULT_MODEL + " (default)" }}", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
-            WrapRow {
-                TextButton(onClick = {
-                    scope.launch {
-                        note = "Asking Google for live models…"
-                        listModels().onSuccess { found = it; note = if (it.isEmpty()) "No live models available for this key." else null }
-                            .onFailure { note = "Couldn't list models: ${it.message}" }
-                    }
-                }) { Text("Find live models") }
-                if (model.isNotBlank()) TextButton(onClick = { onModel("") }) { Text("Use default") }
-            }
-            found?.let { list -> WrapRow { list.forEach { m -> FilterChip(selected = m == model, onClick = { onModel(m) }, label = { Text(m) }) } } }
-            note?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted) }
-            Text("On the loudspeaker ZED mutes the mic while it talks (tap the orb to interrupt). With headphones you can just talk over it.",
-                style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted)
-        }
     }
 }

@@ -37,7 +37,7 @@ class ToolRepair(private val catalog: ToolCatalog, private val clock: () -> Loca
         "sms" to "sms.compose", "sms.send" to "sms.compose", "send.sms" to "sms.compose", "text" to "sms.compose", "message.send" to "sms.compose", "send.message" to "sms.compose", "text.send" to "sms.compose",
         "remember" to "memory.remember", "memory.save" to "memory.remember", "save.memory" to "memory.remember", "memory.add" to "memory.remember", "note" to "memory.remember",
         "memories" to "memory.list", "forget" to "memory.forget",
-        "event.create" to "calendar.create", "calendar.add" to "calendar.create", "create.event" to "calendar.create", "calendar.event" to "calendar.create", "add.event" to "calendar.create", "schedule" to "calendar.create",
+        "event.create" to "calendar.create", "calendar.add" to "calendar.create", "create.event" to "calendar.create", "calendar.event" to "calendar.create", "add.event" to "calendar.create", "schedule" to "calendar.create", "calendar.update" to "calendar.move", "event.move" to "calendar.move", "calendar.reschedule" to "calendar.move", "event.reschedule" to "calendar.move", "move.event" to "calendar.move",
         "calendar" to "calendar.today", "agenda" to "calendar.today", "calendar.list" to "calendar.today",
         "flashlight" to "flashlight.set", "torch" to "flashlight.set", "flashlight.toggle" to "flashlight.set", "flashlight.on" to "flashlight.set",
         "weather" to "weather.get", "get.weather" to "weather.get", "weather.current" to "weather.get",

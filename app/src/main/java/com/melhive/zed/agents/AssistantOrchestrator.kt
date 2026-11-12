@@ -360,10 +360,9 @@ class AssistantOrchestrator(
         val tinyContext = localContext != null && localContext < 2048
         // Casual conversation gets a lean, persona-focused prompt; the tool list is included only when the
         // message looks like a device request (more room for the conversation, more natural replies).
-        val nativeTools = !isLocal && provider.supportsNativeTools
         // On-device models get the same (compact) instructions every turn, so the runtime keeps its cached
         // conversation instead of re-reading the whole history whenever a message switches between chat and actions.
-        val useTools = nativeTools || isLocal || PromptBuilder.looksLikeAction(userText)
+        val useTools = isLocal || PromptBuilder.looksLikeAction(userText)
         val enabled = skills.enabledTools(s.enabledSkills).filter { it.name != "web.research" || researchAvailable }
         val history0 = conversations.history(conversationId, 6)
         val previousUser = history0.dropLast(1).lastOrNull { it.role == Role.USER }?.content
@@ -410,7 +409,6 @@ class AssistantOrchestrator(
         val sourceTag = if (isLocal) "local" else "online:${provider.id}"
         val contextChars = if (isLocal) ((localContext ?: 4096) * 3) else 60_000
 
-        if (nativeTools) return runNativeToolLoop(conversationId, provider, voice, toolSpecs, memories, userName, sourceTag, contextChars)
         val dialogueNote = dialogue(conversationId).describe()
         // Think twice on hard questions: a short plan first, then the answer, then a check.
         val thinkTwice = isLocal && !voice && s.thinkTwice && currentImage == null && com.melhive.zed.core.learning.HardQuestion.isHard(userText)
@@ -503,67 +501,6 @@ class AssistantOrchestrator(
         return AssistantReply(lastText.ifBlank { note }, true, sourceTag)
     }
 
-    /**
-     * Native function calling (online providers): tools are declared to the model, which may call
-     * several in one step and chain steps (read → decide → act). Every call still goes through the
-     * ToolManager (validation, permissions, confirmation, audit). The history is read once; this
-     * turn's tool calls and results are replayed in the provider's own format.
-     */
-    private suspend fun runNativeToolLoop(
-        conversationId: Long, provider: IntelligenceProvider, voice: Boolean, toolSpecs: List<com.melhive.zed.core.tools.ToolSpec>,
-        memories: List<String>, userName: String?, sourceTag: String, contextChars: Int,
-    ): AssistantReply {
-        val s = settings.current()
-        val history = ContextWindow.fit(conversations.history(conversationId, 40), contextChars)
-        val lastUser = history.lastOrNull { it.role == Role.USER }?.content.orEmpty()
-        val knowledgeSnippets = if (s.useKnowledge) {
-            setPhase(AssistantPhase.SEARCHING, "documents", conversationId)
-            runCatching { knowledge.search(lastUser, 3) }.getOrDefault(emptyList()).map { "${it.docPath}: ${it.text.take(700)}" }
-        } else emptyList()
-        val now = ZonedDateTime.now().format(DateTimeFormatter.ofPattern("EEEE yyyy-MM-dd'T'HH:mm:ss (h:mm:ss a, VV)", java.util.Locale.ENGLISH))
-        val system = PromptBuilder.systemPrompt(
-            tools = emptyList(), nowDescription = now, memories = memories, knowledge = knowledgeSnippets, voiceMode = voice,
-            userName = userName, persona = com.melhive.zed.core.intelligence.Persona.parse(s.persona),
-            userTitle = s.userTitle.ifBlank { null }, nativeTools = toolSpecs.isNotEmpty(),
-        )
-        val exchanges = mutableListOf<com.melhive.zed.intelligence.ToolExchange>()
-        val summary = mutableListOf<String>()
-        for (step in 1..MAX_NATIVE_STEPS) {
-            val request = GenerationRequest(
-                system = system, turns = history, maxOutputTokens = if (voice) 1024 else 4096,
-                sessionKey = "conversation-$conversationId", tools = toolSpecs, exchanges = exchanges.toList(),
-                images = listOfNotNull(currentImage),
-            )
-            setPhase(AssistantPhase.THINKING, if (step == 1) provider.label else "Step $step…", conversationId)
-            var result = stream(conversationId, provider, request, sourceTag)
-            if (!result.ok && result.retryable) {
-                setPhase(AssistantPhase.THINKING, "Retrying…", conversationId)
-                conversations.deleteMessage(result.messageId)
-                delay(1500)
-                result = stream(conversationId, provider, request, sourceTag)
-            }
-            if (!result.ok) return AssistantReply(result.text, false, sourceTag)
-            if (result.calls.isEmpty()) {
-                val text = result.text.ifBlank { summary.lastOrNull() ?: "(no response)" }
-                if (result.text.isBlank()) conversations.updateMessage(result.messageId, text, "complete")
-                return AssistantReply(text, true, sourceTag)
-            }
-            if (result.text.isBlank()) conversations.updateMessage(result.messageId, "Working on it…", "complete")
-            val results = mutableListOf<com.melhive.zed.intelligence.ToolCallResult>()
-            for (call in result.calls) {
-                val outcome = runTool(conversationId, ToolRequest(call.name, call.args, ToolRequest.Origin.ONLINE_MODEL))
-                val turn = PromptBuilder.toolResultTurn(call.name, outcome.isSuccess(), outcome.message)
-                conversations.addMessage(conversationId, "tool", turn.content, source = "tool", toolName = call.name, status = "complete")
-                results += com.melhive.zed.intelligence.ToolCallResult(call.id, call.name, outcome.message.take(8000), outcome.isSuccess())
-                summary += outcome.message
-            }
-            exchanges += com.melhive.zed.intelligence.ToolExchange(result.text, result.calls, results)
-        }
-        val note = "I stopped after $MAX_NATIVE_STEPS steps to stay safe. Ask me to continue if there's more to do."
-        conversations.addMessage(conversationId, "assistant", note, source = sourceTag)
-        return AssistantReply(note, true, sourceTag)
-    }
-
     /** A short side generation (a plan, a check) that isn't shown as a chat message. Null when it fails. */
     private suspend fun generateText(provider: IntelligenceProvider, system: String, prompt: String, maxTokens: Int, session: String): String? {
         val out = StringBuilder()
@@ -621,7 +558,5 @@ class AssistantOrchestrator(
 
     companion object {
         const val MAX_ROUNDS = 3
-        /** Native tool calling: enough steps for multi-step requests, bounded for safety and cost. */
-        const val MAX_NATIVE_STEPS = 8
     }
 }

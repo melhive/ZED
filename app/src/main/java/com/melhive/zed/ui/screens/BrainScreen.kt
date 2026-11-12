@@ -778,8 +778,8 @@ fun MiniBrain(modifier: Modifier = Modifier, glow: Boolean = true) {
     val c = rememberContainer()
     val snapshot by c.brain.snapshot.collectAsStateWithLifecycle()
     val settings by c.settings.settings.collectAsStateWithLifecycle(initialValue = null)
-    // Performance mode: full ≈ 33 fps, balanced 15 fps, light one frame a second.
-    val frameGap = when (settings?.animationLevel) { "light" -> 1_000_000_000L; "balanced" -> 66_000_000L; else -> 30_000_000L }
+    // Performance mode: full 20 fps, balanced 12 fps, light one frame a second (a small view doesn't need more).
+    val frameGap = when (settings?.animationLevel) { "light" -> 1_000_000_000L; "balanced" -> 80_000_000L; else -> 50_000_000L }
     val gap by rememberUpdatedState(frameGap)
     val glowOn = glow && settings?.animationLevel != "light"
     val projection = remember { BrainProjection() }

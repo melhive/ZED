@@ -98,6 +98,13 @@ class ToolCatalog(specs: List<ToolSpec>) {
                     p("location", STRING, "Location", required = false),
                     p("description", TEXT, "Notes", required = false),
                 ), MODIFY, setOf(CALENDAR_APP)),
+                ToolSpec("calendar.move", "Move calendar event", "Moves an upcoming calendar event to a new time, keeping its length.", listOf(
+                    p("query", STRING, "Which event: words from its title, e.g. meeting with Ana"),
+                    p("at", DATETIME, "New start, ISO-8601 local date-time"),
+                    p("from", DATETIME, "Its current start, when known", required = false),
+                    p("keep_day", BOOLEAN, "Only the time changes (same day)", required = false),
+                    p("keep_time", BOOLEAN, "Only the day changes (same time)", required = false),
+                ), MODIFY),
                 ToolSpec("reminder.create", "Create reminder", "Schedules a notification reminder.", listOf(
                     p("text", STRING, "What to be reminded about"),
                     p("at", DATETIME, "When, ISO-8601 local date-time"),

@@ -59,7 +59,7 @@ class AppContainer(private val context: Context) {
     val models by lazy { ModelRepository(context, db.models()) }
     val modelDownloader by lazy { ModelDownloader(models) { secrets.get(SecretStore.HF_TOKEN) } }
     val localRuntime by lazy { LocalModelRuntime(File(context.cacheDir, "litertlm").apply { mkdirs() }) }
-    val providers by lazy { ProviderRegistry(context, settings, secrets, models, localRuntime) }
+    val providers by lazy { ProviderRegistry(context, settings, models, localRuntime) }
 
     val taskEngine by lazy { TaskEngine(context, db.tasks()) }
     val confirmations = ConfirmationBroker()
@@ -93,45 +93,24 @@ class AppContainer(private val context: Context) {
     /**
      * Loads the on-device model ahead of the first question (ZED opened, wake
      * word heard, LIVE started), so the reply doesn't wait for it. Skipped when
-     * an online model answers, or when the phone is short of memory.
+     * the phone is short of memory, or the battery is nearly empty and not charging
+     * (loading Gemma costs a few seconds of full CPU).
      */
     fun warmUpModel() {
         appScope.launch {
             runCatching {
                 if (com.melhive.zed.android.DeviceInfo.snapshot(context).lowMemory) return@runCatching
+                val battery = context.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+                val level = battery?.let { b -> b.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, 100) * 100 / maxOf(1, b.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, 100)) } ?: 100
+                val plugged = (battery?.getIntExtra(android.os.BatteryManager.EXTRA_PLUGGED, 0) ?: 0) != 0
+                if (level < 15 && !plugged) return@runCatching
                 (providers.active() as? com.melhive.zed.intelligence.LocalLiteRtProvider)?.warmUp()
             }
         }
     }
 
     val live by lazy {
-        LiveSessionController(context, orchestrator, conversations, settings, { AndroidSpeechToText(context) }, { voice.sessionHandle() }, { realtimeConfig() })
-    }
-
-    /** Gemini Live settings for ZED LIVE, or null when no Gemini key is configured. */
-    private suspend fun realtimeConfig(): com.melhive.zed.voice.RealtimeConfig? {
-        val s = settings.current()
-        val key = secrets.get(SecretStore.apiKeyName(com.melhive.zed.settings.OnlineProviderKind.GEMINI)) ?: return null
-        val tools = skills.enabledTools(s.enabledSkills).filter { it.name != "web.research" }
-        val now = java.time.ZonedDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("EEEE yyyy-MM-dd'T'HH:mm:ss (h:mm:ss a, VV)", java.util.Locale.ENGLISH))
-        val prompt = com.melhive.zed.core.intelligence.PromptBuilder.systemPrompt(
-            tools = emptyList(), nowDescription = now, memories = memory.list(30).map { it.text }, knowledge = emptyList(),
-            voiceMode = true, userName = memory.userName(),
-            persona = com.melhive.zed.core.intelligence.Persona.parse(s.persona), userTitle = s.userTitle.ifBlank { null },
-            nativeTools = tools.isNotEmpty(),
-        )
-        return com.melhive.zed.voice.RealtimeConfig(
-            apiKey = key,
-            model = s.liveModel.ifBlank { com.melhive.zed.voice.GeminiLiveSession.DEFAULT_MODEL },
-            voiceName = s.liveVoice,
-            systemPrompt = prompt,
-            tools = tools,
-            webSearch = true,
-            executeTool = { call ->
-                val out = toolManager.execute(com.melhive.zed.core.tools.ToolRequest(call.name, call.args, com.melhive.zed.core.tools.ToolRequest.Origin.ONLINE_MODEL))
-                com.melhive.zed.intelligence.ToolCallResult(call.id, call.name, out.message, out is com.melhive.zed.tools.ToolOutcome.Executed && out.result.ok)
-            },
-        )
+        LiveSessionController(context, orchestrator, conversations, settings, { AndroidSpeechToText(context) }, { voice.sessionHandle() })
     }
 
     val updates = com.melhive.zed.android.UpdateChecker()

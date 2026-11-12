@@ -27,6 +27,8 @@ class ZedApp : Application() {
         // Before an update upgrades the database, keep a copy of it as it was (Backup & restore → Safety copies).
         runCatching { com.melhive.zed.backup.BackupManager.safetyCopyBeforeUpgrade(this, com.melhive.zed.database.ZedDatabase.VERSION) }
             .onFailure { CrashReporter.recordNonFatal("safety-copy", it) }
+        // ZED is Gemma-only: delete AI keys saved by older versions.
+        runCatching { container.secrets.removeLegacyAiKeys() }
         // If ZED stopped while the recognizer beep was muted, put the volume back.
         runCatching { com.melhive.zed.voice.BeepSuppressor.restore(this) }
         Notifications.createChannels(this)

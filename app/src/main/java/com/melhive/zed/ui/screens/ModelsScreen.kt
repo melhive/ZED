@@ -39,7 +39,6 @@ import com.melhive.zed.models.ModelCatalog
 import com.melhive.zed.security.SecretStore
 import com.melhive.zed.settings.IntelligenceMode
 import com.melhive.zed.settings.LocalBackend
-import com.melhive.zed.settings.OnlineProviderKind
 import com.melhive.zed.ui.components.SectionTitle
 import com.melhive.zed.ui.components.StatusPill
 import com.melhive.zed.ui.components.WrapRow
@@ -57,14 +56,12 @@ fun ModelsScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
     val downloads by vm.downloads.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val importing by vm.importing.collectAsStateWithLifecycle()
-    val available by vm.availableModels.collectAsStateWithLifecycle()
-    val testing by vm.testing.collectAsStateWithLifecycle()
     val uri = LocalUriHandler.current
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { it?.let(vm::import) }
     LaunchedEffect(Unit) { vm.refreshDevice() }
     val s = settings ?: return
 
-    ListScreen("Model Manager", onBack = onBack, subtitle = "Native · On-device · Online") {
+    ListScreen("Model Manager", onBack = onBack, subtitle = "Gemma on your phone · private and offline") {
         message?.let { m -> item { ZedCard(accent = ZedColors.Amber) { Text(m); TextButton(onClick = { vm.message.value = null }) { Text("Dismiss") } } } }
 
         item {
@@ -74,14 +71,12 @@ fun ModelsScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
                     FilterChip(s.mode == IntelligenceMode.AUTO, { vm.setMode(IntelligenceMode.AUTO) }, { Text("Auto") })
                     FilterChip(s.mode == IntelligenceMode.NATIVE_ONLY, { vm.setMode(IntelligenceMode.NATIVE_ONLY) }, { Text("Native") })
                     FilterChip(s.mode == IntelligenceMode.LOCAL, { vm.setMode(IntelligenceMode.LOCAL) }, { Text("On-device") })
-                    FilterChip(s.mode == IntelligenceMode.ONLINE, { vm.setMode(IntelligenceMode.ONLINE) }, { Text("Online") })
                 }
                 Text(
                     when (s.mode) {
-                        IntelligenceMode.AUTO -> "Uses the best available: ${s.onlineProvider.label} when its key is set and you're online, otherwise the on-device model, otherwise native commands."
+                        IntelligenceMode.AUTO -> "Uses the on-device model when one is installed, otherwise native commands. Nothing you say is sent to an AI service."
                         IntelligenceMode.NATIVE_ONLY -> "Deterministic commands only. No model, no network."
                         IntelligenceMode.LOCAL -> "Free-form requests use the active on-device model. Native commands still run first."
-                        IntelligenceMode.ONLINE -> "Free-form requests go to ${s.onlineProvider.label} (${s.modelFor(s.onlineProvider).ifBlank { "model not set" }}). Native commands still run locally."
                     },
                     style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted,
                 )
@@ -203,52 +198,6 @@ fun ModelsScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
             }
         }
 
-        item { SectionTitle("Online providers") }
-        item {
-            ZedCard(accent = ZedColors.Violet) {
-                WrapRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    OnlineProviderKind.entries.forEach { k ->
-                        FilterChip(s.onlineProvider == k, { vm.setProvider(k) }, { Text(when (k) { OnlineProviderKind.GEMINI -> "Gemini"; OnlineProviderKind.OPENAI -> "OpenAI"; OnlineProviderKind.ANTHROPIC -> "Claude"; OnlineProviderKind.OPENAI_COMPATIBLE -> "Custom" }) })
-                    }
-                }
-                val kind = s.onlineProvider
-                val hasKey = SecretStore.apiKeyName(kind) in secrets
-                var keyInput by remember(kind) { mutableStateOf("") }
-                var modelInput by remember(kind, s.onlineModels[kind]) { mutableStateOf(s.modelFor(kind)) }
-                var urlInput by remember(s.compatibleBaseUrl) { mutableStateOf(s.compatibleBaseUrl) }
-                var modelMenu by remember { mutableStateOf(false) }
-                Spacer(Modifier.height(8.dp))
-                Text(kind.label, style = MaterialTheme.typography.titleMedium)
-                if (kind == OnlineProviderKind.OPENAI_COMPATIBLE) {
-                    OutlinedTextField(urlInput, { urlInput = it }, label = { Text("Base URL (e.g. https://host/v1)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    TextButton(onClick = { vm.setBaseUrl(urlInput) }) { Text("Save URL") }
-                }
-                OutlinedTextField(
-                    keyInput, { keyInput = it }, singleLine = true, modifier = Modifier.fillMaxWidth(),
-                    label = { Text(if (hasKey) "API key saved — enter to replace" else "API key") },
-                    visualTransformation = PasswordVisualTransformation(),
-                )
-                WrapRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(enabled = keyInput.isNotBlank(), onClick = { vm.saveKey(kind, keyInput); keyInput = "" }) { Text("Save key") }
-                    if (hasKey) TextButton(onClick = { vm.removeKey(kind) }) { Text("Remove key", color = ZedColors.Red) }
-                }
-                Box {
-                    OutlinedTextField(modelInput, { modelInput = it }, label = { Text("Model") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    DropdownMenu(expanded = modelMenu, onDismissRequest = { modelMenu = false }) {
-                        available[kind].orEmpty().take(80).forEach { id ->
-                            DropdownMenuItem(text = { Text(id) }, onClick = { modelInput = id; vm.setModel(kind, id); modelMenu = false })
-                        }
-                    }
-                }
-                WrapRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { vm.setModel(kind, modelInput) }) { Text("Save model") }
-                    TextButton(onClick = { vm.fetchModels(kind); modelMenu = true }) { Text("List models") }
-                    TextButton(enabled = !testing, onClick = { vm.testProvider(kind) }) { Text(if (testing) "Testing…" else "Test connection") }
-                }
-                Text("Keys are encrypted with Android Keystore and only sent to ${kind.label}. Online use sends your messages (and any retrieved document excerpts) to that provider.",
-                    style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted)
-            }
-        }
         item {
             ZedCard {
                 SectionTitle("Hugging Face token (optional)")

@@ -20,7 +20,6 @@ enum class Capability(val label: String) {
     NOTIFICATIONS("Post notifications"),
     MICROPHONE("Microphone"),
     NETWORK("Internet access"),
-    ONLINE_AI("A configured online AI provider"),
     CLOCK_APP("A clock app that handles alarm intents"),
     CALENDAR_APP("A calendar app that handles insert intents"),
     CONTACTS("Contacts permission"),

@@ -178,7 +178,7 @@ fun ParticleField(modifier: Modifier = Modifier, tilt: Boolean = true) {
     var t by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(Unit) {
         var last = 0L
-        while (true) androidx.compose.animation.core.withInfiniteAnimationFrameNanos { now -> if (now - last >= 41_000_000L) { if (last != 0L) t += (now - last) / 1e9f; last = now } }
+        while (true) androidx.compose.animation.core.withInfiniteAnimationFrameNanos { now -> if (now - last >= 66_000_000L) { if (last != 0L) t += (now - last) / 1e9f; last = now } }
     }
     val dots = remember { List(36) { i -> Triple(((i * 7919) % 1000) / 1000f, ((i * 104729) % 1000) / 1000f, 0.3f + ((i * 31) % 70) / 100f) } }
     Canvas(modifier) {

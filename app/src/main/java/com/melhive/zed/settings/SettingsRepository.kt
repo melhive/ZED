@@ -16,16 +16,10 @@ import kotlinx.coroutines.flow.map
 
 /**
  * Which intelligence layer answers free-form requests. Native commands always work.
- * AUTO picks the best available: online (key set and connected) → on-device model → native.
+ * ZED runs Gemma on the phone only: AUTO and LOCAL both use the on-device
+ * model when one is installed (AUTO falls back to native commands without one).
  */
-enum class IntelligenceMode { AUTO, NATIVE_ONLY, LOCAL, ONLINE }
-
-enum class OnlineProviderKind(val label: String, val defaultModel: String) {
-    GEMINI("Google Gemini", "gemini-2.5-flash"),
-    OPENAI("OpenAI", "gpt-4.1-mini"),
-    ANTHROPIC("Anthropic Claude", "claude-opus-5-5"),
-    OPENAI_COMPATIBLE("OpenAI-compatible endpoint", ""),
-}
+enum class IntelligenceMode { AUTO, NATIVE_ONLY, LOCAL }
 
 enum class LocalBackend { CPU, GPU }
 
@@ -33,9 +27,6 @@ data class AppSettings(
     val mode: IntelligenceMode = IntelligenceMode.AUTO,
     val activeLocalModelId: String? = null,
     val localBackend: LocalBackend = LocalBackend.CPU,
-    val onlineProvider: OnlineProviderKind = OnlineProviderKind.GEMINI,
-    val onlineModels: Map<OnlineProviderKind, String> = emptyMap(),
-    val compatibleBaseUrl: String = "",
     val voiceResponses: Boolean = true,
     val speechRate: Float = 1.0f,
     /** Voice pitch, 1.0 = natural. */
@@ -46,10 +37,6 @@ data class AppSettings(
     val persona: String = "COMPANION",
     /** How ZED addresses the user ("sir", "boss", a nickname); blank = by name. */
     val userTitle: String = "",
-    /** ZED LIVE engine: "standard" (speech recognizer + TTS) or "gemini_live" (real-time). */
-    val liveEngine: String = "standard",
-    val liveModel: String = "",
-    val liveVoice: String = "Charon",
     /** City for weather when location isn't allowed. */
     val weatherCity: String = "",
     val briefingEnabled: Boolean = false,
@@ -99,7 +86,6 @@ data class AppSettings(
     /** full | balanced | light — how much animation runs (performance mode). */
     val animationLevel: String = "full",
 ) {
-    fun modelFor(kind: OnlineProviderKind): String = onlineModels[kind]?.takeIf { it.isNotBlank() } ?: kind.defaultModel
 }
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "zed_settings")
@@ -109,17 +95,12 @@ class SettingsRepository(private val context: Context) {
         val mode = stringPreferencesKey("mode")
         val localModel = stringPreferencesKey("local_model")
         val localBackend = stringPreferencesKey("local_backend")
-        val onlineProvider = stringPreferencesKey("online_provider")
-        val compatibleUrl = stringPreferencesKey("compatible_url")
         val voice = booleanPreferencesKey("voice_responses")
         val rate = floatPreferencesKey("speech_rate")
         val pitch = floatPreferencesKey("speech_pitch")
         val voiceId = stringPreferencesKey("voice_id")
         val persona = stringPreferencesKey("persona")
         val userTitle = stringPreferencesKey("user_title")
-        val liveEngine = stringPreferencesKey("live_engine")
-        val liveModel = stringPreferencesKey("live_model")
-        val liveVoice = stringPreferencesKey("live_voice")
         val weatherCity = stringPreferencesKey("weather_city")
         val briefingEnabled = booleanPreferencesKey("briefing_enabled")
         val briefingTime = stringPreferencesKey("briefing_time")
@@ -150,7 +131,6 @@ class SettingsRepository(private val context: Context) {
         val thinkTwice = booleanPreferencesKey("think_twice")
         val animationLevel = stringPreferencesKey("animation_level")
         val proactiveHints = booleanPreferencesKey("proactive_hints")
-        fun model(kind: OnlineProviderKind) = stringPreferencesKey("online_model_${kind.name.lowercase()}")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -159,18 +139,12 @@ class SettingsRepository(private val context: Context) {
             mode = p[K.mode]?.let { runCatching { IntelligenceMode.valueOf(it) }.getOrNull() } ?: defaults.mode,
             activeLocalModelId = p[K.localModel],
             localBackend = p[K.localBackend]?.let { runCatching { LocalBackend.valueOf(it) }.getOrNull() } ?: defaults.localBackend,
-            onlineProvider = p[K.onlineProvider]?.let { runCatching { OnlineProviderKind.valueOf(it) }.getOrNull() } ?: defaults.onlineProvider,
-            onlineModels = OnlineProviderKind.entries.mapNotNull { k -> p[K.model(k)]?.let { k to it } }.toMap(),
-            compatibleBaseUrl = p[K.compatibleUrl] ?: "",
             voiceResponses = p[K.voice] ?: defaults.voiceResponses,
             speechRate = p[K.rate] ?: defaults.speechRate,
             speechPitch = p[K.pitch] ?: defaults.speechPitch,
             voiceId = p[K.voiceId] ?: defaults.voiceId,
             persona = p[K.persona] ?: defaults.persona,
             userTitle = p[K.userTitle] ?: defaults.userTitle,
-            liveEngine = p[K.liveEngine] ?: defaults.liveEngine,
-            liveModel = p[K.liveModel] ?: defaults.liveModel,
-            liveVoice = p[K.liveVoice] ?: defaults.liveVoice,
             weatherCity = p[K.weatherCity] ?: "",
             briefingEnabled = p[K.briefingEnabled] ?: false,
             briefingTime = p[K.briefingTime] ?: defaults.briefingTime,
@@ -210,18 +184,12 @@ class SettingsRepository(private val context: Context) {
     suspend fun setMode(mode: IntelligenceMode) = context.dataStore.edit { it[K.mode] = mode.name }
     suspend fun setActiveLocalModel(id: String?) = context.dataStore.edit { if (id == null) it.remove(K.localModel) else it[K.localModel] = id }
     suspend fun setLocalBackend(b: LocalBackend) = context.dataStore.edit { it[K.localBackend] = b.name }
-    suspend fun setOnlineProvider(kind: OnlineProviderKind) = context.dataStore.edit { it[K.onlineProvider] = kind.name }
-    suspend fun setOnlineModel(kind: OnlineProviderKind, model: String) = context.dataStore.edit { it[K.model(kind)] = model.trim() }
-    suspend fun setCompatibleBaseUrl(url: String) = context.dataStore.edit { it[K.compatibleUrl] = url.trim() }
     suspend fun setVoiceResponses(v: Boolean) = context.dataStore.edit { it[K.voice] = v }
     suspend fun setSpeechRate(r: Float) = context.dataStore.edit { it[K.rate] = r.coerceIn(0.5f, 2.0f) }
     suspend fun setSpeechPitch(p: Float) = context.dataStore.edit { it[K.pitch] = p.coerceIn(0.5f, 2.0f) }
     suspend fun setVoiceId(id: String) = context.dataStore.edit { it[K.voiceId] = id }
     suspend fun setPersona(name: String) = context.dataStore.edit { it[K.persona] = name }
     suspend fun setUserTitle(title: String) = context.dataStore.edit { it[K.userTitle] = title.trim().take(40) }
-    suspend fun setLiveEngine(engine: String) = context.dataStore.edit { it[K.liveEngine] = engine }
-    suspend fun setLiveModel(model: String) = context.dataStore.edit { it[K.liveModel] = model.trim() }
-    suspend fun setLiveVoice(voice: String) = context.dataStore.edit { it[K.liveVoice] = voice }
     suspend fun setWeatherCity(city: String) = context.dataStore.edit { it[K.weatherCity] = city.trim().take(80) }
     suspend fun setBriefing(enabled: Boolean, time: String) = context.dataStore.edit { it[K.briefingEnabled] = enabled; it[K.briefingTime] = time }
     suspend fun setRoutinesJson(json: String) = context.dataStore.edit { it[K.routines] = json }

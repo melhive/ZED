@@ -36,6 +36,7 @@ data class DialogueState(
             "alarm.set" -> copy(lastTimed = request, reminderId = null)
             "timer.set" -> copy(lastTimed = request, reminderId = null)
             "calendar.create" -> copy(topic = a["title"] ?: topic, lastTimed = request, reminderId = null, person = personIn(a["title"]) ?: person)
+            "calendar.move" -> copy(lastTimed = lastTimed?.takeIf { it.tool == "calendar.create" }?.let { it.copy(args = it.args + ("start" to (a["at"] ?: it.args["start"].orEmpty()))) })
             "todo.add" -> copy(topic = a["title"] ?: topic, person = personIn(a["title"]) ?: person)
             "memory.remember" -> copy(person = personIn(a["fact"]) ?: person)
             else -> this
@@ -160,7 +161,12 @@ class DialogueTracker(private val clock: () -> LocalDateTime = { LocalDateTime.n
                 val secs = TimeHints.duration(change) ?: return null
                 Resolution.Act(ToolRequest("timer.set", mapOf("seconds" to secs.toString()) + listOfNotNull(last.args["label"]?.let { "label" to it }), ToolRequest.Origin.NATIVE), "new timer")
             }
-            "calendar.create" -> Resolution.Explain("I can't move a calendar event yet — open it in your calendar to change the time.")
+            "calendar.create" -> {
+                val previous = last.args["start"]?.let { runCatching { LocalDateTime.parse(it) }.getOrNull() } ?: return null
+                val hint = hintOf(change, now) ?: return null
+                val at = TimeHints.adjust(previous, hint, now)
+                Resolution.Act(ToolRequest("calendar.move", mapOf("query" to (last.args["title"] ?: "event"), "from" to previous.toString(), "at" to at.toString()), ToolRequest.Origin.NATIVE), "moved")
+            }
             else -> null
         }
     }

@@ -171,9 +171,18 @@ object DreamLogic {
     fun duplicates(facts: List<Fact>): List<Pair<Long, List<Long>>> {
         val used = HashSet<Long>()
         val out = mutableListOf<Pair<Long, List<Long>>>()
+        // Each memory's words are worked out once (comparing every pair this way stays fast with hundreds of memories).
+        val keys = facts.associate { it.id to BrainRecall.keys(it.text) }
+        val plain = facts.associate { it.id to it.text.trim().trimEnd('.').lowercase() }
+        fun same(a: Fact, b: Fact): Boolean {
+            if (plain[a.id] == plain[b.id]) return true
+            val ka = keys.getValue(a.id); val kb = keys.getValue(b.id)
+            if (ka.isEmpty() || kb.isEmpty()) return false
+            return ka.intersect(kb).size.toDouble() / ka.union(kb).size >= 0.6
+        }
         for (f in facts) {
             if (f.id in used) continue
-            val group = facts.filter { it.id !in used && (it.id == f.id || LearnedFilter.isDuplicate(it.text, f.text)) }
+            val group = facts.filter { it.id !in used && (it.id == f.id || same(it, f)) }
             if (group.size < 2) continue
             val keep = group.sortedWith(compareByDescending<Fact> { it.pinned }.thenByDescending { it.confirmed }.thenByDescending { it.uses }.thenByDescending { it.createdAt }).first()
             group.forEach { used += it.id }

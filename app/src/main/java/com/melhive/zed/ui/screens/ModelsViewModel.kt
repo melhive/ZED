@@ -9,9 +9,6 @@ import com.melhive.zed.android.DeviceInfo
 import com.melhive.zed.intelligence.GenerationEvent
 import com.melhive.zed.intelligence.GenerationRequest
 import com.melhive.zed.intelligence.LocalModelRuntime
-import com.melhive.zed.intelligence.providers.AnthropicProvider
-import com.melhive.zed.intelligence.providers.GeminiProvider
-import com.melhive.zed.intelligence.providers.OpenAiProvider
 import com.melhive.zed.core.intelligence.ChatTurn
 import com.melhive.zed.core.intelligence.Role
 import com.melhive.zed.database.InstalledModelEntity
@@ -19,7 +16,6 @@ import com.melhive.zed.models.CatalogModel
 import com.melhive.zed.security.SecretStore
 import com.melhive.zed.settings.IntelligenceMode
 import com.melhive.zed.settings.LocalBackend
-import com.melhive.zed.settings.OnlineProviderKind
 import com.melhive.zed.tasks.TaskTypes
 import com.melhive.zed.tasks.input
 import com.melhive.zed.tasks.statusEnum
@@ -45,8 +41,6 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
 
     val message = MutableStateFlow<String?>(null)
     val importing = MutableStateFlow<String?>(null)
-    val availableModels = MutableStateFlow<Map<OnlineProviderKind, List<String>>>(emptyMap())
-    val testing = MutableStateFlow(false)
 
     fun refreshDevice() { device.value = DeviceInfo.snapshot(getApplication()) }
 
@@ -94,37 +88,5 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
     fun setContextTokens(v: Int) = viewModelScope.launch { c.localRuntime.unload(); c.settings.setLocalContextTokens(v) }
     fun setBackend(b: LocalBackend) = viewModelScope.launch { c.localRuntime.unload(); c.settings.setLocalBackend(b) }
     fun setMode(mode: IntelligenceMode) = viewModelScope.launch { c.settings.setMode(mode) }
-    fun setProvider(kind: OnlineProviderKind) = viewModelScope.launch { c.settings.setOnlineProvider(kind) }
-    fun setModel(kind: OnlineProviderKind, model: String) = viewModelScope.launch { c.settings.setOnlineModel(kind, model) }
-    fun setBaseUrl(url: String) = viewModelScope.launch { c.settings.setCompatibleBaseUrl(url) }
-    fun saveKey(kind: OnlineProviderKind, key: String) { c.secrets.put(SecretStore.apiKeyName(kind), key); message.value = "API key saved (encrypted with Android Keystore)" }
-    fun removeKey(kind: OnlineProviderKind) { c.secrets.remove(SecretStore.apiKeyName(kind)); message.value = "API key removed" }
     fun saveHfToken(token: String) { c.secrets.put(SecretStore.HF_TOKEN, token); message.value = "Hugging Face token saved" }
-
-    fun fetchModels(kind: OnlineProviderKind) = viewModelScope.launch {
-        val s = c.settings.current()
-        val key = { c.secrets.get(SecretStore.apiKeyName(kind)) }
-        val result = when (kind) {
-            OnlineProviderKind.GEMINI -> GeminiProvider(s.modelFor(kind), key).listModels()
-            OnlineProviderKind.OPENAI -> OpenAiProvider("OpenAI", "https://api.openai.com/v1", s.modelFor(kind), key).listModels()
-            OnlineProviderKind.ANTHROPIC -> AnthropicProvider(s.modelFor(kind), key).listModels()
-            OnlineProviderKind.OPENAI_COMPATIBLE -> OpenAiProvider("Compatible", s.compatibleBaseUrl, s.modelFor(kind), key, requireKey = false, isOfficial = false).listModels()
-        }
-        result.onSuccess { availableModels.value = availableModels.value + (kind to it); message.value = "Found ${it.size} models" }
-            .onFailure { message.value = "Could not list models: ${it.message}" }
-    }
-
-    /** Sends a tiny real request to verify the key, model and connectivity. */
-    fun testProvider(kind: OnlineProviderKind) = viewModelScope.launch {
-        testing.value = true
-        val provider = c.providers.online(kind, c.settings.current())
-        val st = provider.status()
-        if (!st.ready) { message.value = "Not ready: ${st.detail}"; testing.value = false; return@launch }
-        val sb = StringBuilder(); var err: String? = null; var usage: GenerationEvent.Usage? = null
-        provider.generate(GenerationRequest("Reply with one short sentence.", listOf(ChatTurn(Role.USER, "Say hello to ZED.")), maxOutputTokens = 256)).collect { e ->
-            when (e) { is GenerationEvent.Delta -> sb.append(e.text); is GenerationEvent.Error -> err = e.message; is GenerationEvent.Usage -> usage = e; else -> Unit }
-        }
-        message.value = err?.let { "Test failed: $it" } ?: ("Connected ✓ “${sb.toString().trim().take(80)}”" + (usage?.let { u -> " · tokens in ${u.inputTokens ?: "?"} / out ${u.outputTokens ?: "?"}" } ?: ""))
-        testing.value = false
-    }
 }

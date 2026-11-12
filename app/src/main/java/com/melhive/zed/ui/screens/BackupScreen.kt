@@ -155,8 +155,8 @@ fun BackupScreen(onBack: () -> Unit) {
                     includeVoices && (s?.voicePackCount ?: 0) > 0, enabled = (s?.voicePackCount ?: 0) > 0 && working == null,
                 ) { includeVoices = it }
                 if (keyCount > 0) {
-                    Text("API keys", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
-                    Text("Your $keyCount saved key${if (keyCount == 1) "" else "s"} (AI providers, smart home) ${if (keyCount == 1) "is" else "are"} included only if you set a password. They're encrypted with it, and you'll type it again when restoring.",
+                    Text("Saved tokens", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
+                    Text("Your $keyCount saved key${if (keyCount == 1) "" else "s"} (smart home) ${if (keyCount == 1) "is" else "are"} included only if you set a password. They're encrypted with it, and you'll type it again when restoring.",
                         style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
                     OutlinedTextField(
                         value = backupPassword, onValueChange = { backupPassword = it.take(64) }, singleLine = true, enabled = working == null,
@@ -186,7 +186,7 @@ fun BackupScreen(onBack: () -> Unit) {
                         Text("• " + (if (counts.isEmpty()) "Settings and routines" else counts.joinToString() + ", settings and routines"), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
                         Text("• AI models: " + if (m.models.isEmpty()) "not included" else m.models.joinToString(), style = MaterialTheme.typography.bodySmall)
                         Text("• Offline voices: " + if (m.voices.isEmpty()) "not included" else "${m.voices.size} pack${if (m.voices.size == 1) "" else "s"}", style = MaterialTheme.typography.bodySmall)
-                        Text("• API keys: " + if (m.keyNames.isEmpty()) "not included" else "${m.keyNames.size}, password-protected", style = MaterialTheme.typography.bodySmall)
+                        Text("• Saved tokens: " + if (m.keyNames.isEmpty()) "not included" else "${m.keyNames.size}, password-protected", style = MaterialTheme.typography.bodySmall)
                         if (m.keyNames.isNotEmpty()) OutlinedTextField(
                             value = restorePassword, onValueChange = { restorePassword = it.take(64) }, singleLine = true, enabled = working == null,
                             label = { Text("Backup password (empty = skip the keys)") }, visualTransformation = PasswordVisualTransformation(),
@@ -210,7 +210,7 @@ fun BackupScreen(onBack: () -> Unit) {
         item(key = "auto") {
             ZedCard(accent = ZedColors.Teal) {
                 SectionTitle("Weekly automatic backup")
-                Text("Once a week ZED saves your data and settings into a folder you choose and keeps the newest four files. Models, voices and API keys are left out, so each file stays small.",
+                Text("Once a week ZED saves your data and settings into a folder you choose and keeps the newest four files. Models, voices and saved tokens are left out, so each file stays small.",
                     style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
                 if (autoFolder.isBlank()) {
                     Button(onClick = { pickFolder.launch(null) }, modifier = Modifier.padding(top = 8.dp)) { Text("Choose a folder") }

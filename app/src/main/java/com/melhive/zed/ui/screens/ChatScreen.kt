@@ -115,13 +115,12 @@ fun ChatScreen(initialConversationId: Long?, onOpenLive: () -> Unit, onOpenModel
         ScreenHeader("Chat", subtitle = null) {
             Box {
                 AssistChip(onClick = { modeMenu = true }, label = {
-                    Text(when (settings?.mode) { IntelligenceMode.AUTO -> "Auto"; IntelligenceMode.LOCAL -> "On-device"; IntelligenceMode.ONLINE -> settings?.onlineProvider?.label ?: "Online"; else -> "Native" })
+                    Text(when (settings?.mode) { IntelligenceMode.AUTO -> "Auto"; IntelligenceMode.LOCAL -> "On-device"; else -> "Native" })
                 })
                 DropdownMenu(expanded = modeMenu, onDismissRequest = { modeMenu = false }) {
-                    DropdownMenuItem(text = { Text("Auto (best available)") }, onClick = { vm.setMode(IntelligenceMode.AUTO); modeMenu = false })
+                    DropdownMenuItem(text = { Text("Auto (Gemma when installed)") }, onClick = { vm.setMode(IntelligenceMode.AUTO); modeMenu = false })
                     DropdownMenuItem(text = { Text("Native commands only") }, onClick = { vm.setMode(IntelligenceMode.NATIVE_ONLY); modeMenu = false })
                     DropdownMenuItem(text = { Text("On-device model") }, onClick = { vm.setMode(IntelligenceMode.LOCAL); modeMenu = false })
-                    DropdownMenuItem(text = { Text("Online provider") }, onClick = { vm.setMode(IntelligenceMode.ONLINE); modeMenu = false })
                     DropdownMenuItem(text = { Text("Manage models…") }, onClick = { modeMenu = false; onOpenModels() })
                 }
             }

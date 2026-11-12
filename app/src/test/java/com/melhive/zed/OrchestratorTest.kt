@@ -80,7 +80,6 @@ class OrchestratorTest {
         val source = object : ProviderSource {
             override val localRuntime = LocalModelRuntime(File(ctx.cacheDir, "lm"))
             override suspend fun active() = provider
-            override suspend fun research(): IntelligenceProvider? = null
             override suspend fun anyConfigured() = provider != null
         }
         return AssistantOrchestrator(CoroutineScope(Dispatchers.Unconfined), conversations, MemoryRepository(db),

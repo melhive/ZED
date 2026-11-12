@@ -2,7 +2,6 @@ package com.melhive.zed.security
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.melhive.zed.settings.OnlineProviderKind
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,9 +41,18 @@ class SecretStore(context: Context, private val cipher: KeystoreCipher = Keystor
 
     private fun configuredKeys(): Set<String> = prefs.all.keys.toSet()
 
+    /** ZED is Gemma-only: AI keys saved by older versions are deleted from the phone. */
+    fun removeLegacyAiKeys() {
+        val old = prefs.all.keys.filter { it.startsWith(LEGACY_AI_KEY_PREFIX) }
+        if (old.isEmpty()) return
+        prefs.edit().apply { old.forEach { remove(it) } }.apply()
+        _configured.value = configuredKeys()
+    }
+
     companion object {
         const val HOME_ASSISTANT_TOKEN = "home_assistant_token"
-        fun apiKeyName(kind: OnlineProviderKind) = "api_key_${kind.name.lowercase()}"
+        /** Names AI-provider keys were stored under before ZED became Gemma-only (removed at start). */
+        const val LEGACY_AI_KEY_PREFIX = "api_key_"
         const val HF_TOKEN = "huggingface_token"
     }
 }

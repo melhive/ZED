@@ -21,6 +21,7 @@ object ToolSelector {
         "time.left" to w("how long until", "how much time", "time left", "how long till", "when(?:'s| is) my next"),
         "time.now" to w("what time", "the time", "what day", "today'?s date", "the date"),
         "calendar.create" to w("schedule", "meeting", "appointment", "event", "calendar", "book"),
+        "calendar.move" to w("(?:move|reschedule|push|shift) (?:my |the )?(?:[\\w']+ ){0,4}(?:meeting|appointment|event|call|lunch|dinner|class)", "reschedule"),
         "calendar.today" to w("agenda", "calendar", "schedule (?:today|tomorrow)", "what do i have", "what'?s on"),
         "todo.add" to w("task", "to-?do", "add .+ to (?:my )?list", "need to buy", "shopping"),
         "todo.list" to w("tasks", "to-?dos", "task list", "to-?do list"),

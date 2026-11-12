@@ -99,7 +99,7 @@ object PlasmaShape {
     fun framesPerSecond(state: String, light: Boolean): Int = when {
         light -> 12
         state == "THINKING" || state == "RESEARCHING" || state == "SEARCHING" -> 20
-        state == "IDLE" -> 30
+        state == "IDLE" -> 24
         else -> 60
     }
 
@@ -121,7 +121,7 @@ object ActionLabels {
     private val PROGRESS = mapOf(
         "alarm.set" to "Setting alarm…", "timer.set" to "Starting timer…", "reminder.create" to "Setting reminder…",
         "reminder.reschedule" to "Moving reminder…", "reminder.cancel" to "Cancelling reminder…", "reminder.list" to "Checking reminders…",
-        "calendar.create" to "Adding to calendar…", "calendar.today" to "Reading your calendar…", "todo.add" to "Adding task…",
+        "calendar.create" to "Adding to calendar…", "calendar.move" to "Moving the event…", "calendar.today" to "Reading your calendar…", "todo.add" to "Adding task…",
         "todo.list" to "Reading your tasks…", "todo.complete" to "Ticking it off…", "memory.remember" to "Remembering…",
         "memory.forget" to "Forgetting…", "memory.list" to "Recalling…", "phone.call" to "Calling…", "sms.compose" to "Writing message…",
         "contacts.find" to "Looking up contact…", "app.open" to "Opening app…", "music.play" to "Starting music…", "media.control" to "Controlling playback…",
@@ -147,6 +147,7 @@ object ActionLabels {
             "timer.set" -> args["seconds"]?.toLongOrNull()?.let { s -> "Timer " + when { s % 3600 == 0L -> "${s / 3600} h"; s >= 60 && s % 60 == 0L -> "${s / 60} min"; s >= 60 -> "${s / 60} min ${s % 60} s"; else -> "$s s" } }
             "reminder.create", "reminder.reschedule" -> "Reminder " + (time(args["at"]) ?: "")
             "calendar.create" -> (args["title"] ?: "Event").take(18) + (time(args["start"])?.let { " $it" } ?: "")
+            "calendar.move" -> "Moved " + args["query"].orEmpty().take(16)
             "todo.add" -> "Task added"
             "todo.complete" -> "Task done"
             "memory.remember" -> "Remembered"

@@ -41,7 +41,12 @@ class Dreamer(private val context: Context, private val c: AppContainer) {
     /** Suggestions waiting on Home. */
     val insights: StateFlow<List<Insight>> = _insights.asStateFlow()
 
+    /** Dreams at most every six hours (two while charging), however often ZED goes quiet. */
     suspend fun dream(allowModel: Boolean) {
+        val now = System.currentTimeMillis()
+        val gap = if (allowModel) 2 * 3_600_000L else 6 * 3_600_000L
+        if (now - prefs.getLong(KEY_LAST_DREAM, 0L) < gap) return
+        prefs.edit().putLong(KEY_LAST_DREAM, now).apply()
         mergeDuplicates()
         relationships(allowModel)
         notice()
@@ -125,17 +130,33 @@ class Dreamer(private val context: Context, private val c: AppContainer) {
 
     companion object {
         private const val KEY_REL_CURSOR = "relations_cursor"
+        private const val KEY_LAST_DREAM = "last_dream"
         private const val KEY_SEEN = "seen"
         private const val KEY_INSIGHTS = "insights"
         private const val KEY_HINTS = "hints"
         private const val KEY_EVENTS = "events"
         private const val HINT_WORK = "zed-hints"
+        private const val HINT_PLANNER = "zed-hints-planner"
 
-        /** The leave-now check every 15 minutes (cheap: one calendar query). */
+        /**
+         * Leave-now hints without waking the phone all day: a light check every
+         * three hours plans one wake-up 40 minutes before the next event that has
+         * a place.
+         */
         fun scheduleHints(context: Context, enabled: Boolean) {
             val wm = WorkManager.getInstance(context)
-            if (!enabled) { wm.cancelUniqueWork(HINT_WORK); return }
-            wm.enqueueUniquePeriodicWork(HINT_WORK, ExistingPeriodicWorkPolicy.KEEP, PeriodicWorkRequestBuilder<HintWorker>(15, TimeUnit.MINUTES).build())
+            wm.cancelUniqueWork(HINT_WORK) // the old every-15-minutes check
+            if (!enabled) { wm.cancelUniqueWork(HINT_PLANNER); wm.cancelUniqueWork(HINT_AT); return }
+            wm.enqueueUniquePeriodicWork(HINT_PLANNER, ExistingPeriodicWorkPolicy.KEEP, PeriodicWorkRequestBuilder<HintWorker>(3, TimeUnit.HOURS).build())
+        }
+
+        private const val HINT_AT = "zed-hints-at"
+
+        /** One wake-up at [at] (epoch millis) for the leave-now check. */
+        fun planHintAt(context: Context, at: Long) {
+            val delay = (at - System.currentTimeMillis()).coerceAtLeast(0)
+            WorkManager.getInstance(context).enqueueUniqueWork(HINT_AT, androidx.work.ExistingWorkPolicy.REPLACE,
+                androidx.work.OneTimeWorkRequestBuilder<HintWorker>().setInitialDelay(delay, TimeUnit.MILLISECONDS).build())
         }
     }
 }
@@ -146,8 +167,10 @@ class HintWorker(appContext: Context, params: WorkerParameters) : CoroutineWorke
         val c = (applicationContext as ZedApp).container
         if (!c.settings.current().proactiveHints) return Result.success()
         val now = System.currentTimeMillis()
-        val event = runCatching { com.melhive.zed.agents.CalendarReader(applicationContext).nextEventWithPlace(now) }.getOrNull() ?: return Result.success()
+        val event = runCatching { com.melhive.zed.agents.CalendarReader(applicationContext).nextEventWithPlace(now, hours = 4) }.getOrNull() ?: return Result.success()
         val (title, start, place) = event
+        // Too early: wake up again 40 minutes before it (once), instead of polling.
+        if (start - now > 50 * 60_000L) { Dreamer.planHintAt(applicationContext, start - 40 * 60_000L); return Result.success() }
         val message = Hints.leaveNow(title, start, place, now, c.dreamer.notifiedEvents()) ?: return Result.success()
         if (!Hints.allowed(c.dreamer.sentHints(), now)) return Result.success()
         Notifications.post(applicationContext, Notifications.CHANNEL_REMINDERS, 7600, "Time to go", message, "live:directions to $place")

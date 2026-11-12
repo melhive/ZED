@@ -128,6 +128,14 @@ class ExamTest {
         "tell me a joke" to "none",
         "how are you" to "none",
         "what should I cook tonight" to "none",
+        // Moving events — and the near-misses that must stay what they are.
+        "move my meeting with Ana to 4pm" to "calendar.move at=2026-11-12T16:00 keep_day=true query=meeting with Ana",
+        "reschedule the dentist to friday at 10am" to "calendar.move at=2026-11-13T10:00 query=dentist",
+        "push my lunch to tomorrow" to "calendar.move at=2026-11-13T09:00 keep_time=true query=lunch",
+        "move notes.txt to Archive" to "file.move destination=Archive source=notes.txt",
+        "move Projects to Archive" to "file.move destination=Archive source=Projects",
+        "change the thermostat to 22" to "home.control action=temperature target=thermostat value=22",
+        "change the volume to 50" to "volume.set action=set level=50",
     )) { describe(parser.parse(it)) }
 
     // ------------------------------------------------------- tricky dates
@@ -214,7 +222,7 @@ class ExamTest {
             Triple("make it 7", alarm, "act:alarm.set hour=7 minute=0"),
             Triple("change it to 6:45", alarm, "act:alarm.set hour=6 minute=45"),
             Triple("make it 15 minutes", timer, "act:timer.set seconds=900"),
-            Triple("move it to 4", meeting, "explain"),
+            Triple("move it to 4", meeting, "act:calendar.move at=2026-11-13T16:00 from=2026-11-13T12:00 query=Lunch"),
             Triple("I meant 6", DialogueState(), "text:I meant 6"),
         )
         val wrong = cases.mapNotNull { (input, state, expected) ->
@@ -222,6 +230,20 @@ class ExamTest {
             if (got == expected) null else "  “$input”\n    expected: $expected\n    got:      $got"
         }
         assertTrue(wrong.isEmpty(), "Follow-ups — ${wrong.size} of ${cases.size} wrong:\n" + wrong.joinToString("\n"))
+    }
+
+    @Test fun choosingTheEventToMove() {
+        val m = com.melhive.zed.core.understanding.CalendarMove
+        val lunch = m.Event(1, "Lunch with Ana", now.plusDays(1).withHour(12), now.plusDays(1).withHour(13))
+        val lunch2 = m.Event(2, "Lunch with Ana", now.plusDays(8).withHour(12), now.plusDays(8).withHour(13))
+        val standup = m.Event(3, "Team standup", now.plusHours(2), now.plusHours(2).plusMinutes(15), recurring = true)
+        val events = listOf(lunch2, standup, lunch)
+        assertEquals(1L, m.pick(events, "lunch with Ana", null, now)?.id, "the next one")
+        assertEquals(2L, m.pick(events, "lunch", lunch2.start, now)?.id, "the one the conversation was about")
+        assertEquals(3L, m.pick(events, "my meeting", null, now)?.id, "“my meeting” means the next event")
+        assertEquals(null, m.pick(events, "dentist", null, now))
+        assertEquals(lunch.start.toLocalDate().atTime(16, 0), m.newStart(lunch, now.withHour(16), keepDay = true, keepTime = false))
+        assertEquals(now.plusDays(3).toLocalDate().atTime(12, 0), m.newStart(lunch, now.plusDays(3).withHour(9), keepDay = false, keepTime = true))
     }
 
     @Test fun conversationState() {
