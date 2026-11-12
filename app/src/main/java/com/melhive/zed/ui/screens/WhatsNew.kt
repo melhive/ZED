@@ -31,6 +31,11 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.23", "2026-11-12", "Live Brain, balanced", listOf(
+            "Neurons are bigger again — between the two earlier looks — so the brain is easy to see and tap without turning into a wash of light.",
+            "Connections are clearly visible, and more signals travel along them at once, with a longer glowing trail and a spark where they land.",
+            "Areas, concepts and well-used memories have a soft glow; a memory ZED just used still flashes brightest.",
+        )),
         Release("0.1.22", "2026-11-12", "A calmer Live Brain", listOf(
             "Live Brain redesigned as points of light: neurons are much smaller and softer, with a clear size order — the core, then the areas, then concepts, then memories by how strong they are.",
             "Glow now means something: only the areas, strong memories and whatever you select glow. A memory ZED just used still flashes, so it stands out.",

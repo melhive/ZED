@@ -487,17 +487,17 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
                     val depthA = 0.3f + 0.7f * near[lo]; val depthB = 0.3f + 0.7f * near[hi]
                     val depth = (depthA + depthB) / 2f
                     val k = bend(lo, hi)
-                    val alpha = (when { hot -> 0.9f; dim -> 0.05f; else -> (0.05f + 0.08f * edge.strength) * depth }) * grown
+                    val alpha = (when { hot -> 0.9f; dim -> 0.06f; else -> (0.16f + 0.16f * edge.strength) * depth }) * grown
                     // Thick where it leaves the hub, thin where it reaches the memory.
-                    val wide = (if (hot) 1.6f else 0.9f) * unit * persp[lo].coerceIn(0.7f, 1.4f)
-                    val thin = (if (hot) 0.9f else 0.35f) * unit * persp[hi].coerceIn(0.7f, 1.4f)
+                    val wide = (if (hot) 2.2f else 1.5f) * unit * persp[lo].coerceIn(0.7f, 1.5f)
+                    val thin = (if (hot) 1.2f else 0.7f) * unit * persp[hi].coerceIn(0.7f, 1.5f)
                     synapse(ax, ay, bx, by, k, color.copy(alpha = alpha.coerceIn(0f, 1f)), wide, thin, segments)
 
                     if ((!glow && !hot) || dim || grown < 0.9f) return@forEachIndexed
                     val period = if (hot) 0.9f else 2.2f + (e * 37 % 17) / 10f
                     val u = t / period + e * 0.618f
                     val cycle = floor(u).toInt()
-                    if (!hot && (cycle * 7 + e * 13) % 4 != 0) return@forEachIndexed
+                    if (!hot && (cycle * 7 + e * 13) % 2 != 0) return@forEachIndexed
                     val f = u - cycle
                     // Selected: signals leave the selected node. Otherwise the direction alternates.
                     val forward = if (hot) lo == selected else (cycle + e) % 2 == 0
@@ -505,22 +505,22 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
                     val fade = sin(PI.toFloat() * f) * depth
                     val p = curve(ax, ay, bx, by, k, at)
                     // A short trail behind the signal.
-                    for (s in 1..3) {
-                        val back = (if (forward) at - s * 0.045f else at + s * 0.045f).coerceIn(0f, 1f)
-                        drawCircle(color.copy(alpha = 0.22f * fade * (1f - s / 4f)), (1.4f - s * 0.25f) * unit, curve(ax, ay, bx, by, k, back))
+                    for (s in 1..4) {
+                        val back = (if (forward) at - s * 0.04f else at + s * 0.04f).coerceIn(0f, 1f)
+                        drawCircle(color.copy(alpha = 0.4f * fade * (1f - s / 5f)), (2.2f - s * 0.35f) * unit, curve(ax, ay, bx, by, k, back))
                     }
-                    drawCircle(color.copy(alpha = 0.10f * fade), 4f * unit, p)
-                    drawCircle(color.copy(alpha = 0.35f * fade), 1.8f * unit, p)
-                    drawCircle(Color.White.copy(alpha = (0.75f * fade).coerceIn(0f, 1f)), 0.9f * unit, p)
+                    drawCircle(color.copy(alpha = 0.18f * fade), 6f * unit, p)
+                    drawCircle(color.copy(alpha = 0.5f * fade), 2.8f * unit, p)
+                    drawCircle(Color.White.copy(alpha = (0.95f * fade).coerceIn(0f, 1f)), 1.3f * unit, p)
                     // A spark where it lands.
                     if (f > 0.86f) {
                         val end = if (forward) Offset(bx, by) else Offset(ax, ay)
                         val burst = (f - 0.86f) / 0.14f
                         for (s in 0 until 5) {
                             val angle = s * 1.2566f + e
-                            val from = end + Offset(cos(angle), sin(angle)) * (3f + 4f * burst) * unit
-                            val to = end + Offset(cos(angle), sin(angle)) * (5f + 7f * burst) * unit
-                            drawLine(Color.White.copy(alpha = (1f - burst) * 0.45f * depth), from, to, strokeWidth = 0.7f * unit, cap = StrokeCap.Round)
+                            val from = end + Offset(cos(angle), sin(angle)) * (4f + 6f * burst) * unit
+                            val to = end + Offset(cos(angle), sin(angle)) * (6f + 10f * burst) * unit
+                            drawLine(Color.White.copy(alpha = (1f - burst) * 0.65f * depth), from, to, strokeWidth = 0.9f * unit, cap = StrokeCap.Round)
                         }
                     }
                 }
@@ -537,8 +537,8 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
                     val lo = min(a, b); val hi = maxOf(a, b)
                     val f = at - hop
                     val p = curve(sx[lo], sy[lo], sx[hi], sy[hi], bend(lo, hi), if (a == lo) f else 1f - f)
-                    drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = 0.7f), ZedColors.Cyan.copy(alpha = 0.3f), Color.Transparent), p, 8f * unit), 8f * unit, p)
-                    drawCircle(Color.White, 1.6f * unit, p)
+                    drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = 0.7f), ZedColors.Cyan.copy(alpha = 0.3f), Color.Transparent), p, 11f * unit), 11f * unit, p)
+                    drawCircle(Color.White, 2.2f * unit, p)
                 }
 
                 // Neurons, far ones first so near ones are drawn over them.
@@ -554,7 +554,7 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
                     val isSelected = i == selected
                     val lit = focusSet == null || i in focusSet
                     val depth = 0.32f + 0.68f * near[i]
-                    var alpha = (if (lit) 0.8f else 0.15f) * depth
+                    var alpha = (if (lit) 0.9f else 0.18f) * depth
                     // Memories ZED hasn't touched in a long time fade; they are never removed.
                     if (node.itemId != null) alpha *= 0.4f + 0.6f * node.strength
                     if (node.done) alpha *= 0.6f
@@ -587,8 +587,9 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
                         // Glow is kept for what matters: the areas, strong memories, and whatever is selected.
                         val haloAlpha = when {
                             isSelected -> 0.3f
-                            node.type == BrainNodeType.CATEGORY -> 0.16f * alpha
-                            node.itemId != null && node.strength >= 0.75f -> 0.12f * alpha
+                            node.type == BrainNodeType.CATEGORY -> 0.24f * alpha
+                            node.type == BrainNodeType.CONCEPT -> 0.12f * alpha
+                            node.itemId != null && node.strength >= 0.6f -> 0.18f * alpha
                             else -> 0f
                         }
                         if (glow && haloAlpha > 0f) {
@@ -597,8 +598,8 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
                         }
                         drawCircle(color.copy(alpha = alpha.coerceIn(0f, 1f)), r, p)
                         // A small nucleus, only on the near side, so depth reads at a glance.
-                        val nucleus = (0.45f * near[i] * near[i] * alpha + flash * 0.5f).coerceIn(0f, 1f)
-                        if (nucleus > 0.04f) drawCircle(Color.White.copy(alpha = nucleus), r * 0.38f, p)
+                        val nucleus = ((0.2f + 0.45f * near[i]) * alpha + flash * 0.5f).coerceIn(0f, 1f)
+                        if (nucleus > 0.04f) drawCircle(Color.White.copy(alpha = nucleus), r * 0.4f, p)
                         if (node.pinned) drawCircle(Color.White.copy(alpha = (0.5f * alpha).coerceIn(0f, 1f)), r + 1.8f * unit, p, style = Stroke(0.8f * unit))
                     }
                     if (i in matches) drawCircle(ZedColors.Amber, r + 3.5f * unit, p, style = Stroke(1.2f * unit))
@@ -734,12 +735,12 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
  */
 private fun nodeRadius(node: BrainNode, apparentScale: Float, density: Float): Float {
     val dp = when (node.type) {
-        BrainNodeType.CORE -> 7f
-        BrainNodeType.CATEGORY -> 3.6f + 2.4f * node.weight
-        BrainNodeType.CONCEPT -> 2.4f
-        else -> 1.6f + 2.2f * node.strength + if (node.pinned) 0.4f else 0f
+        BrainNodeType.CORE -> 11f
+        BrainNodeType.CATEGORY -> 5.5f + 3f * node.weight
+        BrainNodeType.CONCEPT -> 4f
+        else -> 3f + 3f * node.strength + if (node.pinned) 0.5f else 0f
     }
-    return dp * density * sqrt(apparentScale.coerceAtLeast(0.01f)).coerceIn(0.65f, 1.7f)
+    return dp * density * sqrt(apparentScale.coerceAtLeast(0.01f)).coerceIn(0.75f, 1.8f)
 }
 
 /**
@@ -805,7 +806,7 @@ fun MiniBrain(modifier: Modifier = Modifier, glow: Boolean = true) {
             val depth = 0.25f + 0.75f * (near[edge.a] + near[edge.b]) / 2f
             val hot = maxOf(lit[edge.a], lit[edge.b])
             val color = if (hot > 0f) Color.White else g.nodes[edge.b].type.color()
-            drawLine(color.copy(alpha = ((0.08f + 0.08f * edge.strength) * depth + 0.5f * hot).coerceIn(0f, 1f)), Offset(sx[edge.a], sy[edge.a]), Offset(sx[edge.b], sy[edge.b]), strokeWidth = (0.5f + 0.6f * hot) * unit)
+            drawLine(color.copy(alpha = ((0.16f + 0.12f * edge.strength) * depth + 0.5f * hot).coerceIn(0f, 1f)), Offset(sx[edge.a], sy[edge.a]), Offset(sx[edge.b], sy[edge.b]), strokeWidth = (0.8f + 0.6f * hot) * unit)
         }
         val order = projection.order
         for (slot in order.indices) {
@@ -815,7 +816,7 @@ fun MiniBrain(modifier: Modifier = Modifier, glow: Boolean = true) {
             val color = node.type.color()
             val depth = 0.3f + 0.7f * near[i]
             val core = node.type == BrainNodeType.CORE
-            val r = (if (core) 3f else if (node.type == BrainNodeType.CATEGORY) 1.8f else 0.8f + 1.2f * node.strength) * unit * persp[i].coerceIn(0.7f, 1.3f) * (1f + 0.05f * sin(t * 1.7f + i))
+            val r = (if (core) 3.8f else if (node.type == BrainNodeType.CATEGORY) 2.5f else 1.2f + 1.6f * node.strength) * unit * persp[i].coerceIn(0.7f, 1.3f) * (1f + 0.05f * sin(t * 1.7f + i))
             val alpha = 0.85f * if (node.itemId != null) depth * (0.4f + 0.6f * node.strength) else depth
             if (glow && (core || node.type == BrainNodeType.CATEGORY)) drawCircle(Brush.radialGradient(listOf(color.copy(alpha = (if (core) 0.3f else 0.15f) * alpha), Color.Transparent), p, r * 3f), r * 3f, p)
             if (lit[i] > 0f) {
