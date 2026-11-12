@@ -15,7 +15,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -63,7 +62,7 @@ internal fun PlasmaOrb(state: OrbState, modifier: Modifier, micLevel: Float, spe
     LaunchedEffect(light) {
         var last = 0L
         var drawn = 0L
-        while (true) withFrameNanos { now ->
+        while (true) androidx.compose.animation.core.withInfiniteAnimationFrameNanos { now ->
             if (last == 0L) { last = now; drawn = now }
             val gap = 1_000_000_000L / PlasmaShape.framesPerSecond(currentState.name, light)
             if (now - drawn >= gap) {
