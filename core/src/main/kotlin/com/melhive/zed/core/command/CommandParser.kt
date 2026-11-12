@@ -109,7 +109,7 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         // Reminders (before generic delete/cancel).
         Rule(rx("(?:list|show)(?: me)?(?: all)? (?:my )?reminders|what are my reminders|reminders")) { tool("reminder.list") },
         Rule(rx("(?:cancel|delete|remove) reminder (?:#|number )?(\\d+)")) { m -> tool("reminder.cancel", "id" to m.groupValues[1]) },
-        Rule(rx("remind me (in .+?|at .+?|tomorrow.*?|today.*?|tonight.*?|on .+?) (?:to|about|that) (.+)")) { m ->
+        Rule(rx("remind me (in .+?|at .+?|tomorrow.*?|today.*?|tonight.*?|on .+?|next .+?|(?:mon|tues|wednes|thurs|fri|satur|sun)day.*?) (?:to|about|that) (.+)")) { m ->
             val at = TimeParser.parseDateTime(m.groupValues[1], clock()) ?: return@Rule null
             tool("reminder.create", "text" to m.groupValues[2], "at" to at.toString())
         },

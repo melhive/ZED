@@ -107,6 +107,8 @@ class AssistOverlayActivity : ComponentActivity() {
             startActivity(ZedLaunch.intent(this, ZedLaunch.ROUTE_LIVE)); finish(); return
         }
         live.start()
+        // Have the on-device model ready by the time the question is asked.
+        (application as com.melhive.zed.ZedApp).container.warmUpModel()
         setContent { ZedTheme { AssistOverlay(onClose = ::close, onOpenApp = ::openApp) } }
     }
 

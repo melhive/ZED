@@ -13,7 +13,7 @@ Native Android personal AI assistant (Kotlin, Jetpack Compose). Three intelligen
 | Default branch | `main` (stable merges) |
 | Latest commit | see `git log -1` (this file is updated with each milestone) |
 | Build status | ✅ GitHub Actions **Android Build** green: core tests, Android unit tests, debug APK |
-| Releases | ✅ Signed release **v0.1.23** published (latest). Install/share link: https://github.com/melhive/ZED/releases/latest/download/zed.apk. Every push to `main` publishes the version in `VERSION` (bump it for a new release; re-pushing the same version replaces that release). App id `com.melhive.zed`, signed with the key in `/root/zed-signing` (back it up — updates need the same key). |
+| Releases | ✅ Signed release **v0.1.24** published (latest). Install/share link: https://github.com/melhive/ZED/releases/latest/download/zed.apk. Every push to `main` publishes the version in `VERSION` (bump it for a new release; re-pushing the same version replaces that release). App id `com.melhive.zed`, signed with the key in `/root/zed-signing` (back it up — updates need the same key). |
 
 ## Milestones
 
@@ -59,6 +59,17 @@ Failed tests: none.
 | Model download (2–3 GB) with resume + SHA-256 | | ✅ | ✅ | |
 | Keystore secret storage | | ✅ | ✅ | |
 | STT / TTS / sentence streaming / barge-in / audio focus | VAD only | ✅ | ✅ | |
+
+## Understanding and reliable actions (v0.1.24)
+
+Pure, unit-tested logic in `core/understanding/`; wired in `AssistantOrchestrator`.
+- **Exam** (`core/src/test/.../ExamTest.kt`): ~155 real requests with a fixed clock — commands, tricky dates, durations, follow-ups and corrections, several requests in one sentence, tool repair, tool selection, recall. Every "Report" file that shows a mistake becomes a new line.
+- **DialogueTracker**: per-conversation state (person, topic, last timed action, reminder id). Resolves pronouns ("call her"), relations from memories ("call my sister" → name), "remind me about it", "move it to 5" / "no, I meant Friday" (→ `reminder.reschedule`, new alarm/timer), and splits sentences only when every part is a command on its own.
+- **Awareness brief** (`Awareness`, app side `AwarenessCollector`): time, place, battery, online, next event, countdowns, dialogue, profile, related memories, computed results and the selected tools, attached to the user message. The on-device system prompt (`PromptBuilder.localSystemPrompt`) no longer changes between messages.
+- **ToolSelector** (≤5 tools per message on-device), **ToolRepair** (tool/arg aliases, date formats, durations; the user's own times override the model's unless the sentence is relative), lenient extraction of ```json / tool_code / bare-JSON calls.
+- **MemoryRanker**: direct shared concepts, then two-step links, then pinned/strength; recency alone never selects a memory.
+- **Faster**: model warm-up on app open, wake word and assistant overlay; instant replies (`QuickReplies`); voice replies capped at 256 tokens and 1–2 sentences; LIVE acknowledgement tick. **Needs the speed test on the phone to confirm no regression.**
+- Online providers are still in the code; removing them (the plan's Gemma-only rule) is left for a later release.
 
 ## Foundation and Live Brain 2.0 (v0.1.21)
 

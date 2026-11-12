@@ -364,6 +364,8 @@ class LiveSessionController(
         val conv = conversationId ?: return
         _state.update { it.copy(transcript = it.transcript + LiveTurn(true, text)) }
         setOrb(OrbState.THINKING)
+        // Instant acknowledgement: a soft tick the moment ZED has the request, before any answer exists.
+        if (soundStyle != com.melhive.zed.core.voice.SoundSynth.Style.OFF) ZedSounds.tick(context, 2)
         streamText = ""; spokenChars = 0; replyFinished = false
         requestJob = scope?.launch {
             val reply = try { orchestrator.respond(conv, text.removePrefix("📷 "), voice = true, image = image) } catch (e: kotlinx.coroutines.CancellationException) { throw e }

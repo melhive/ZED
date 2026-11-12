@@ -72,6 +72,11 @@ class OrchestratorTest {
         val tm = ToolManager(ToolCatalog.DEFAULT, SkillRegistry.DEFAULT, settings, caps, ConfirmationBroker(), AuditLogger(db.audit()), ConfirmationText { s, _ -> s.title })
         tm.register("time.now") { _, _ -> executed += "time.now"; ToolResult(true, "Monday 10:00") }
         tm.register("todo.list") { _, _ -> executed += "todo.list"; ToolResult(true, "Your tasks: buy milk") }
+        tm.register("reminder.create") { a, _ -> executed += "reminder.create ${a.string("text")}"; ToolResult(true, "Reminder #5 set: “${a.string("text")}”.") }
+        tm.register("reminder.reschedule") { a, _ -> executed += "reminder.reschedule ${a.int("id")}"; ToolResult(true, "Reminder #6 moved.") }
+        tm.register("sms.compose") { a, _ -> executed += "sms.compose ${a.string("to")}"; ToolResult(true, "Message ready.") }
+        tm.register("flashlight.set") { a, _ -> executed += "flashlight.set ${a.bool("on")}"; ToolResult(true, "Flashlight ${if (a.bool("on")) "on" else "off"}.") }
+        tm.register("timer.set") { a, _ -> executed += "timer.set ${a.int("seconds")}"; ToolResult(true, "Timer started.") }
         val source = object : ProviderSource {
             override val localRuntime = LocalModelRuntime(File(ctx.cacheDir, "lm"))
             override suspend fun active() = provider
@@ -153,6 +158,23 @@ class OrchestratorTest {
         // Exact computations stay native even with a model.
         assertEquals("12 times 7 = 84", o.respond(id, "what is 12 times 7").text)
         assertEquals(1, fake.requests.size)
+    }
+
+    @Test fun followUpsAndSeveralRequestsUnderstoodWithoutTheModel() = runBlocking<Unit> {
+        val fake = FakeProvider()
+        provider = fake
+        val o = orchestrator()
+        val id = conversations.create()
+        o.respond(id, "remind me to call Ana at 11pm")
+        // "it" is that reminder; "her" is Ana.
+        o.respond(id, "move it to 10")
+        o.respond(id, "text her saying I'm on my way")
+        // Two requests in one sentence, both carried out.
+        val both = o.respond(id, "turn on the flashlight and set a timer for 5 minutes")
+        assertTrue(both.ok)
+        assertEquals("Okay.", o.respond(id, "ok").text)
+        assertEquals(listOf("reminder.create call Ana", "reminder.reschedule 5", "sms.compose Ana", "flashlight.set true", "timer.set 300"), executed)
+        assertEquals(0, fake.requests.size, "none of this needed the model")
     }
 
     @Test fun regenerateReplacesTheLastAnswer() = runBlocking<Unit> {

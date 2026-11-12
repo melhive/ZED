@@ -311,6 +311,9 @@ class LocalLiteRtProvider(
 ) : IntelligenceProvider {
     val contextTokens: Int get() = options.contextTokens
     override val id = "local"
+
+    /** Loads the model now (does nothing when it is already loaded). */
+    suspend fun warmUp() { if (file.exists()) runtime.ensureLoaded(modelId, file, options) }
     override val label = "On-device · $modelName"
 
     override suspend fun status(): ProviderStatus =

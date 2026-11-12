@@ -31,6 +31,7 @@ import com.melhive.zed.voice.LiveSessionController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import java.io.File
 
 /** Manual dependency container. One instance per process, owned by [ZedApp]. */
@@ -85,6 +86,21 @@ class AppContainer(private val context: Context) {
     val orchestrator by lazy {
         AssistantOrchestrator(appScope, conversations, memory, knowledge, providers, toolManager, skills, settings).also { o ->
             o.routineMatcher = { text -> routines.matchPhrase(text)?.name }
+            o.awareness = { com.melhive.zed.agents.AwarenessCollector(context, this).collect() }
+        }
+    }
+
+    /**
+     * Loads the on-device model ahead of the first question (ZED opened, wake
+     * word heard, LIVE started), so the reply doesn't wait for it. Skipped when
+     * an online model answers, or when the phone is short of memory.
+     */
+    fun warmUpModel() {
+        appScope.launch {
+            runCatching {
+                if (com.melhive.zed.android.DeviceInfo.snapshot(context).lowMemory) return@runCatching
+                (providers.active() as? com.melhive.zed.intelligence.LocalLiteRtProvider)?.warmUp()
+            }
         }
     }
 

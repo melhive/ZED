@@ -154,6 +154,8 @@ class WakeWordService : Service() {
     /** Opens LIVE when allowed; otherwise handles one request hands-free. */
     private suspend fun onWake() {
         val c = (application as ZedApp).container
+        // Start loading the model while the user is still speaking.
+        c.warmUpModel()
         val style = com.melhive.zed.core.voice.SoundSynth.Style.parse(c.settings.current().liveSound)
         val foreground = ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
         if (foreground || Settings.canDrawOverlays(this)) {

@@ -31,6 +31,16 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.24", "2026-11-12", "ZED understands you better", listOf(
+            "Follows the conversation: “call her”, “text him that I'm late”, “remind me about it tomorrow”. “Call my sister” works when ZED knows who your sister is.",
+            "Corrections and changes: after setting a reminder, say “move it to 6”, “no, I meant Friday” or “make it tomorrow at 9” — it moves the same reminder. Works for alarms and timers too (“make it 15 minutes”).",
+            "Several requests in one sentence: “turn on the flashlight and set a timer for 5 minutes” does both.",
+            "Before every reply ZED now tells Gemma the moment it's in: time, place, battery, your next event, running timers and reminders, who you were just talking about, and a short profile of you.",
+            "Relevant memories: ZED picks the memories connected to your question (through the names and ideas they share, like the Live Brain), not just the newest ones.",
+            "More reliable actions: Gemma sees only the few tools that fit your request, and its tool calls are checked and repaired — a wrong name, a wrong date format or a mistaken time is fixed, and the time you actually said always wins.",
+            "Sums, percentages and dates in your message are computed exactly and handed to Gemma, instead of Gemma doing the maths.",
+            "Faster: Gemma starts loading when ZED opens, when you say “Hey Zed” and when the floating assistant appears. “Thanks”, “ok”, “bye” and “what's my name” are answered instantly. Spoken answers are kept short, and LIVE gives a soft tick the moment it has your request.",
+        )),
         Release("0.1.23", "2026-11-12", "Live Brain, balanced", listOf(
             "Neurons are bigger again — between the two earlier looks — so the brain is easy to see and tap without turning into a wash of light.",
             "Connections are clearly visible, and more signals travel along them at once, with a longer glowing trail and a spark where they land.",

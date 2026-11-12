@@ -103,6 +103,10 @@ class ToolCatalog(specs: List<ToolSpec>) {
                     p("text", STRING, "What to be reminded about"),
                     p("at", DATETIME, "When, ISO-8601 local date-time"),
                 ), MODIFY, setOf(NOTIFICATIONS)),
+                ToolSpec("reminder.reschedule", "Move reminder", "Moves a scheduled reminder to a new time.", listOf(
+                    p("id", INT, "Reminder id", min = 1),
+                    p("at", DATETIME, "New time, ISO-8601 local date-time"),
+                ), MODIFY, setOf(NOTIFICATIONS)),
                 ToolSpec("reminder.list", "List reminders", "Lists upcoming reminders.", emptyList(), READ_ONLY),
                 ToolSpec("reminder.cancel", "Cancel reminder", "Cancels a scheduled reminder by id.", listOf(
                     p("id", INT, "Reminder id", min = 1),

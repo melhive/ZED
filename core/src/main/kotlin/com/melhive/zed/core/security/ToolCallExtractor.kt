@@ -22,6 +22,11 @@ object ToolCallExtractor {
     const val FENCE = "zed-tool"
     private val BLOCK = Regex("```$FENCE\\s*\\n(.*?)\\n?```", RegexOption.DOT_MATCHES_ALL)
     private val json = Json { ignoreUnknownKeys = false; isLenient = false }
+    private val lenient = Json { ignoreUnknownKeys = false; isLenient = true }
+
+    /** Other ways small models write the same call: ```json / ```tool_code / ```zed_tool fences, or a bare {"tool": …} object. */
+    private val LOOSE_BLOCK = Regex("```(?:json|tool_code|tool|zed_tool|zedtool|zed)?\\s*\\n?(\\{.*?\\})\\s*```", RegexOption.DOT_MATCHES_ALL)
+    private val BARE = Regex("(?m)^\\s*(\\{\\s*\"tool\"\\s*:.*\\})\\s*$")
     const val MAX_CALLS = 3
 
     data class Extraction(val visibleText: String, val requests: List<ToolRequest>, val errors: List<String>)
@@ -36,6 +41,18 @@ object ToolCallExtractor {
                 is Parsed.Error -> errors += r.message
             }
         }
+        if (requests.isEmpty() && errors.isEmpty()) {
+            // No exact block: accept the near-misses, but only objects that really are tool calls.
+            for (rx in listOf(LOOSE_BLOCK, BARE)) {
+                val found = rx.findAll(output).toList().filter { m -> Regex("\"(?:tool|args|arguments|parameters)\"\\s*:").containsMatchIn(m.groupValues[1]) }
+                val parsed = found.mapNotNull { m -> (parse(m.groupValues[1].trim(), origin, lenient) as? Parsed.Ok)?.request?.let { m to it } }
+                if (parsed.isEmpty()) continue
+                parsed.take(MAX_CALLS).forEach { requests += it.second }
+                var visible = output
+                parsed.forEach { (m, _) -> visible = visible.replace(m.value, "") }
+                return Extraction(visible.trim(), requests, errors)
+            }
+        }
         val visible = BLOCK.replace(output, "").trim()
         return Extraction(visible, requests, errors)
     }
@@ -45,16 +62,19 @@ object ToolCallExtractor {
         data class Error(val message: String) : Parsed
     }
 
-    private fun parse(body: String, origin: ToolRequest.Origin): Parsed {
+    private fun parse(body: String, origin: ToolRequest.Origin, parser: Json = json): Parsed {
         if (body.length > 120_000) return Parsed.Error("Tool call too large")
-        val element: JsonElement = try { json.parseToJsonElement(body) } catch (e: Exception) {
+        val element: JsonElement = try { parser.parseToJsonElement(body) } catch (e: Exception) {
             return Parsed.Error("Malformed tool call JSON")
         }
         val obj = element as? JsonObject ?: return Parsed.Error("Tool call must be a JSON object")
-        if (obj.keys - setOf("tool", "args") != emptySet<String>()) return Parsed.Error("Unexpected keys in tool call")
-        val tool = (obj["tool"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+        // Models trained on other formats write "name" / "arguments" / "parameters"; they mean the same.
+        val toolKey = listOf("tool", "name", "function").firstOrNull { it in obj }
+        val argsKey = listOf("args", "arguments", "parameters", "params").firstOrNull { it in obj }
+        if (obj.keys - setOfNotNull(toolKey, argsKey) != emptySet<String>()) return Parsed.Error("Unexpected keys in tool call")
+        val tool = (obj[toolKey ?: "tool"] as? JsonPrimitive)?.takeIf { it.isString }?.content
             ?: return Parsed.Error("Tool call missing 'tool'")
-        val argsEl = obj["args"]
+        val argsEl = argsKey?.let { obj[it] }
         val args = LinkedHashMap<String, String>()
         if (argsEl != null && argsEl != JsonNull) {
             val argsObj = argsEl as? JsonObject ?: return Parsed.Error("'args' must be an object")

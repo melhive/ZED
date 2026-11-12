@@ -85,6 +85,7 @@ object DefaultConfirmationText : ConfirmationText {
         "calendar.create" -> "Add “${args.string("title")}” to your calendar at ${args.dateTime("start").pretty()}?"
         "reminder.create" -> "Remind you “${args.string("text")}” at ${args.dateTime("at").pretty()}?"
         "reminder.cancel" -> "Cancel reminder #${args.int("id")}?"
+        "reminder.reschedule" -> "Move reminder #${args.int("id")} to ${args.dateTime("at").pretty()}?"
         "todo.add" -> "Add “${args.string("title")}” to your task list?"
         "todo.complete" -> "Mark “${args.string("item")}” as done?"
         "memory.remember" -> "Remember permanently: “${args.string("fact")}”?"
@@ -348,6 +349,14 @@ fun registerExecutors(tm: ToolManager, c: AppContainer, context: Context) {
         if (!at.isAfter(LocalDateTime.now())) return@register fail("That time (${at.pretty()}) has already passed.")
         val r = c.reminderScheduler.create(a.string("text"), at.epochMillis())
         ok("Reminder #${r.id} set for ${at.pretty()}: “${r.text}”." + if (!r.exact) " (Approximate timing: allow “Alarms & reminders” in Permissions for exact delivery.)" else "")
+    }
+    tm.register("reminder.reschedule") { a, _ ->
+        val at = a.dateTime("at")
+        if (!at.isAfter(LocalDateTime.now())) return@register fail("That time (${at.pretty()}) has already passed.")
+        val old = c.db.reminders().get(a.int("id"))?.takeIf { it.status == "scheduled" } ?: return@register fail("No scheduled reminder #${a.int("id")}.")
+        c.reminderScheduler.cancelReminder(old.id)
+        val r = c.reminderScheduler.create(old.text, at.epochMillis())
+        ok("Reminder #${r.id} moved to ${at.pretty()}: “${r.text}”.")
     }
     tm.register("reminder.list") { _, _ ->
         val list = c.db.reminders().scheduled()

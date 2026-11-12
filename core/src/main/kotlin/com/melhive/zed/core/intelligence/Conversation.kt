@@ -78,7 +78,7 @@ Never claim a device action happened unless a tool result confirms it. If a tool
             appendLine("Use this exact time for anything time-related. For countdowns (\"how long until…\", \"how much time is left\") compute the exact difference and say it in hours, minutes and seconds. Don't mention the time zone unless the user asks.")
         }
         if (voiceMode) {
-            appendLine("This is a spoken conversation: answer in short natural sentences without markdown, lists or emoji.")
+            appendLine("This is a spoken conversation: answer in one or two short natural sentences (more only if asked), without markdown, lists or emoji.")
             appendLine("Your name is pronounced \"Zed\" — one syllable that rhymes with \"bed\". Always say it as that one word; never spell it out as letters (not \"Z E D\", \"zee\" or \"zid\"). Write it as Zed.")
         }
         if (memories.isNotEmpty()) {
@@ -102,6 +102,31 @@ Never claim a device action happened unless a tool result confirms it. If a tool
             appendLine("If the user asks for a device action (reminders, alarms, files, tasks, memory), tell them to say it directly, e.g. \"remind me to call Ana at 5pm\" — ZED handles such commands itself.")
         }
     }
+
+    /**
+     * The on-device system prompt. It never changes between messages (so the
+     * runtime keeps the work it already did on the conversation): the time,
+     * memories and the tools that fit each message travel with the message
+     * in bracketed lines instead.
+     */
+    fun localSystemPrompt(voiceMode: Boolean, persona: Persona = Persona.COMPANION, userTitle: String? = null): String = buildString {
+        appendLine(identity(persona, userTitle))
+        if (voiceMode) {
+            appendLine("This is a spoken conversation: answer in one or two short natural sentences (more only if asked), without markdown, lists or emoji.")
+            appendLine("Your name is pronounced \"Zed\" — one syllable that rhymes with \"bed\". Write it as Zed.")
+        }
+        appendLine()
+        appendLine(LOCAL_CONTEXT_GUIDE.trimIndent())
+        appendLine()
+        appendLine("To act on the phone, reply with a fenced block exactly like:")
+        appendLine("```${ToolCallExtractor.FENCE}")
+        appendLine("{\"tool\": \"reminder.create\", \"args\": {\"text\": \"Call Ana\", \"at\": \"2026-01-31T17:00\"}}")
+        appendLine("```")
+        append("Only use tools listed under [Tools for this message]; if none are listed, just answer. Argument values are strings; date-times are ISO-8601 local. " +
+            "Copy times from [Now] and [Computed] instead of working them out. After a tool call stop and wait for the result. Never say an action happened before its result confirms it.")
+    }
+
+    const val LOCAL_CONTEXT_GUIDE = """Each user message may start with bracketed lines from the phone: [Now] (date, time, place, battery), [Coming up], [Conversation] (who "her"/"him"/"it" refers to), [About the user], [Related memories], [Computed exactly] and [Tools for this message]. Use them silently: don't repeat them back unless asked. Memories are what the user told you before; trust them over guesses."""
 
     const val NATIVE_TOOL_GUIDE = """You can act on the user's phone with the provided tools.
 - When a request needs several steps, chain tools: call one, read its result, then call the next (e.g. read a file, then add a task for each item). Independent calls can be made together.

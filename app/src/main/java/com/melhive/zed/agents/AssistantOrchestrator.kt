@@ -91,6 +91,18 @@ class AssistantOrchestrator(
     /** Returns a routine name when the message is one of the user's routine phrases ("good night"). */
     var routineMatcher: (suspend (String) -> String?)? = null
 
+    /** The phone's side of the awareness brief (time, place, battery, what's coming up). */
+    var awareness: (suspend () -> com.melhive.zed.core.understanding.Awareness)? = null
+
+    // ---- Understanding (follow-ups, corrections, tool repair) ----
+    private val tracker = com.melhive.zed.core.understanding.DialogueTracker()
+    private val repair = com.melhive.zed.core.understanding.ToolRepair(skills.catalog)
+    private val dialogues = java.util.concurrent.ConcurrentHashMap<Long, com.melhive.zed.core.understanding.DialogueState>()
+    /** What the user said in the turn being answered (dates and durations in it beat the model's). */
+    @Volatile private var currentUserText: String? = null
+
+    fun dialogue(conversationId: Long): com.melhive.zed.core.understanding.DialogueState = dialogues[conversationId] ?: com.melhive.zed.core.understanding.DialogueState()
+
     fun submit(conversationId: Long, text: String, attachmentName: String? = null, attachmentText: String? = null, voice: Boolean = false, image: com.melhive.zed.intelligence.ImageInput? = null, onReply: (AssistantReply) -> Unit = {}): Job {
         currentJob?.cancel()
         val job = appScope.launch {
@@ -143,7 +155,9 @@ class AssistantOrchestrator(
                 setPhase(AssistantPhase.COMPLETED, null, conversationId)
                 return AssistantReply(msg, false, "system")
             }
-            val reply = if (attachmentText == null && image == null) handleNative(conversationId, trimmed, modelAvailable = provider != null) else null
+            currentUserText = trimmed
+            val plain = attachmentText == null && image == null
+            val reply = if (plain) understood(conversationId, trimmed, modelAvailable = provider != null) else null
             val final = reply ?: if (provider != null) handleWithModel(conversationId, provider, voice, trimmed) else nativeConversation(conversationId, trimmed)
             // Instant (native) replies record how long the whole turn took; model replies are timed while streaming.
             runCatching { conversations.setTotalOnLastReply(conversationId, (System.nanoTime() - turnStartedAt) / 1_000_000) }
@@ -158,6 +172,39 @@ class AssistantOrchestrator(
             conversations.addMessage(conversationId, "assistant", msg, status = "error", source = "system")
             setPhase(AssistantPhase.ERROR, msg, conversationId)
             AssistantReply(msg, false, "system")
+        }
+    }
+
+    /**
+     * Follows the conversation before anything else: instant social replies,
+     * follow-ups that change the last action ("move that to 5"), pronouns
+     * ("call her") and several requests in one sentence. Returns null when
+     * the message should go on to the native parser's normal path or the model.
+     */
+    private suspend fun understood(conversationId: Long, text: String, modelAvailable: Boolean): AssistantReply? {
+        com.melhive.zed.core.understanding.QuickReplies.reply(text, runCatching { memory.userName() }.getOrNull())?.let { r ->
+            conversations.addMessage(conversationId, "assistant", r, source = "native")
+            return AssistantReply(r, true, "native")
+        }
+        val state = dialogue(conversationId).heard(text)
+        dialogues[conversationId] = state
+        val facts = runCatching { memory.list(200).map { it.text } }.getOrDefault(emptyList())
+        return when (val r = tracker.resolve(text, state, facts)) {
+            is com.melhive.zed.core.understanding.Resolution.Act -> {
+                val outcome = runTool(conversationId, r.request)
+                conversations.addMessage(conversationId, "assistant", outcome.message, source = "native", toolName = r.request.tool, status = if (outcome.isSuccess()) "complete" else "error")
+                AssistantReply(outcome.message, outcome.isSuccess(), "native")
+            }
+            is com.melhive.zed.core.understanding.Resolution.Explain -> {
+                conversations.addMessage(conversationId, "assistant", r.message, source = "native")
+                AssistantReply(r.message, true, "native")
+            }
+            is com.melhive.zed.core.understanding.Resolution.Several -> {
+                val replies = r.parts.mapNotNull { part -> handleNative(conversationId, part, modelAvailable = true) }
+                if (replies.isEmpty()) null
+                else AssistantReply(replies.joinToString(" ") { it.text }, replies.all { it.ok }, "native")
+            }
+            is com.melhive.zed.core.understanding.Resolution.Text -> handleNative(conversationId, r.text, modelAvailable)
         }
     }
 
@@ -206,7 +253,12 @@ class AssistantOrchestrator(
             else -> AssistantPhase.EXECUTING
         }
         setPhase(phase, request.tool, conversationId)
-        return tools.execute(request)
+        // Model-written calls get their everyday mistakes fixed (names, formats, the user's own times) first.
+        val fixed = if (request.origin == ToolRequest.Origin.LOCAL_MODEL || request.origin == ToolRequest.Origin.ONLINE_MODEL)
+            repair.repair(request, currentUserText).request else request
+        val outcome = tools.execute(fixed)
+        if (outcome.isSuccess()) dialogues[conversationId] = dialogue(conversationId).after(fixed, outcome.message)
+        return outcome
     }
 
     /** No model available: social replies or an honest, helpful explanation. */
@@ -234,17 +286,45 @@ class AssistantOrchestrator(
         val nativeTools = !isLocal && provider.supportsNativeTools
         // On-device models get the same (compact) instructions every turn, so the runtime keeps its cached
         // conversation instead of re-reading the whole history whenever a message switches between chat and actions.
-        val useTools = nativeTools || (if (isLocal) !tinyContext else PromptBuilder.looksLikeAction(userText))
-        val toolSpecs = if (!useTools) emptyList() else skills.enabledTools(s.enabledSkills).filter { it.name != "web.research" || researchAvailable }
+        val useTools = nativeTools || isLocal || PromptBuilder.looksLikeAction(userText)
+        val enabled = skills.enabledTools(s.enabledSkills).filter { it.name != "web.research" || researchAvailable }
+        val history0 = conversations.history(conversationId, 6)
+        val previousUser = history0.dropLast(1).lastOrNull { it.role == Role.USER }?.content
+        // On-device: only the few tools that fit this message (a small model chooses far better from four than from fifty).
+        val toolSpecs = when {
+            !useTools -> emptyList()
+            isLocal -> com.melhive.zed.core.understanding.ToolSelector.select(userText, enabled, max = if (tinyContext) 3 else 5, context = previousUser)
+            else -> enabled
+        }
         val userName = memory.userName()
-        val memories = memory.list(if (tinyContext) 5 else 30).map { it.text }
+        // Memories connected to the question (through shared names and ideas), not just the newest ones.
+        val now0 = System.currentTimeMillis()
+        val allFacts = memory.list(300)
+        val ranked = com.melhive.zed.core.understanding.MemoryRanker.rank(
+            userText,
+            allFacts.map { com.melhive.zed.core.understanding.MemoryFact(it.id, it.text, it.pinned, com.melhive.zed.core.brain.BrainStrength.of(it.uses, it.lastUsedAt, it.createdAt, it.pinned, now0)) },
+            previous = previousUser, limit = if (tinyContext) 3 else 6,
+        )
+        val profile = buildList {
+            userName?.let { add("name $it") }
+            allFacts.filter { it.pinned && ranked.none { r -> r.fact.id == it.id } }.take(3).forEach { add(it.text) }
+        }
+        val memories = if (isLocal) ranked.map { it.fact.text } else (ranked.map { it.fact.text } + allFacts.filter { it.pinned }.map { it.text } + allFacts.take(12).map { it.text }).distinct().take(30)
         // The memories this question touches grow stronger and light up in the Live Brain (off the reply path).
-        appScope.launch { runCatching { memory.markUsed(memory.related(userText).map { it.id }) } }
+        if (ranked.isNotEmpty()) appScope.launch { runCatching { memory.markUsed(ranked.map { it.fact.id }) } }
+        val environment = runCatching { awareness?.invoke() }.getOrNull()
+        val computed = buildList {
+            addAll(com.melhive.zed.core.understanding.Computations.find(userText, java.time.LocalDate.now()))
+            com.melhive.zed.core.understanding.TimeHints.moment(userText, java.time.LocalDateTime.now())?.let { at ->
+                add("the time mentioned = " + at.format(DateTimeFormatter.ofPattern("EEEE d MMMM yyyy, h:mm a", java.util.Locale.ENGLISH)) + " ($at)")
+            }
+        }
         val origin = if (isLocal) ToolRequest.Origin.LOCAL_MODEL else ToolRequest.Origin.ONLINE_MODEL
         val sourceTag = if (isLocal) "local" else "online:${provider.id}"
         val contextChars = if (isLocal) ((localContext ?: 4096) * 3) else 60_000
 
         if (nativeTools) return runNativeToolLoop(conversationId, provider, voice, toolSpecs, memories, userName, sourceTag, contextChars)
+        val dialogueNote = dialogue(conversationId).describe()
 
         var lastText = ""
         for (round in 1..MAX_ROUNDS) {
@@ -257,23 +337,29 @@ class AssistantOrchestrator(
             val now = ZonedDateTime.now().format(DateTimeFormatter.ofPattern("EEEE yyyy-MM-dd'T'HH:mm:ss (h:mm:ss a, VV)", java.util.Locale.ENGLISH))
             // On-device: keep the system prompt stable so the runtime can reuse its session; time and
             // document excerpts travel with the newest user message instead.
-            val system = PromptBuilder.systemPrompt(
+            val persona = com.melhive.zed.core.intelligence.Persona.parse(s.persona)
+            // On-device: the system prompt never changes, so the runtime keeps its cached conversation;
+            // the brief (time, place, memories, the tools that fit) travels with the message.
+            val system = if (isLocal) PromptBuilder.localSystemPrompt(voice, persona, s.userTitle.ifBlank { null }) else PromptBuilder.systemPrompt(
                 tools = toolSpecs,
-                nowDescription = if (isLocal) null else now,
+                nowDescription = now,
                 memories = memories,
-                knowledge = if (isLocal) emptyList() else knowledgeSnippets,
+                knowledge = knowledgeSnippets,
                 voiceMode = voice,
-                compact = isLocal,
                 userName = userName,
-                persona = com.melhive.zed.core.intelligence.Persona.parse(s.persona),
+                persona = persona,
                 userTitle = s.userTitle.ifBlank { null },
             )
+            val brief = if (!isLocal) null else (environment ?: com.melhive.zed.core.understanding.Awareness(ZonedDateTime.now())).let { env ->
+                if (round == 1) env.copy(dialogue = dialogueNote, profile = profile, memories = memories, computed = computed, tools = toolSpecs, knowledge = knowledgeSnippets)
+                else env.copy(tools = toolSpecs) // after a tool result: just the time and the tools
+            }.render()
             val request = GenerationRequest(
                 system = system,
                 turns = ContextWindow.fit(history, contextChars),
-                maxOutputTokens = when { isLocal && voice -> 384; isLocal -> 1024; voice -> 1024; else -> 4096 },
+                maxOutputTokens = when { isLocal && voice -> 256; isLocal -> 1024; voice -> 1024; else -> 4096 },
                 sessionKey = "conversation-$conversationId",
-                volatileContext = if (isLocal) PromptBuilder.volatileContext(now, knowledgeSnippets) else null,
+                volatileContext = brief,
                 images = listOfNotNull(currentImage),
             )
             val loading = isLocal && providers.localRuntime.state.value !is LocalModelRuntime.State.Ready
