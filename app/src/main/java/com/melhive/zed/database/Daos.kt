@@ -71,6 +71,10 @@ interface MessageDao {
     @Query("SELECT * FROM messages WHERE conversationId = :conversationId ORDER BY id ASC")
     suspend fun all(conversationId: Long): List<MessageEntity>
 
+    /** What the user said since [since] (epoch millis), oldest first (insights read these). */
+    @Query("SELECT * FROM messages WHERE role = 'user' AND createdAt > :since ORDER BY id ASC LIMIT :limit")
+    suspend fun userMessagesSince(since: Long, limit: Int = 600): List<MessageEntity>
+
     /** What the user said after message [after], oldest first (automatic learning reads these). */
     @Query("SELECT * FROM messages WHERE role = 'user' AND id > :after ORDER BY id ASC LIMIT :limit")
     suspend fun userMessagesAfter(after: Long, limit: Int): List<MessageEntity>
@@ -289,4 +293,19 @@ interface PendingRequestDao {
 
     @Query("UPDATE pending_requests SET status = :status, result = :result WHERE id = :id")
     suspend fun finish(id: Long, status: String, result: String?)
+}
+
+@Dao
+interface RelationDao {
+    @Query("SELECT * FROM relations ORDER BY id DESC LIMIT 200")
+    fun observeAll(): Flow<List<RelationEntity>>
+
+    @Query("SELECT * FROM relations")
+    suspend fun all(): List<RelationEntity>
+
+    @Insert suspend fun insert(r: RelationEntity): Long
+
+    /** Relationships read from a memory that has since been forgotten. */
+    @Query("DELETE FROM relations WHERE factId IS NOT NULL AND factId NOT IN (SELECT id FROM memory_facts)")
+    suspend fun pruneOrphans()
 }

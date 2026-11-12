@@ -13,7 +13,7 @@ Native Android personal AI assistant (Kotlin, Jetpack Compose). Three intelligen
 | Default branch | `main` (stable merges) |
 | Latest commit | see `git log -1` (this file is updated with each milestone) |
 | Build status | ✅ GitHub Actions **Android Build** green: core tests, Android unit tests, debug APK |
-| Releases | ✅ Signed release **v0.1.27** published (latest). Install/share link: https://github.com/melhive/ZED/releases/latest/download/zed.apk. Every push to `main` publishes the version in `VERSION` (bump it for a new release; re-pushing the same version replaces that release). App id `com.melhive.zed`, signed with the key in `/root/zed-signing` (back it up — updates need the same key). |
+| Releases | ✅ Signed release **v0.1.28** published (latest). Install/share link: https://github.com/melhive/ZED/releases/latest/download/zed.apk. Every push to `main` publishes the version in `VERSION` (bump it for a new release; re-pushing the same version replaces that release). App id `com.melhive.zed`, signed with the key in `/root/zed-signing` (back it up — updates need the same key). |
 
 ## Milestones
 
@@ -59,6 +59,16 @@ Failed tests: none.
 | Model download (2–3 GB) with resume + SHA-256 | | ✅ | ✅ | |
 | Keystore secret storage | | ✅ | ✅ | |
 | STT / TTS / sentence streaming / barge-in / audio focus | VAD only | ✅ | ✅ | |
+
+## Deeper intelligence (v0.1.28)
+
+Pure logic in `core/learning/Deeper.kt` (unit-tested in `DeeperIntelligenceTest`); app side in `learning/Dreamer.kt`.
+- **Relationships**: `RelationPatterns` (exact phrasings) + Gemma lines "A | relation | B" (parsed strictly) into the `relations` table; `BrainBuilder.build(…, links)` adds labelled edges, reusing concept nodes; labels drawn on focused/close connections and in the connected list.
+- **Dreaming** (after learning; model parts only when charging or already loaded, cancelled when the user is active): `DreamLogic.duplicates` merges memories (pinned > confirmed > most used > newest), relations, orphan pruning.
+- **Insights**: `Insights.topics` (≥3 mentions on ≥2 days in 14 days, not covered by a reminder/task) and `Insights.habits` (same action within an hour on ≥3 days in 21 days, from the audit log). One new insight at a time, each offered once; Home card; a notification only within `Hints.allowed` (≤1 per 3 h, ≤3 a day).
+- **Leave-now**: `HintWorker` every 15 min, `CalendarReader.nextEventWithPlace`, `Hints.leaveNow` (30–50 min before, once per event); tapping opens LIVE with "directions to …".
+- **Corrections**: `Corrections.detect` in the orchestrator ("that's wrong[, it's X]"; asks when no fix is given); lessons saved with `source = correction` and flagged in the brief; Wrong button on replies (`correctReply`).
+- **Brain by voice**: `brain.show` (parser rule + tool + selector trigger) sets `brainFocus` and opens the brain, which flies to `BrainGraph.find(query)`.
 
 ## Classic orb restored and improved (v0.1.27)
 

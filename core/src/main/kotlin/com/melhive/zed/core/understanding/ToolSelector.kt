@@ -28,6 +28,7 @@ object ToolSelector {
         "memory.remember" to w("remember", "note that", "keep in mind", "my .+ is", "i (?:like|love|hate|prefer|am allergic)", "don'?t forget"),
         "memory.list" to w("what do you (?:know|remember)", "memories"),
         "memory.forget" to w("forget"),
+        "brain.show" to w("brain", "everything (?:you know )?about", "show me (?:what|all)"),
         "phone.call" to w("call", "phone", "ring", "dial"),
         "sms.compose" to w("text", "message", "sms", "tell .+ that"),
         "contacts.find" to w("number", "contact"),

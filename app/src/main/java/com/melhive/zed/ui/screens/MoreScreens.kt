@@ -212,6 +212,9 @@ fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
                     scope.launch { c.settings.setAutoLearning(it); com.melhive.zed.learning.Learner.schedule(ctx.applicationContext, it) }
                 }
                 SwitchRow("Search the web", "When a question needs fresh facts, ZED searches the web (no account or key) and answers with sources. Only the search question leaves the phone.", settings.webResearch) { scope.launch { c.settings.setWebResearch(it) } }
+                SwitchRow("Proactive hints", "Rare, useful nudges: time to leave for an event with a place, or a pattern ZED noticed. At most one every three hours.", settings.proactiveHints) {
+                    scope.launch { c.settings.setProactiveHints(it); com.melhive.zed.learning.Dreamer.scheduleHints(ctx.applicationContext, it) }
+                }
                 SwitchRow("Think twice on hard questions", "Plans, answers, then checks itself on planning, comparing and multi-step questions. Slower, more careful. Everyday questions are never slowed down.", settings.thinkTwice) { scope.launch { c.settings.setThinkTwice(it) } }
                 Text("Animation", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 6.dp))
                 WrapRow {

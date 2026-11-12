@@ -48,7 +48,7 @@ class SkillRegistry(val catalog: ToolCatalog, skills: List<SkillDescriptor>) {
             SkillDescriptor("calendar.events", "Calendar", "Creates calendar events through your calendar app.", listOf("calendar.create")),
             SkillDescriptor("reminders", "Reminders", "Schedules reminder notifications.", listOf("reminder.create", "reminder.reschedule", "reminder.list", "reminder.cancel")),
             SkillDescriptor("tasks.list", "Task List", "Keeps your personal to-do list.", listOf("todo.add", "todo.list", "todo.complete")),
-            SkillDescriptor("memory.personal", "Personal Memory", "Remembers facts only when you ask, and forgets on request.", listOf("memory.remember", "memory.list", "memory.forget")),
+            SkillDescriptor("memory.personal", "Personal Memory", "Remembers facts only when you ask, and forgets on request.", listOf("memory.remember", "memory.list", "memory.forget", "brain.show")),
             SkillDescriptor("history.search", "Conversation History", "Searches your past conversations.", listOf("history.search")),
             SkillDescriptor("app.settings", "Settings Control", "Changes ZED settings by voice or chat.", listOf("settings.set")),
             SkillDescriptor("automation.workflows", "Workflows", "Runs predefined multi-step workflows.", listOf("workflow.run")),

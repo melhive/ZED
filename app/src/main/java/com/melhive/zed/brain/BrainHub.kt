@@ -46,13 +46,16 @@ class BrainHub(scope: CoroutineScope, c: AppContainer) {
         }
     }
 
+    /** Labelled relationships ("Ana —sister→ you"), drawn as named connections. */
+    val links: Flow<List<BrainBuilder.Link>> = c.db.relations().observeAll().map { list -> list.map { BrainBuilder.Link(it.subject, it.relation, it.target) } }
+
     /** A settled brain: the graph and where each node sits. */
     class Snapshot(val graph: BrainGraph, val x: FloatArray, val y: FloatArray, val z: FloatArray, val radius: Float)
 
     private val layout = BrainLayout()
 
-    val snapshot: StateFlow<Snapshot?> = items.map { list ->
-        val graph = BrainBuilder.build(list)
+    val snapshot: StateFlow<Snapshot?> = combine(items, links) { a, b -> a to b }.map { (list, links) ->
+        val graph = BrainBuilder.build(list, links = links)
         val first = layout.graph.nodes.isEmpty()
         layout.setGraph(graph)
         layout.settle(if (first) 1500 else 240)

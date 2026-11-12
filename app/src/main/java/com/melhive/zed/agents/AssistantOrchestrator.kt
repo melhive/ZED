@@ -113,6 +113,40 @@ class AssistantOrchestrator(
     /** Sources from web research done in this turn, listed under the answer. */
     @Volatile private var researchSources: List<String> = emptyList()
 
+    /** Conversations where ZED asked "what's right?" and is waiting for the answer. */
+    private val awaitingFix = java.util.concurrent.ConcurrentHashMap<Long, Pair<String, String>>()
+
+    /**
+     * Learns from "that's wrong": the right answer is saved as a lesson (and as a
+     * fact when it states one), so recall brings it back next time the topic comes up.
+     */
+    suspend fun recordCorrection(conversationId: Long, question: String, wrong: String, fix: String): String {
+        val lesson = com.melhive.zed.core.learning.Corrections.lesson(question, wrong, fix)
+        memory.remember(lesson, "correction")
+        com.melhive.zed.core.learning.FactPatterns.extract(fix).forEach { memory.remember(it.text, "correction") }
+        awaitingFix.remove(conversationId)
+        return "Thanks — noted: $fix. I'll get that right next time."
+    }
+
+    /** The "Wrong" button on a reply: [fix] is what the user says is right. */
+    suspend fun correctReply(conversationId: Long, messageId: Long, fix: String): String {
+        val all = conversations.allMessages(conversationId)
+        val i = all.indexOfFirst { it.id == messageId }
+        val wrong = all.getOrNull(i)?.content.orEmpty()
+        val question = (i - 1 downTo 0).firstOrNull { all[it].role == "user" }?.let { all[it].content }.orEmpty()
+        val reply = recordCorrection(conversationId, question, wrong, fix.trim())
+        conversations.addMessage(conversationId, "assistant", reply, source = "native")
+        return reply
+    }
+
+    /** The last exchange before the current message: what the user asked and what ZED answered. */
+    private suspend fun lastExchange(conversationId: Long): Pair<String, String>? {
+        val all = conversations.allMessages(conversationId).dropLast(1) // the current message is already saved
+        val answer = all.lastOrNull { it.role == "assistant" && it.status == "complete" } ?: return null
+        val question = all.lastOrNull { it.role == "user" && it.id < answer.id }?.content.orEmpty()
+        return question to answer.content
+    }
+
     fun dialogue(conversationId: Long): com.melhive.zed.core.understanding.DialogueState = dialogues[conversationId] ?: com.melhive.zed.core.understanding.DialogueState()
 
     fun submit(conversationId: Long, text: String, attachmentName: String? = null, attachmentText: String? = null, voice: Boolean = false, image: com.melhive.zed.intelligence.ImageInput? = null, onReply: (AssistantReply) -> Unit = {}): Job {
@@ -199,6 +233,29 @@ class AssistantOrchestrator(
         com.melhive.zed.core.understanding.QuickReplies.reply(text, runCatching { memory.userName() }.getOrNull())?.let { r ->
             conversations.addMessage(conversationId, "assistant", r, source = "native")
             return AssistantReply(r, true, "native")
+        }
+        // "That's wrong": learn the right answer (or ask for it).
+        when (val found = com.melhive.zed.core.learning.Corrections.detect(text)) {
+            is com.melhive.zed.core.learning.Corrections.Found.WithFix -> lastExchange(conversationId)?.let { (q, a) ->
+                val r = recordCorrection(conversationId, q, a, found.fix)
+                conversations.addMessage(conversationId, "assistant", r, source = "native")
+                return AssistantReply(r, true, "native")
+            }
+            com.melhive.zed.core.learning.Corrections.Found.WrongOnly -> lastExchange(conversationId)?.let { ex ->
+                awaitingFix[conversationId] = ex
+                val r = "Sorry about that — what's the right answer?"
+                conversations.addMessage(conversationId, "assistant", r, source = "native")
+                return AssistantReply(r, true, "native")
+            }
+            null -> awaitingFix[conversationId]?.let { (q, a) ->
+                // The answer to "what's right?" — unless it is a new request.
+                if (parser.parse(text) == ParsedCommand.NotACommand && !text.trim().endsWith("?")) {
+                    val r = recordCorrection(conversationId, q, a, text.trim().trimEnd('.'))
+                    conversations.addMessage(conversationId, "assistant", r, source = "native")
+                    return AssistantReply(r, true, "native")
+                }
+                awaitingFix.remove(conversationId)
+            }
         }
         val state = dialogue(conversationId).heard(text)
         dialogues[conversationId] = state
@@ -334,7 +391,11 @@ class AssistantOrchestrator(
         }
         // What ZED learned by itself is marked, so the model treats it as less certain than what the user said.
         val sourceOf = allFacts.associate { it.id to it.source }
-        fun label(f: com.melhive.zed.core.understanding.MemoryFact) = if (sourceOf[f.id] == "learned") "${f.text} (learned, not confirmed)" else f.text
+        fun label(f: com.melhive.zed.core.understanding.MemoryFact) = when (sourceOf[f.id]) {
+            "learned" -> "${f.text} (learned, not confirmed)"
+            "correction" -> "${f.text} (the user corrected you — follow this)"
+            else -> f.text
+        }
         val memories = if (isLocal) ranked.map { label(it.fact) } else (ranked.map { it.fact.text } + allFacts.filter { it.pinned }.map { it.text } + allFacts.take(12).map { it.text }).distinct().take(30)
         // The memories this question touches grow stronger and light up in the Live Brain (off the reply path).
         if (ranked.isNotEmpty()) appScope.launch { runCatching { memory.markUsed(ranked.map { it.fact.id }) } }

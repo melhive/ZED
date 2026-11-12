@@ -101,7 +101,7 @@ class Learner(private val context: Context, private val c: AppContainer, private
         val messages = c.db.messages().userMessagesAfter(after, 60)
             .filter { it.source == null || it.source == "user" }
             .filter { it.attachmentName == null || !it.content.contains("[Attached file:") }
-        if (messages.isEmpty()) return emptyList()
+        if (messages.isEmpty()) { dreamNow(allowModel); return emptyList() }
         val texts = messages.map { it.content.substringBefore("\n\n[Attached file:").trim() }.filter { it.length >= 6 }
         val existing = c.memory.list(400).map { it.text }
 
@@ -138,7 +138,19 @@ class Learner(private val context: Context, private val c: AppContainer, private
         }
         // The model's part didn't finish (the user came back): read these messages again next time.
         if (modelFinished) prefs.edit().putLong(KEY_CURSOR, messages.maxOf { it.id }).apply()
+        dreamNow(allowModel && modelFinished)
         return savedFacts.map { it.text }
+    }
+
+    /** Dreaming after learning; its model part stops the moment the user needs the model, like learning's. */
+    private suspend fun dreamNow(allowModel: Boolean) {
+        val job = scope.launch {
+            modelBusy = allowModel
+            try { runCatching { c.dreamer.dream(allowModel) }.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it } } finally { modelBusy = false }
+        }
+        running = job
+        job.join()
+        running = null
     }
 
     /** The user kept a learned fact: it becomes as certain as something they said. */

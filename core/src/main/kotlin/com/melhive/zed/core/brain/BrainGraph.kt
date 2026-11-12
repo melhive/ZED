@@ -72,7 +72,8 @@ data class BrainNode(
     val strength: Float = 0.5f,
 )
 
-data class BrainEdge(val a: Int, val b: Int, val strength: Float)
+/** A connection. [label] names a relationship ("sister", "works at") when ZED knows one. */
+data class BrainEdge(val a: Int, val b: Int, val strength: Float, val label: String? = null)
 
 class BrainGraph(val nodes: List<BrainNode>, val edges: List<BrainEdge>) {
     /** For each node, the indices of the nodes it is connected to. */
@@ -86,6 +87,17 @@ class BrainGraph(val nodes: List<BrainNode>, val edges: List<BrainEdge>) {
     val conceptCount: Int get() = nodes.count { it.type == BrainNodeType.CONCEPT }
 
     fun indexOf(key: String): Int = nodes.indexOfFirst { it.key == key }
+
+    /** The relationship label between two nodes, if their connection has one. */
+    fun edgeLabel(a: Int, b: Int): String? = edges.firstOrNull { (it.a == a && it.b == b) || (it.a == b && it.b == a) }?.label
+
+    /** Nodes whose label or text mentions [query], best match (exact name) first. */
+    fun find(query: String): List<Int> {
+        val q = query.trim().lowercase().removePrefix("my ").trim()
+        if (q.isEmpty()) return emptyList()
+        return nodes.indices.filter { nodes[it].type != BrainNodeType.CORE && (nodes[it].label.lowercase().contains(q) || nodes[it].text.lowercase().contains(q)) }
+            .sortedWith(compareBy<Int> { if (nodes[it].label.equals(q, true)) 0 else if (nodes[it].type == BrainNodeType.CONCEPT) 1 else 2 })
+    }
 
     /** Nodes whose text contains every word of [query]. */
     fun search(query: String): List<Int> {
@@ -214,7 +226,10 @@ object BrainBuilder {
         return if (line.length <= max) line else line.take(max - 1).trimEnd() + "…"
     }
 
-    fun build(items: List<BrainItem>, maxItems: Int = 110, maxConcepts: Int = 26): BrainGraph {
+    /** A labelled relationship to draw: (subject) —relation→ (target). "me" is the user. */
+    data class Link(val subject: String, val relation: String, val target: String)
+
+    fun build(items: List<BrainItem>, maxItems: Int = 110, maxConcepts: Int = 26, links: List<Link> = emptyList()): BrainGraph {
         val kept = items.filter { it.text.isNotBlank() }
             .sortedWith(compareByDescending<BrainItem> { it.pinned }.thenByDescending { it.timestamp })
             .take(maxItems)
@@ -280,6 +295,28 @@ object BrainBuilder {
                 )
                 for (i in c.items) edges += BrainEdge(index, itemIndex[i], 0.5f)
             }
+
+        // Labelled relationships: each side becomes a named node (reusing a concept for the same word), joined by a labelled edge.
+        if (links.isNotEmpty()) {
+            val keyIndex = HashMap<String, Int>().apply { nodes.forEachIndexed { i, n -> put(n.key, i) } }
+            fun entity(name: String): Int {
+                if (name.equals("me", true)) return areaIndex["You"] ?: 0
+                val words = name.split(SPLIT).mapNotNull { conceptKey(it) }
+                val key = if (words.size == 1) "concept:${words[0]}" else "entity:" + name.lowercase().trim()
+                keyIndex[key]?.let { return it }
+                val i = nodes.size
+                nodes += BrainNode(key, BrainNodeType.CONCEPT, name.trim(), "“${name.trim()}” — someone or something ZED knows about.", 0.4f)
+                keyIndex[key] = i
+                // Connect the new name to the memories that mention it.
+                val needle = name.lowercase()
+                kept.forEachIndexed { k, item -> if (item.text.lowercase().contains(needle)) edges += BrainEdge(i, itemIndex[k], 0.5f) }
+                return i
+            }
+            links.take(40).forEach { l ->
+                val a = entity(l.subject); val b = entity(l.target)
+                if (a != b && edges.none { ((it.a == a && it.b == b) || (it.a == b && it.b == a)) && it.label == l.relation }) edges += BrainEdge(a, b, 0.8f, l.relation)
+            }
+        }
         return BrainGraph(nodes, edges)
     }
 }

@@ -112,6 +112,12 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
     fun stop() { c.orchestrator.cancelCurrent(); c.chatTts.stop() }
 
+    /** "Wrong" on a reply: ZED saves what is right and won't repeat the mistake. */
+    fun correct(m: MessageEntity, fix: String) {
+        if (fix.isBlank()) return
+        viewModelScope.launch { runCatching { c.orchestrator.correctReply(m.conversationId, m.id, fix) } }
+    }
+
     /** "Report" on a reply: writes what was asked, what ZED did and how long it took to a file in Downloads. */
     fun report(m: MessageEntity) {
         viewModelScope.launch {

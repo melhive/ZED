@@ -179,6 +179,11 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         },
         Rule(rx("forget (?:that |about )?(.+)")) { m -> tool("memory.forget", "query" to m.groupValues[1]) },
 
+        // The Live Brain, by voice: "show me everything about Ana".
+        Rule(rx("(?:show|open|display)(?: me)? (?:everything|all|what you know|what do you know|all you know) (?:about|on) (.+?)(?: in (?:my|the|your) brain)?|show (.+?) in (?:my|the|your) (?:live )?brain|(?:open|show)(?: me)? (?:my |the |your )?(?:live )?brain")) { m ->
+            tool("brain.show", "query" to m.groupValues[1].ifEmpty { m.groupValues[2] })
+        },
+
         // History and documents.
         Rule(rx("search (?:my |the )?(?:history|conversations|chats|chat history) (?:for )?(.+)")) { m -> tool("history.search", "query" to m.groupValues[1]) },
         Rule(rx("index (?:my |the )?(?:documents|docs|files)(?: in (.+))?")) { m -> tool("docs.index", "path" to normalizeFolderWords(m.groupValues[1])) },

@@ -272,6 +272,7 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
 
         // What ZED learned from recent conversations, for review.
         LearnedCard()
+        InsightsCard(onNavigate, onTab)
         val waitingOnline by c.pending.waiting.collectAsStateWithLifecycle(initialValue = 0)
         if (waitingOnline > 0) ZedCard(accent = ZedColors.Amber) {
             SectionTitle("Waiting for the internet")

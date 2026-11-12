@@ -33,6 +33,7 @@ abstract class ZedDatabase : RoomDatabase() {
     abstract fun knowledge(): KnowledgeDao
     abstract fun audit(): AuditDao
     abstract fun pendingRequests(): PendingRequestDao
+    abstract fun relations(): RelationDao
 
     companion object {
         const val NAME = "zed.db"

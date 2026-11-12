@@ -182,6 +182,12 @@ class AppContainer(private val context: Context) {
     /** Requests that wait for the internet (answered and announced when it is back). */
     val pending by lazy { com.melhive.zed.web.PendingQueue(context, this) }
 
+    /** Dreaming: merges duplicates, reads relationships, notices patterns (while charging). */
+    val dreamer by lazy { com.melhive.zed.learning.Dreamer(context, this) }
+
+    /** "Show me everything about Ana": what the Live Brain should fly to when it opens. */
+    val brainFocus = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+
     /** Automatic learning from ordinary conversation. */
     val learner by lazy { com.melhive.zed.learning.Learner(context, this, appScope) }
 

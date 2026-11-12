@@ -124,6 +124,9 @@ class ToolCatalog(specs: List<ToolSpec>) {
                     p("fact", STRING, "The fact to remember"),
                 ), MODIFY),
                 ToolSpec("memory.list", "List memories", "Lists remembered facts.", emptyList(), READ_ONLY),
+                ToolSpec("brain.show", "Show in the Live Brain", "Opens the Live Brain and flies to everything ZED knows about a person, place or topic.", listOf(
+                    p("query", STRING, "Who or what to show, e.g. Ana; omit for the whole brain", required = false),
+                ), READ_ONLY),
                 ToolSpec("memory.forget", "Forget fact", "Deletes remembered facts matching the text.", listOf(
                     p("query", STRING, "Text of the fact(s) to forget"),
                 ), DESTRUCTIVE),

@@ -350,6 +350,17 @@ fun registerExecutors(tm: ToolManager, c: AppContainer, context: Context) {
         val r = c.reminderScheduler.create(a.string("text"), at.epochMillis())
         ok("Reminder #${r.id} set for ${at.pretty()}: “${r.text}”." + if (!r.exact) " (Approximate timing: allow “Alarms & reminders” in Permissions for exact delivery.)" else "")
     }
+    tm.register("brain.show") { a, _ ->
+        val q = a.stringOrNull("query")?.trim()?.removePrefix("my ")?.trim().orEmpty()
+        val count = if (q.isEmpty()) 0 else c.memory.find(q).size + c.todos.list(true).count { it.title.contains(q, true) } + c.db.reminders().scheduled().count { it.text.contains(q, true) }
+        c.brainFocus.value = q.ifEmpty { null }
+        context.startActivity(com.melhive.zed.assist.ZedLaunch.intent(context, com.melhive.zed.ui.navigation.Routes.BRAIN))
+        ok(when {
+            q.isEmpty() -> "Opening the Live Brain."
+            count == 0 -> "Opening the Live Brain — I don't have anything about “$q” yet."
+            else -> "Opening the Live Brain at “$q” — $count thing${if (count == 1) "" else "s"} I know."
+        })
+    }
     tm.register("reminder.reschedule") { a, _ ->
         val at = a.dateTime("at")
         if (!at.isAfter(LocalDateTime.now())) return@register fail("That time (${at.pretty()}) has already passed.")

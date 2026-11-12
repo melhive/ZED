@@ -31,6 +31,14 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.28", "2026-11-12", "Deeper intelligence", listOf(
+            "Relationships in the Live Brain: ZED reads who and what connects — “Ana → sister”, “Dr. Cruz → dentist → Cebu” — and draws them as named connections. Tap a person to see how they relate to you.",
+            "Dreaming: while the phone charges, ZED tidies its memory — duplicates are merged and relationships are read out (Gemma helps when it's allowed to run).",
+            "Insights, kept rare: “You've mentioned the dentist 3 times lately — want a reminder?” or “You turn on Do Not Disturb around 10 PM most days — make it a routine?” Shown once on Home; wave them away with Not now.",
+            "Leave-now hints: before a calendar event that has a place, ZED tells you when it's time to get going. At most one hint every three hours (Settings → Intelligence → Proactive hints).",
+            "Learning from “that's wrong”: say it (with the right answer, or ZED will ask), or tap Wrong under a reply. The correction is remembered and used the next time the topic comes up.",
+            "Voice control of the brain: “show me everything about Ana” opens the Live Brain and flies straight there.",
+        )),
         Release("0.1.27", "2026-11-12", "The classic orb is back, improved", listOf(
             "The arc-reactor orb is back in place of the plasma orb, with improvements.",
             "While you speak, rings travel inward with your voice. While ZED speaks, a ring of fine ticks follows its actual voice (on-device voices; phone voices pulse word by word).",

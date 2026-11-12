@@ -94,6 +94,8 @@ data class AppSettings(
     val webResearch: Boolean = true,
     /** Plan → answer → check on hard questions (slower, more careful). */
     val thinkTwice: Boolean = true,
+    /** Rare, useful nudges: leave-now before events with a place, insights from dreaming. */
+    val proactiveHints: Boolean = true,
     /** full | balanced | light — how much animation runs (performance mode). */
     val animationLevel: String = "full",
 ) {
@@ -147,6 +149,7 @@ class SettingsRepository(private val context: Context) {
         val webResearch = booleanPreferencesKey("web_research")
         val thinkTwice = booleanPreferencesKey("think_twice")
         val animationLevel = stringPreferencesKey("animation_level")
+        val proactiveHints = booleanPreferencesKey("proactive_hints")
         fun model(kind: OnlineProviderKind) = stringPreferencesKey("online_model_${kind.name.lowercase()}")
     }
 
@@ -198,6 +201,7 @@ class SettingsRepository(private val context: Context) {
             webResearch = p[K.webResearch] ?: true,
             thinkTwice = p[K.thinkTwice] ?: true,
             animationLevel = p[K.animationLevel] ?: "full",
+            proactiveHints = p[K.proactiveHints] ?: true,
         )
     }
 
@@ -243,6 +247,7 @@ class SettingsRepository(private val context: Context) {
     suspend fun setWebResearch(v: Boolean) = context.dataStore.edit { it[K.webResearch] = v }
     suspend fun setThinkTwice(v: Boolean) = context.dataStore.edit { it[K.thinkTwice] = v }
     suspend fun setAnimationLevel(v: String) = context.dataStore.edit { it[K.animationLevel] = v }
+    suspend fun setProactiveHints(v: Boolean) = context.dataStore.edit { it[K.proactiveHints] = v }
     suspend fun setOnboardingDone() = context.dataStore.edit { it[K.onboarding] = true }
     suspend fun setSkillEnabled(id: String, enabled: Boolean) = context.dataStore.edit { p ->
         val all = AppSettings().enabledSkills

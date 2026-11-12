@@ -177,6 +177,26 @@ class OrchestratorTest {
         assertEquals(0, fake.requests.size, "none of this needed the model")
     }
 
+    @Test fun thatsWrongIsLearned() = runBlocking<Unit> {
+        val fake = FakeProvider(
+            listOf(GenerationEvent.Delta("Ana's birthday is May 5."), GenerationEvent.Done("stop")),
+            listOf(GenerationEvent.Delta("The capital of Australia is Sydney."), GenerationEvent.Done("stop")),
+        )
+        provider = fake
+        val o = orchestrator()
+        val id = conversations.create()
+        o.respond(id, "When is Ana's birthday?")
+        assertTrue(o.respond(id, "That's wrong, her birthday is March 3").text.startsWith("Thanks — noted"))
+        val memory = MemoryRepository(db)
+        assertTrue(memory.list(20).any { it.source == "correction" && it.text.contains("March 3") && it.text.contains("May 5") })
+        // Without the right answer, ZED asks — and learns from the reply.
+        o.respond(id, "What's the capital of Australia?")
+        assertEquals("Sorry about that — what's the right answer?", o.respond(id, "that's not right").text)
+        assertTrue(o.respond(id, "Canberra").text.contains("Canberra"))
+        assertTrue(memory.list(20).any { it.source == "correction" && it.text.contains("Canberra") })
+        assertEquals(2, fake.requests.size, "corrections never needed the model")
+    }
+
     @Test fun regenerateReplacesTheLastAnswer() = runBlocking<Unit> {
         provider = FakeProvider(
             listOf(GenerationEvent.Delta("First answer"), GenerationEvent.Done("stop")),

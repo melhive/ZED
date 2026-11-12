@@ -219,6 +219,8 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
     val facts by c.memory.facts.collectAsStateWithLifecycle(initialValue = emptyList())
     val todos by c.todos.todos.collectAsStateWithLifecycle(initialValue = emptyList())
     val allItems by c.brain.items.collectAsStateWithLifecycle(initialValue = emptyList())
+    val links by c.brain.links.collectAsStateWithLifecycle(initialValue = emptyList())
+    val focusRequest by c.brainFocus.collectAsStateWithLifecycle()
     val recalls by c.brain.recalls.collectAsStateWithLifecycle()
     val settings by c.settings.settings.collectAsStateWithLifecycle(initialValue = null)
     // Performance mode: "balanced" drops the travelling signals, "light" also the glow.
@@ -258,8 +260,8 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
         if (haptic) runCatching { view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK) }
     }
 
-    LaunchedEffect(items) {
-        val next = withContext(Dispatchers.Default) { BrainBuilder.build(items) }
+    LaunchedEffect(items, links) {
+        val next = withContext(Dispatchers.Default) { BrainBuilder.build(items, links = links) }
         if (layout.graph.nodes.isEmpty()) {
             // First time: unfold the brain off-screen so it appears already organized.
             layout = withContext(Dispatchers.Default) { BrainLayout().also { it.setGraph(next); it.settle() } }
@@ -358,6 +360,16 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
             tick(key.hashCode())
             if (center) { cam.focusKey = key; if (cam.zoom < 1.8f) cam.zoom = 1.8f }
         }
+    }
+
+    // "Show me everything about Ana": fly to the best match and light up everything that mentions it.
+    LaunchedEffect(focusRequest, graph) {
+        val q = focusRequest ?: return@LaunchedEffect
+        if (graph.nodes.isEmpty()) return@LaunchedEffect
+        val hits = graph.find(q)
+        searching = true; query = q.removePrefix("my ").trim()
+        if (hits.isNotEmpty()) select(graph.nodes[hits.first()].key, center = true)
+        c.brainFocus.value = null
     }
 
     fun startLapse() {
@@ -495,6 +507,14 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
                     val wide = (if (hot) 2.2f else 1.5f) * unit * persp[lo].coerceIn(0.7f, 1.5f)
                     val thin = (if (hot) 1.2f else 0.7f) * unit * persp[hi].coerceIn(0.7f, 1.5f)
                     synapse(ax, ay, bx, by, k, color.copy(alpha = alpha.coerceIn(0f, 1f)), wide, thin, segments)
+                    // Named relationships ("sister", "works at") are written along the connection when it is in focus or close up.
+                    edge.label?.let { lbl ->
+                        if (hot || (focusSet == null && scale * (persp[lo] + persp[hi]) / 2f > 1.1f)) {
+                            val text = labels.getOrPut("rel:$lbl") { measurer.measure(lbl, TextStyle(fontSize = 10.sp, color = ZedColors.Amber), maxLines = 1) }
+                            val mid = curve(ax, ay, bx, by, k, 0.5f)
+                            drawText(text, color = ZedColors.Amber.copy(alpha = if (hot) 0.95f else 0.6f * depth), topLeft = Offset(mid.x - text.size.width / 2f, mid.y - text.size.height - 2f * unit))
+                        }
+                    }
 
                     if (((!glow || !signals) && !hot) || dim || grown < 0.9f) return@forEachIndexed
                     val period = if (hot) 0.9f else 2.2f + (e * 37 % 17) / 10f
@@ -705,7 +725,8 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
                                     Canvas(Modifier.size(8.dp)) { drawCircle(other.type.color()) }
                                     Spacer(Modifier.width(8.dp))
                                     Text(other.label, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                                    Text(if (other.type == BrainNodeType.CATEGORY) "Area" else other.type.label, style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted)
+                                    val rel = graph.edgeLabel(selected, graph.indexOf(other.key))
+                                    Text(rel ?: if (other.type == BrainNodeType.CATEGORY) "Area" else other.type.label, style = MaterialTheme.typography.labelSmall, color = if (rel != null) ZedColors.Amber else ZedColors.Muted)
                                 }
                             }
                         }

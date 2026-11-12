@@ -119,6 +119,21 @@ class CalendarReader(private val context: Context) {
         return out
     }
 
+    /** The next timed event in the coming two hours that has a place: title, start and location. */
+    fun nextEventWithPlace(now: Long): Triple<String, Long, String>? {
+        if (!granted()) return null
+        val uri = CalendarContract.Instances.CONTENT_URI.buildUpon().also { android.content.ContentUris.appendId(it, now); android.content.ContentUris.appendId(it, now + 2 * 3_600_000L) }.build()
+        return context.contentResolver.query(uri, arrayOf(CalendarContract.Instances.TITLE, CalendarContract.Instances.BEGIN, CalendarContract.Instances.ALL_DAY, CalendarContract.Instances.EVENT_LOCATION),
+            "${CalendarContract.Instances.BEGIN} > ?", arrayOf(now.toString()), "${CalendarContract.Instances.BEGIN} ASC")?.use { c ->
+            while (c.moveToNext()) {
+                if (c.getInt(2) == 1) continue
+                val place = c.getString(3)?.trim().orEmpty()
+                if (place.isNotEmpty()) return@use Triple(c.getString(0) ?: "(no title)", c.getLong(1), place)
+            }
+            null
+        }
+    }
+
     /** The next event starting after [now] in the coming week: title and start time. */
     fun nextEvent(now: Long): Pair<String, Long>? {
         if (!granted()) return null

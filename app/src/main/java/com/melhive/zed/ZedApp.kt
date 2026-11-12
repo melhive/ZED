@@ -41,6 +41,8 @@ class ZedApp : Application() {
             runCatching { com.melhive.zed.backup.AutoBackupWorker.schedule(this@ZedApp, container.settings.current().autoBackupFolder.isNotBlank()) }
             // Automatic learning: after conversations while ZED is open, and twice a day while charging.
             runCatching { com.melhive.zed.learning.Learner.schedule(this@ZedApp, container.settings.current().autoLearning); container.learner.watch() }
+            // Rare, useful nudges (leave-now before events with a place).
+            runCatching { com.melhive.zed.learning.Dreamer.scheduleHints(this@ZedApp, container.settings.current().proactiveHints) }
             // Anything still waiting for the internet runs as soon as there is a connection.
             runCatching { if (container.db.pendingRequests().waiting().isNotEmpty()) com.melhive.zed.web.PendingQueue.schedule(this@ZedApp) }
             // Keep the home-screen widget's next reminder and task count current.

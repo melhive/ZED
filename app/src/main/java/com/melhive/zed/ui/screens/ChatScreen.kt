@@ -92,6 +92,7 @@ fun ChatScreen(initialConversationId: Long?, onOpenLive: () -> Unit, onOpenModel
 
     var input by rememberSaveable { mutableStateOf("") }
     var showHistory by remember { mutableStateOf(false) }
+    var wrongFor by remember { mutableStateOf<MessageEntity?>(null) }
     var modeMenu by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
@@ -143,7 +144,7 @@ fun ChatScreen(initialConversationId: Long?, onOpenLive: () -> Unit, onOpenModel
                 LazyColumn(state = listState, contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
                     val lastAssistantId = messages.lastOrNull { it.role == "assistant" }?.id
                     items(messages, key = { it.id }) { m ->
-                        MessageBubble(m, showRegenerate = !busy && m.id == lastAssistantId && m.source != "native", onRegenerate = vm::regenerate, onReport = { vm.report(m) })
+                        MessageBubble(m, showRegenerate = !busy && m.id == lastAssistantId && m.source != "native", onRegenerate = vm::regenerate, onReport = { vm.report(m) }, onWrong = { wrongFor = m })
                     }
                 }
             }
@@ -208,6 +209,23 @@ fun ChatScreen(initialConversationId: Long?, onOpenLive: () -> Unit, onOpenModel
         }
     }
 
+    wrongFor?.let { m ->
+        var fix by remember(m.id) { mutableStateOf("") }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { wrongFor = null },
+            title = { Text("What's right?") },
+            text = {
+                Column {
+                    Text("Tell me the correct answer. I'll remember it, so I don't make the same mistake again.", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
+                    OutlinedTextField(value = fix, onValueChange = { fix = it.take(300) }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+                }
+            },
+            confirmButton = { TextButton(enabled = fix.isNotBlank(), onClick = { vm.correct(m, fix); wrongFor = null }) { Text("Save") } },
+            dismissButton = { TextButton(onClick = { wrongFor = null }) { Text("Cancel") } },
+            containerColor = ZedColors.SurfaceHigh,
+        )
+    }
+
     if (showHistory) {
         ModalBottomSheet(onDismissRequest = { showHistory = false }, containerColor = ZedColors.Surface) {
             Text("Conversations", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(16.dp))
@@ -233,7 +251,7 @@ fun ChatScreen(initialConversationId: Long?, onOpenLive: () -> Unit, onOpenModel
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun MessageBubble(m: MessageEntity, showRegenerate: Boolean = false, onRegenerate: () -> Unit = {}, onReport: () -> Unit = {}) {
+private fun MessageBubble(m: MessageEntity, showRegenerate: Boolean = false, onRegenerate: () -> Unit = {}, onReport: () -> Unit = {}, onWrong: () -> Unit = {}) {
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     val isUser = m.role == "user"
     if (m.role == "tool") {
@@ -284,6 +302,9 @@ private fun MessageBubble(m: MessageEntity, showRegenerate: Boolean = false, onR
                 }
                 if (showRegenerate) TextButton(onClick = onRegenerate, contentPadding = PaddingValues(horizontal = 6.dp)) {
                     Text("Regenerate", style = MaterialTheme.typography.labelSmall, color = ZedColors.Cyan)
+                }
+                TextButton(onClick = onWrong, contentPadding = PaddingValues(horizontal = 6.dp)) {
+                    Text("Wrong", style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted)
                 }
                 TextButton(onClick = onReport, contentPadding = PaddingValues(horizontal = 6.dp)) {
                     Text("Report", style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted)
