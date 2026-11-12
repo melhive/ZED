@@ -13,7 +13,7 @@ Native Android personal AI assistant (Kotlin, Jetpack Compose). Three intelligen
 | Default branch | `main` (stable merges) |
 | Latest commit | see `git log -1` (this file is updated with each milestone) |
 | Build status | ✅ GitHub Actions **Android Build** green: core tests, Android unit tests, debug APK |
-| Releases | ✅ Signed release **v0.1.26** published (latest). Install/share link: https://github.com/melhive/ZED/releases/latest/download/zed.apk. Every push to `main` publishes the version in `VERSION` (bump it for a new release; re-pushing the same version replaces that release). App id `com.melhive.zed`, signed with the key in `/root/zed-signing` (back it up — updates need the same key). |
+| Releases | ✅ Signed release **v0.1.27** published (latest). Install/share link: https://github.com/melhive/ZED/releases/latest/download/zed.apk. Every push to `main` publishes the version in `VERSION` (bump it for a new release; re-pushing the same version replaces that release). App id `com.melhive.zed`, signed with the key in `/root/zed-signing` (back it up — updates need the same key). |
 
 ## Milestones
 
@@ -59,6 +59,10 @@ Failed tests: none.
 | Model download (2–3 GB) with resume + SHA-256 | | ✅ | ✅ | |
 | Keystore secret storage | | ✅ | ✅ | |
 | STT / TTS / sentence streaming / barge-in / audio focus | VAD only | ✅ | ✅ | |
+
+## Classic orb restored and improved (v0.1.27)
+
+The user preferred the arc-reactor orb, so `PlasmaOrb` was removed and `ZedOrb` is the classic orb again, improved: one throttled frame clock (20 fps thinking, 12 fps light, 60 fps speaking) with accumulated rotation; inward ripples from the mic level; a mirrored 48-tick voice ring driven by `AudioLevels` (word pulse for phone voices); synapse sparks in the core while thinking; a check on completion; softer glow. Release 5 work is paused in `git stash` ("release 5 (deeper intelligence) — paused, unfinished").
 
 ## Orb and futuristic UI (v0.1.26)
 

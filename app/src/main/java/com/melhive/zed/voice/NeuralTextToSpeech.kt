@@ -94,7 +94,7 @@ class NeuralTextToSpeech(
 
     /** Called after each rendered sentence with render time ÷ audio length (below 1 = faster than real time). */
     @Volatile var onRealTimeFactor: ((Float) -> Unit)? = null
-    /** Loudness of each slice of speech as it is played (for the plasma orb; may run in another process). */
+    /** Loudness of each slice of speech as it is played (drives the orb; may run in another process). */
     @Volatile var onLevels: ((FloatArray) -> Unit)? = null
 
     private class Request(val id: String, val sentences: List<String>, val gen: Int)

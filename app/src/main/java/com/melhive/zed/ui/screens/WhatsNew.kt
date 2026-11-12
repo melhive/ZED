@@ -31,6 +31,12 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.27", "2026-11-12", "The classic orb is back, improved", listOf(
+            "The arc-reactor orb is back in place of the plasma orb, with improvements.",
+            "While you speak, rings travel inward with your voice. While ZED speaks, a ring of fine ticks follows its actual voice (on-device voices; phone voices pulse word by word).",
+            "While thinking, faint synapse sparks cross the core, and the orb draws fewer frames so Gemma keeps the chip. When something is done, a check mark appears.",
+            "The glow is a little softer, and Light mode (Settings → Intelligence → Animation) turns it off and slows the orb further.",
+        )),
         Release("0.1.26", "2026-11-12", "The plasma orb and a new Home", listOf(
             "A new plasma orb: a soft, living surface. Your voice energises it and sends ripples inward; when ZED speaks with an on-device voice, the surface takes its shape from the actual sound. Older phones keep the classic orb.",
             "Clearer states: listening, thinking (small synapse flashes cross the orb), acting (it says what — “Setting alarm…”), speaking, done and error.",

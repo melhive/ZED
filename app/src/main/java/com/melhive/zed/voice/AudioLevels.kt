@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * The loudness of what ZED is saying right now, slice by slice, taken from the
- * actual audio being played (on-device voices). The plasma orb shapes its
+ * actual audio being played (on-device voices). The orb's voice ring follows
  * surface from it. The phone's built-in voices don't share their audio, so
  * with them the orb falls back to the word-by-word pulse.
  */
