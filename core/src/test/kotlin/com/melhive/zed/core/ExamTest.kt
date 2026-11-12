@@ -234,9 +234,9 @@ class ExamTest {
 
     @Test fun choosingTheEventToMove() {
         val m = com.melhive.zed.core.understanding.CalendarMove
-        val lunch = m.Event(1, "Lunch with Ana", now.plusDays(1).withHour(12), now.plusDays(1).withHour(13))
-        val lunch2 = m.Event(2, "Lunch with Ana", now.plusDays(8).withHour(12), now.plusDays(8).withHour(13))
-        val standup = m.Event(3, "Team standup", now.plusHours(2), now.plusHours(2).plusMinutes(15), recurring = true)
+        val lunch = com.melhive.zed.core.understanding.CalendarMove.Event(1, "Lunch with Ana", now.plusDays(1).withHour(12), now.plusDays(1).withHour(13))
+        val lunch2 = com.melhive.zed.core.understanding.CalendarMove.Event(2, "Lunch with Ana", now.plusDays(8).withHour(12), now.plusDays(8).withHour(13))
+        val standup = com.melhive.zed.core.understanding.CalendarMove.Event(3, "Team standup", now.plusHours(2), now.plusHours(2).plusMinutes(15), recurring = true)
         val events = listOf(lunch2, standup, lunch)
         assertEquals(1L, m.pick(events, "lunch with Ana", null, now)?.id, "the next one")
         assertEquals(2L, m.pick(events, "lunch", lunch2.start, now)?.id, "the one the conversation was about")
