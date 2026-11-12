@@ -30,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -39,6 +40,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -46,6 +48,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.melhive.zed.agents.ConfirmationRequest
 import com.melhive.zed.ui.theme.ZedColors
+
+/** full | balanced | light — how much motion the UI shows (Settings → Intelligence → Animation). */
+val LocalMotion = androidx.compose.runtime.staticCompositionLocalOf { "full" }
 
 @Composable
 fun ZedCard(
@@ -56,8 +61,16 @@ fun ZedCard(
 ) {
     // Borderless glass panel: deep translucent fill, a soft accent glow from the corner and a small accent tab.
     val shape = RoundedCornerShape(22.dp)
+    // Scans in once: a band of light passes over the panel as it appears (kept across scrolling).
+    var seen by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    val sweep = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(if (seen || LocalMotion.current != "full") 1f else 0f) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        if (sweep.value < 1f) sweep.animateTo(1f, androidx.compose.animation.core.tween(650, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+        seen = true
+    }
     Column(
         modifier
+            .graphicsLayer { alpha = (0.35f + sweep.value * 1.3f).coerceAtMost(1f); translationY = (1f - sweep.value) * 18f }
             .clip(shape)
             .background(Brush.linearGradient(listOf(ZedColors.SurfaceHigh.copy(alpha = 0.85f), ZedColors.Surface.copy(alpha = 0.7f))))
             .drawWithContent {
@@ -66,6 +79,11 @@ fun ZedCard(
                     size.minDimension * 0.95f, androidx.compose.ui.geometry.Offset.Zero,
                 )
                 drawContent()
+                val p = sweep.value
+                if (p < 1f) {
+                    val y = size.height * (p * 1.4f - 0.2f)
+                    drawRect(Brush.verticalGradient(listOf(Color.Transparent, accent.copy(alpha = 0.22f * (1f - p)), Color.Transparent), y - 40f, y + 40f))
+                }
             }
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(16.dp),

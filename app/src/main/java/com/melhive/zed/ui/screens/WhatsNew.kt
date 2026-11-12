@@ -31,6 +31,14 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.26", "2026-11-12", "The plasma orb and a new Home", listOf(
+            "A new plasma orb: a soft, living surface. Your voice energises it and sends ripples inward; when ZED speaks with an on-device voice, the surface takes its shape from the actual sound. Older phones keep the classic orb.",
+            "Clearer states: listening, thinking (small synapse flashes cross the orb), acting (it says what — “Setting alarm…”), speaking, done and error.",
+            "Lighter while Gemma works: the orb draws fewer frames and the rings hold still while ZED is thinking, leaving the chip to the model.",
+            "Floating assistant: the screen edges glow while ZED listens, live captions show what it hears and says, chips confirm what it did (“Alarm 6:00 ✓”), and weather, schedule, tasks and web answers appear as cards. Drag it around; fling it away to close.",
+            "Home console: rings for battery, memory, network and Gemma, and a live countdown to your next event, reminder or timer.",
+            "Motion: panels scan in with a light sweep, numbers count up, points of light drift behind Home and lean as you tilt the phone, and taps give a light vibration. Settings → Intelligence → Animation turns it down.",
+        )),
         Release("0.1.25", "2026-11-12", "Learning and the internet", listOf(
             "Web research without any key: ZED searches the web (DuckDuckGo, with Bing and Wikipedia as backups), reads the best pages and Gemma answers with numbered sources listed underneath. Only the search question leaves the phone — never your memories or conversations.",
             "ZED researches on its own when a question needs fresh facts (news, prices, results, opening hours). Say “research …” to ask directly.",

@@ -13,7 +13,7 @@ Native Android personal AI assistant (Kotlin, Jetpack Compose). Three intelligen
 | Default branch | `main` (stable merges) |
 | Latest commit | see `git log -1` (this file is updated with each milestone) |
 | Build status | ✅ GitHub Actions **Android Build** green: core tests, Android unit tests, debug APK |
-| Releases | ✅ Signed release **v0.1.25** published (latest). Install/share link: https://github.com/melhive/ZED/releases/latest/download/zed.apk. Every push to `main` publishes the version in `VERSION` (bump it for a new release; re-pushing the same version replaces that release). App id `com.melhive.zed`, signed with the key in `/root/zed-signing` (back it up — updates need the same key). |
+| Releases | ✅ Signed release **v0.1.26** published (latest). Install/share link: https://github.com/melhive/ZED/releases/latest/download/zed.apk. Every push to `main` publishes the version in `VERSION` (bump it for a new release; re-pushing the same version replaces that release). App id `com.melhive.zed`, signed with the key in `/root/zed-signing` (back it up — updates need the same key). |
 
 ## Milestones
 
@@ -59,6 +59,14 @@ Failed tests: none.
 | Model download (2–3 GB) with resume + SHA-256 | | ✅ | ✅ | |
 | Keystore secret storage | | ✅ | ✅ | |
 | STT / TTS / sentence streaming / barge-in / audio focus | VAD only | ✅ | ✅ | |
+
+## Orb and futuristic UI (v0.1.26)
+
+- **Plasma orb** (`ui/components/PlasmaOrb.kt`, shape maths in `core/ui/Plasma.kt`, unit-tested): three drifting layers, inward ripples from the mic level, surface shaped by the real speech envelope. The neural voice runs in the `:voice` process, so `NeuralTextToSpeech.onLevels` → `NeuralVoiceService.MSG_LEVELS` → `AudioLevels` carries the loudness across; phone voices fall back to the word pulse. Own frame clock: 20 fps while thinking, 12 fps in Light mode. Android < 10 or < 3 GB RAM keeps the classic orb.
+- **States**: action labels from `ActionLabels.progress` in the activity detail; synapse flashes while thinking; `JarvisHud` holds still while the model works.
+- **Floating assistant**: `EdgeGlow`, `LiveCaptions` (streaming text), `ResultChips` and `ResultCard` from the new `AssistantOrchestrator.results` stream; drag anywhere, fling > 140 dp to dismiss; haptics on results.
+- **Home console** (`ui/components/Console.kt`): battery, memory, network and Gemma rings with count-up numbers, live countdown to the next event/reminder/timer, tilt-reactive `ParticleField`.
+- **Motion**: `LocalMotion` (animation level) app-wide; `ZedCard` scans in once (state kept across scrolling); tab haptics. **Everything visual needs the user's eyes on the phone.**
 
 ## Learning and the internet (v0.1.25)
 

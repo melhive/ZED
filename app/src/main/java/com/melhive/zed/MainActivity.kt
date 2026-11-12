@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.mutableStateOf
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import com.melhive.zed.ui.navigation.ZedRoot
 import com.melhive.zed.ui.theme.ZedTheme
@@ -19,7 +20,12 @@ class MainActivity : ComponentActivity() {
         requestedRoute.value = route(intent)
         setContent {
             ZedTheme {
-                ZedRoot(requestedRoute = requestedRoute.value, onRouteConsumed = { requestedRoute.value = null })
+                // How much motion the whole app shows (Settings → Intelligence → Animation).
+                val settings = (application as ZedApp).container.settings.settings
+                val motion = settings.collectAsStateWithLifecycle(initialValue = null).value?.animationLevel ?: "full"
+                androidx.compose.runtime.CompositionLocalProvider(com.melhive.zed.ui.components.LocalMotion provides motion) {
+                    ZedRoot(requestedRoute = requestedRoute.value, onRouteConsumed = { requestedRoute.value = null })
+                }
             }
         }
     }

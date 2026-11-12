@@ -76,14 +76,42 @@ fun rememberContinuousRotation(degreesPerSecond: Float): Float {
     return angle
 }
 
+/** Older or low-memory phones get the simpler orb. */
+private var simpleDevice: Boolean? = null
+
+private fun isSimpleDevice(context: android.content.Context): Boolean = simpleDevice ?: (android.os.Build.VERSION.SDK_INT < 29 || runCatching {
+    val mi = android.app.ActivityManager.MemoryInfo()
+    context.getSystemService(android.app.ActivityManager::class.java).getMemoryInfo(mi)
+    mi.totalMem in 1 until 3L * 1024 * 1024 * 1024
+}.getOrDefault(false)).also { simpleDevice = it }
+
 /**
- * The ZED orb. Every state-specific effect is driven by real inputs:
+ * The ZED orb: the plasma orb, or on older phones the simpler arc-reactor.
+ * [light] is the Light animation level (fewer frames, no glow).
+ */
+@Composable
+fun ZedOrb(
+    state: OrbState,
+    modifier: Modifier = Modifier,
+    micLevel: Float = 0f,
+    speechPulse: Int = 0,
+    size: Dp = 240.dp,
+    glow: Boolean = true,
+    light: Boolean = false,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    if (remember { isSimpleDevice(context) }) ClassicOrb(state, modifier, micLevel, speechPulse, size, glow && !light)
+    else PlasmaOrb(state, modifier, micLevel, speechPulse, size, glow && !light, light)
+}
+
+/**
+ * The classic ZED orb. Every state-specific effect is driven by real inputs:
  * [micLevel] comes from the recognizer / barge-in monitor RMS, [speechPulse]
  * increments on each TTS word boundary, and [state] follows the assistant
  * pipeline. Only the idle breathing/floating is a free-running animation.
  */
 @Composable
-fun ZedOrb(
+private fun ClassicOrb(
     state: OrbState,
     modifier: Modifier = Modifier,
     micLevel: Float = 0f,

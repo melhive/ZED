@@ -94,6 +94,8 @@ class NeuralTextToSpeech(
 
     /** Called after each rendered sentence with render time ÷ audio length (below 1 = faster than real time). */
     @Volatile var onRealTimeFactor: ((Float) -> Unit)? = null
+    /** Loudness of each slice of speech as it is played (for the plasma orb; may run in another process). */
+    @Volatile var onLevels: ((FloatArray) -> Unit)? = null
 
     private class Request(val id: String, val sentences: List<String>, val gen: Int)
     private class Chunk(val id: String, val pcm: ShortArray, val first: Boolean, val last: Boolean, val gen: Int)
@@ -272,6 +274,8 @@ class NeuralTextToSpeech(
             for (k in offset until offset + len) { val v = c.pcm[k] / 32768.0; sum += v * v }
             val now = System.currentTimeMillis()
             if (sqrt(sum / len) > 0.04 && now - lastPulse > 110) { _events.tryEmit(TtsEvent.Word(c.id)); lastPulse = now }
+            // The orb shapes itself from this slice of the real speech.
+            onLevels?.invoke(com.melhive.zed.core.ui.PlasmaShape.envelope(c.pcm, offset, len))
             val n = t.write(c.pcm, offset, len, AudioTrack.WRITE_BLOCKING)
             if (n <= 0) break
             offset += n
@@ -281,6 +285,7 @@ class NeuralTextToSpeech(
         // Wait until the last sample has actually been heard before reporting Done.
         val deadline = System.currentTimeMillis() + 1000L + (framesWritten * 1000L / maxOf(1, sampleRate))
         while (c.gen == generation.get() && !released && (t.playbackHeadPosition.toLong() and 0xFFFFFFFFL) < framesWritten && System.currentTimeMillis() < deadline) delay(15)
+        onLevels?.invoke(FloatArray(0))
         if (c.gen == generation.get()) finish(c.id, TtsEvent.Done(c.id))
     }
 

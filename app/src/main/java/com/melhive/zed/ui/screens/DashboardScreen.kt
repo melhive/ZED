@@ -133,6 +133,8 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
     val upcoming = reminders.filter { it.status == "scheduled" && it.triggerAt > now }.sortedBy { it.triggerAt }
     val openTodos = todos.filter { !it.done }
     val nextLine = when {
+        // Acting: say what ("Setting alarm…"); thinking: which model.
+        activity.busy && activity.phase != com.melhive.zed.agents.AssistantPhase.THINKING -> activity.detail ?: activity.phase.toOrb().label
         activity.busy -> activity.phase.toOrb().label + (activity.detail?.let { " · $it" } ?: "")
         upcoming.isNotEmpty() -> "Next: ${upcoming.first().text} at ${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(upcoming.first().triggerAt))}" +
             if (openTodos.isNotEmpty()) " · ${openTodos.size} open task${if (openTodos.size == 1) "" else "s"}" else ""
@@ -154,6 +156,11 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
         }
     }
 
+    val motion = settings?.animationLevel ?: "full"
+    val view = androidx.compose.ui.platform.LocalView.current
+    Box(Modifier.fillMaxSize()) {
+    // Points of light behind everything, leaning with the phone.
+    if (motion != "light") com.melhive.zed.ui.components.ParticleField(Modifier.matchParentSize(), tilt = motion == "full")
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().imePadding().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -173,11 +180,17 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
 
         // Orb: tap to talk.
         val interaction = remember { MutableInteractionSource() }
-        Box(Modifier.fillMaxWidth().clickable(interactionSource = interaction, indication = null) { onTab(Routes.LIVE) }, contentAlignment = Alignment.Center) {
-            ZedOrb(orbState, size = 190.dp, glow = (settings?.glow ?: true) && settings?.animationLevel != "light")
+        Box(Modifier.fillMaxWidth().clickable(interactionSource = interaction, indication = null) {
+            runCatching { view.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK) }
+            onTab(Routes.LIVE)
+        }, contentAlignment = Alignment.Center) {
+            ZedOrb(orbState, size = 190.dp, glow = settings?.glow ?: true, light = settings?.animationLevel == "light")
         }
         Text(nextLine, Modifier.fillMaxWidth(), textAlign = TextAlign.Center, color = if (activity.busy) ZedColors.Cyan else ZedColors.Muted,
             style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+
+        // The console: battery, memory, network and Gemma at a glance, and a live countdown to what's next.
+        com.melhive.zed.ui.components.HomeConsole(c, upcoming.firstOrNull()?.let { it.text to it.triggerAt })
 
         // Ask box
         OutlinedTextField(
@@ -300,6 +313,8 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
             StatusPill(intelligence, color, Modifier.weight(1f, fill = false))
         }
         Spacer(Modifier.height(8.dp))
+    }
+
     }
 
     if (askName) NameDialog(initial = "", onDismiss = { askName = false }) { name -> scope.launch { c.memory.setUserName(name) }; askName = false }

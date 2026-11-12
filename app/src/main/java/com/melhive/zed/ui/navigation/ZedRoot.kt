@@ -124,6 +124,7 @@ fun ZedRoot(requestedRoute: String?, onRouteConsumed: () -> Unit) {
         containerColor = ZedColors.Background,
         bottomBar = {
             if (route != Routes.LIVE && !imeVisible) {
+                val tabView = androidx.compose.ui.platform.LocalView.current
                 NavigationBar(
                     containerColor = ZedColors.Surface.copy(alpha = 0.97f),
                 ) {
@@ -131,7 +132,10 @@ fun ZedRoot(requestedRoute: String?, onRouteConsumed: () -> Unit) {
                         val selected = route?.substringBefore('?') == tab.route
                         NavigationBarItem(
                             selected = selected,
-                            onClick = { nav.navigateTab(tab.route) },
+                            onClick = {
+                                if (!selected) runCatching { tabView.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK) }
+                                nav.navigateTab(tab.route)
+                            },
                             icon = { Icon(tab.icon, tab.label) },
                             label = { Text(tab.label.uppercase(), letterSpacing = 1.5.sp, style = MaterialTheme.typography.labelSmall) },
                             colors = NavigationBarItemDefaults.colors(indicatorColor = ZedColors.Cyan.copy(alpha = 0.15f), selectedIconColor = ZedColors.Cyan, selectedTextColor = ZedColors.Cyan),

@@ -47,6 +47,9 @@ data class AssistantActivity(
 
 data class AssistantReply(val text: String, val ok: Boolean, val source: String)
 
+/** An action ZED just finished, for result chips ("Alarm 6:00 ✓") and cards. */
+data class ActionResult(val tool: String, val ok: Boolean, val chip: String?, val message: String, val conversationId: Long, val at: Long = System.currentTimeMillis())
+
 /**
  * Handles one user turn end to end:
  *  1. Deterministic native commands and computations are tried first (no model needed).
@@ -76,6 +79,10 @@ class AssistantOrchestrator(
     private val _streamingText = MutableStateFlow("")
     /** Live text of the reply being generated (for streaming TTS / UI). */
     val streamingText: StateFlow<String> = _streamingText.asStateFlow()
+
+    private val _results = kotlinx.coroutines.flow.MutableSharedFlow<ActionResult>(extraBufferCapacity = 16)
+    /** Every action as it finishes. */
+    val results: kotlinx.coroutines.flow.SharedFlow<ActionResult> = _results
 
     private val _lastUsage = MutableStateFlow<String?>(null)
     /** Token usage of the last online reply, when the provider reports it. */
@@ -262,11 +269,12 @@ class AssistantOrchestrator(
             "docs.search", "history.search", "file.read", "file.list" -> AssistantPhase.SEARCHING
             else -> AssistantPhase.EXECUTING
         }
-        setPhase(phase, request.tool, conversationId)
+        setPhase(phase, com.melhive.zed.core.ui.ActionLabels.progress(request.tool), conversationId)
         // Model-written calls get their everyday mistakes fixed (names, formats, the user's own times) first.
         val fixed = if (request.origin == ToolRequest.Origin.LOCAL_MODEL || request.origin == ToolRequest.Origin.ONLINE_MODEL)
             repair.repair(request, currentUserText).request else request
         val outcome = tools.execute(fixed)
+        _results.tryEmit(ActionResult(fixed.tool, outcome.isSuccess(), com.melhive.zed.core.ui.ActionLabels.chip(fixed.tool, fixed.args), outcome.message, conversationId))
         if (outcome.isSuccess()) dialogues[conversationId] = dialogue(conversationId).after(fixed, outcome.message)
         if (fixed.tool == "web.research" && outcome.isSuccess()) researchSources = (researchSources + com.melhive.zed.core.web.Research.sourcesFrom(outcome.message)).distinct()
         return outcome

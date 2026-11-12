@@ -61,6 +61,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.animation.core.VectorConverter
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -157,6 +162,27 @@ private fun AssistOverlay(onClose: () -> Unit, onOpenApp: () -> Unit) {
         uri?.let { askAbout(it) }
     }
     var photoMenu by remember { mutableStateOf(false) }
+    val settings by c.settings.settings.collectAsStateWithLifecycle(initialValue = null)
+    val light = settings?.animationLevel == "light"
+    val view = androidx.compose.ui.platform.LocalView.current
+
+    // What ZED did during this session: chips, and a card for results worth reading.
+    val openedAt = remember { System.currentTimeMillis() }
+    val results = remember { androidx.compose.runtime.mutableStateListOf<com.melhive.zed.agents.ActionResult>() }
+    var card by remember { mutableStateOf<com.melhive.zed.agents.ActionResult?>(null) }
+    LaunchedEffect(Unit) {
+        c.orchestrator.results.collect { r ->
+            if (r.at < openedAt) return@collect
+            results += r
+            if (com.melhive.zed.core.ui.ActionLabels.cardKind(r.tool) != null && r.ok) card = r
+            if (r.chip != null) runCatching { view.performHapticFeedback(if (r.ok) android.view.HapticFeedbackConstants.CONFIRM else android.view.HapticFeedbackConstants.REJECT) }
+        }
+    }
+    val streaming by c.orchestrator.streamingText.collectAsStateWithLifecycle()
+
+    // Drag the panel anywhere; fling it away to dismiss.
+    val drag = remember { androidx.compose.animation.core.Animatable(Offset.Zero, Offset.VectorConverter) }
+    val dismissAt = with(androidx.compose.ui.platform.LocalDensity.current) { 140.dp.toPx() }
 
     Box(Modifier.fillMaxSize()) {
         // Dim the app behind; tapping the empty area closes.
@@ -165,9 +191,23 @@ private fun AssistOverlay(onClose: () -> Unit, onOpenApp: () -> Unit) {
                 .background(Brush.radialGradient(listOf(Color(0xE6070B16), Color(0xF205070D))))
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClose),
         )
+        // The edges glow while ZED listens, brighter with the voice.
+        com.melhive.zed.ui.components.EdgeGlow(state.orb == OrbState.LISTENING, state.micLevel)
         AnimatedVisibility(shown, enter = androidx.compose.animation.scaleIn(tween(420), initialScale = 0.85f), modifier = Modifier.fillMaxSize()) {
             Column(
-                Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 16.dp, vertical = 12.dp),
+                Modifier.fillMaxSize()
+                    .offset { androidx.compose.ui.unit.IntOffset(drag.value.x.toInt(), drag.value.y.toInt()) }
+                    .graphicsLayer { alpha = (1f - drag.value.getDistance() / (dismissAt * 2.2f)).coerceIn(0.2f, 1f) }
+                    .pointerInput(Unit) {
+                        detectDragGestures(
+                            onDragEnd = {
+                                if (drag.value.getDistance() > dismissAt) onClose()
+                                else scope.launch { drag.animateTo(Offset.Zero, androidx.compose.animation.core.spring(dampingRatio = 0.7f)) }
+                            },
+                            onDragCancel = { scope.launch { drag.animateTo(Offset.Zero) } },
+                        ) { change, amount -> change.consume(); scope.launch { drag.snapTo(drag.value + amount) } }
+                    }
+                    .statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text("ZED", style = MaterialTheme.typography.titleMedium, color = ZedColors.Cyan, letterSpacing = 8.sp, modifier = Modifier.padding(top = 8.dp))
@@ -177,20 +217,22 @@ private fun AssistOverlay(onClose: () -> Unit, onOpenApp: () -> Unit) {
                 androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     val hud = minOf(maxWidth * 0.88f, 380.dp)
                     Box(Modifier.size(hud).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { live.tapOrb() }, contentAlignment = Alignment.Center) {
-                        JarvisHud(state, Modifier.fillMaxSize())
-                        ZedOrb(state.orb, micLevel = state.micLevel, speechPulse = state.speechPulse, size = hud * 0.58f, glow = true)
+                        JarvisHud(state, Modifier.fillMaxSize(), animate = !light)
+                        ZedOrb(state.orb, micLevel = state.micLevel, speechPulse = state.speechPulse, size = hud * 0.58f, glow = settings?.glow ?: true, light = light)
                     }
                 }
                 Text(
                     (state.statusDetail?.takeIf { state.orb == OrbState.ERROR || state.orb == OrbState.EXECUTING } ?: state.orb.label).uppercase(),
                     style = MaterialTheme.typography.labelLarge, color = hudColor(state.orb), letterSpacing = 4.sp, textAlign = TextAlign.Center,
                 )
+                // Live captions: what ZED hears, and what it says while it says it.
                 val lastUser = state.partial.ifBlank { state.transcript.lastOrNull { it.fromUser }?.text.orEmpty() }
-                val lastZed = state.transcript.lastOrNull { !it.fromUser }?.text.orEmpty()
-                if (lastUser.isNotBlank()) Text("“$lastUser”", style = MaterialTheme.typography.bodyMedium, color = ZedColors.Muted, textAlign = TextAlign.Center,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
-                if (lastZed.isNotBlank() && (state.transcript.lastOrNull()?.fromUser == false)) Text(lastZed, style = MaterialTheme.typography.bodyLarge, color = ZedColors.Text,
-                    textAlign = TextAlign.Center, maxLines = 4, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+                val answering = state.orb == OrbState.THINKING || state.orb == OrbState.SPEAKING
+                val lastZed = if (answering && streaming.isNotBlank()) streaming.substringBefore("```")
+                    else state.transcript.lastOrNull { !it.fromUser }?.text.orEmpty().takeIf { state.transcript.lastOrNull()?.fromUser == false }.orEmpty()
+                com.melhive.zed.ui.components.LiveCaptions(lastUser, lastZed)
+                com.melhive.zed.ui.components.ResultChips(results, Modifier.padding(top = 10.dp))
+                card?.let { r -> com.melhive.zed.ui.components.ResultCard(r, onDismiss = { card = null }, modifier = Modifier.padding(top = 10.dp)) }
                 Spacer(Modifier.weight(1f))
                 if (typing) OutlinedTextField(
                     value = typed, onValueChange = { typed = it }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),

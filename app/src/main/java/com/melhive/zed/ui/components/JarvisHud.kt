@@ -35,20 +35,34 @@ fun hudColor(o: OrbState): Color = when (o) {
     else -> ZedColors.Cyan
 }
 
-/** Arc-reactor style rings around the orb: rotating tick ring, counter-rotating arcs, a scanner while thinking. */
+/**
+ * Arc-reactor style rings around the orb: rotating tick ring, counter-rotating
+ * arcs. While the model is working (or with [animate] off) the rings hold
+ * still, so the screen leaves the graphics chip to the model.
+ */
 @Composable
-fun JarvisHud(state: LiveUiState, modifier: Modifier = Modifier) {
+fun JarvisHud(state: LiveUiState, modifier: Modifier = Modifier, animate: Boolean = true) {
+    val working = state.orb in setOf(OrbState.THINKING, OrbState.SEARCHING, OrbState.RESEARCHING)
+    if (animate && !working) AnimatedHud(state, modifier) else HudRings(state, modifier, 0f, 0f, 0f, 1f, false)
+}
+
+@Composable
+private fun AnimatedHud(state: LiveUiState, modifier: Modifier) {
     val t = rememberInfiniteTransition(label = "hud")
     val slow by t.animateFloat(0f, 360f, infiniteRepeatable(tween(24_000, easing = LinearEasing)), label = "slow")
     val fast by t.animateFloat(360f, 0f, infiniteRepeatable(tween(7_000, easing = LinearEasing)), label = "fast")
     val scan by t.animateFloat(0f, 360f, infiniteRepeatable(tween(1_600, easing = LinearEasing)), label = "scan")
     val breathe by t.animateFloat(0.85f, 1f, infiniteRepeatable(tween(1_400), RepeatMode.Reverse), label = "breathe")
+    HudRings(state, modifier, slow, fast, scan, breathe, state.orb == OrbState.EXECUTING)
+}
+
+@Composable
+private fun HudRings(state: LiveUiState, modifier: Modifier, slow: Float, fast: Float, scan: Float, breathe: Float, thinking: Boolean) {
     val color by animateColorAsState(hudColor(state.orb), tween(400), label = "color")
     val energy by animateFloatAsState(
         when (state.orb) { OrbState.LISTENING -> 0.35f + state.micLevel; OrbState.SPEAKING -> 0.8f + (state.speechPulse % 2) * 0.2f; else -> 0.4f },
         tween(180), label = "energy",
     )
-    val thinking = state.orb in setOf(OrbState.THINKING, OrbState.SEARCHING, OrbState.RESEARCHING, OrbState.EXECUTING)
 
     Canvas(modifier) {
         val c = Offset(size.width / 2, size.height / 2)
