@@ -179,6 +179,12 @@ class AppContainer(private val context: Context) {
         if (active != null && models.get(active) == null) settings.setActiveLocalModel(models.firstInstalled()?.id)
     }
 
+    /** Requests that wait for the internet (answered and announced when it is back). */
+    val pending by lazy { com.melhive.zed.web.PendingQueue(context, this) }
+
+    /** Automatic learning from ordinary conversation. */
+    val learner by lazy { com.melhive.zed.learning.Learner(context, this, appScope) }
+
     /** Diagnostics → Speed test. */
     val speedTest by lazy { com.melhive.zed.diagnostics.SpeedTest(context, this) }
 

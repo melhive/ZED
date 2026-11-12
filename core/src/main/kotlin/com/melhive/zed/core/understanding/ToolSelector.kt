@@ -67,6 +67,22 @@ object ToolSelector {
         "file.read" to listOf("file.list"),
     )
 
+    private val FACTUAL = Regex("^(?:who|what|when|where|which|how (?:much|many|old|tall|far|long|big|high)|is|are|was|were|did|does)\\b", RegexOption.IGNORE_CASE)
+    private val PERSONAL = Regex("\\b(?:you|your|yours|me|my|mine|i|i'm|i've|we|our|us)\\b", RegexOption.IGNORE_CASE)
+    private val FRESH = Regex("\\b(?:latest|news|today'?s|current(?:ly)?|right now|this (?:week|month|year)|prices?|costs?|score|who won|results?|released?|update|stocks?|exchange rate|election|schedule of|opening hours|open now)\\b", RegexOption.IGNORE_CASE)
+
+    /**
+     * A question about the world that the web may answer better than a small
+     * model's memory ("who won the game last night", "price of gold today").
+     * Questions about the user or ZED itself never qualify.
+     */
+    fun looksFactual(text: String): Boolean {
+        val t = text.trim()
+        if (PERSONAL.containsMatchIn(t)) return false
+        val words = t.split(Regex("\\s+")).size
+        return words >= 3 && (FRESH.containsMatchIn(t) || FACTUAL.containsMatchIn(t))
+    }
+
     /**
      * Up to [max] tools from [available] that fit [text], best first. [context]
      * is the previous message, used when this one is a short follow-up ("and

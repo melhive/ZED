@@ -82,6 +82,8 @@ data class Awareness(
     val tools: List<ToolSpec> = emptyList(),
     /** Excerpts from the user's documents. */
     val knowledge: List<String> = emptyList(),
+    /** Think twice: the plan made for this answer. */
+    val plan: String? = null,
 ) {
     fun render(): String = buildString {
         val time = DateTimeFormatter.ofPattern("EEEE d MMMM yyyy, h:mm a", Locale.ENGLISH).format(now)
@@ -107,6 +109,7 @@ data class Awareness(
             append("\n").append(com.melhive.zed.core.intelligence.PromptBuilder.KNOWLEDGE_HEADER)
             knowledge.forEachIndexed { i, k -> append("\n[${i + 1}] ").append(k) }
         }
+        plan?.let { append("\n[Your plan for this answer — follow it, check each point:\n").append(it.trim()).append("]") }
         if (tools.isNotEmpty()) {
             append("\n[Tools for this message (? = optional):")
             tools.forEach { t -> append("\n- ").append(t.name).append("(").append(t.params.joinToString(", ") { p -> p.name + if (p.required) "" else "?" }).append(") — ").append(t.title) }

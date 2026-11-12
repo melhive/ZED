@@ -39,6 +39,10 @@ class ZedApp : Application() {
             runCatching { container.routines.scheduleAll() }
             runCatching { container.audit.prune() }
             runCatching { com.melhive.zed.backup.AutoBackupWorker.schedule(this@ZedApp, container.settings.current().autoBackupFolder.isNotBlank()) }
+            // Automatic learning: after conversations while ZED is open, and twice a day while charging.
+            runCatching { com.melhive.zed.learning.Learner.schedule(this@ZedApp, container.settings.current().autoLearning); container.learner.watch() }
+            // Anything still waiting for the internet runs as soon as there is a connection.
+            runCatching { if (container.db.pendingRequests().waiting().isNotEmpty()) com.melhive.zed.web.PendingQueue.schedule(this@ZedApp) }
             // Keep the home-screen widget's next reminder and task count current.
             launch {
                 kotlinx.coroutines.flow.combine(container.db.reminders().observeAll(), container.db.todos().observeAll()) { r, t -> r.size to t.hashCode() + r.hashCode() }

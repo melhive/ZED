@@ -78,6 +78,17 @@ class MemoryRepository(private val db: ZedDatabase) {
         return f.copy(id = db.memory().insert(f)).also { events.tryEmit(com.melhive.zed.core.brain.BrainEvent.Saved("FACT:${it.id}")) }
     }
 
+    /**
+     * Saves something ZED learned by itself. It is marked as learned and less
+     * certain than what the user stated, and is skipped if already known.
+     */
+    suspend fun learn(text: String, confidence: Float): MemoryFactEntity? {
+        val t = text.trim()
+        if (db.memory().find(likeEscape(t.trimEnd('.'))).any { it.text.trim().trimEnd('.').equals(t.trimEnd('.'), ignoreCase = true) }) return null
+        val f = MemoryFactEntity(text = t, createdAt = System.currentTimeMillis(), source = "learned", confidence = confidence.coerceIn(0f, 1f))
+        return f.copy(id = db.memory().insert(f)).also { events.tryEmit(com.melhive.zed.core.brain.BrainEvent.Saved("FACT:${it.id}")) }
+    }
+
     /** Records that ZED used these memories: they grow stronger and the Live Brain lights them up. */
     suspend fun markUsed(ids: List<Long>) {
         if (ids.isEmpty()) return

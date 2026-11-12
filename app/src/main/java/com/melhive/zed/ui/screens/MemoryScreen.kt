@@ -107,7 +107,7 @@ fun MemoryScreen(onBack: () -> Unit, initialTab: Int = 0, onOpenBrain: (() -> Un
                 }
             }
             0 -> {
-                item { Text("ZED only remembers what you explicitly ask it to (“remember that…”), or what you approve when an AI model requests it.", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted) }
+                item { Text("What you ask ZED to remember (“remember that…”), plus what it learns from your conversations — marked “learned” until you confirm it. Turn learning off in Settings → Intelligence.", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted) }
                 if (facts.isEmpty()) item { EmptyState("No memories", "Say “remember that my sister's name is Ana”.") }
                 items(facts, key = { it.id }) { f ->
                     ZedCard {
@@ -118,7 +118,11 @@ fun MemoryScreen(onBack: () -> Unit, initialTab: Int = 0, onOpenBrain: (() -> Un
                             }
                             IconButton(onClick = { scope.launch { c.memory.delete(listOf(f.id)) } }) { Icon(Icons.Outlined.Delete, "Delete", tint = ZedColors.Muted) }
                         }
-                        Text("${formatTime(f.createdAt)} · ${f.source.replace('_', ' ')}", style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted)
+                        val learned = f.source == "learned"
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("${formatTime(f.createdAt)} · ${if (learned) "learned by ZED — not confirmed" else f.source.replace('_', ' ')}", style = MaterialTheme.typography.labelSmall, color = if (learned) ZedColors.Amber else ZedColors.Muted, modifier = Modifier.weight(1f))
+                            if (learned) TextButton(onClick = { scope.launch { c.learner.confirm(f.id) } }) { Text("It's right", style = MaterialTheme.typography.labelSmall) }
+                        }
                     }
                 }
                 if (facts.isNotEmpty()) item { TextButton(onClick = { confirmClear = true }) { Text("Forget everything", color = ZedColors.Red) } }

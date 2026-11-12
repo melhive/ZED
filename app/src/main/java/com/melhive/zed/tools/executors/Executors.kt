@@ -12,10 +12,6 @@ import com.melhive.zed.core.tools.Capability
 import com.melhive.zed.core.tools.ToolRequest
 import com.melhive.zed.core.tools.ToolSpec
 import com.melhive.zed.core.tools.ValidatedArgs
-import com.melhive.zed.intelligence.GenerationEvent
-import com.melhive.zed.intelligence.GenerationRequest
-import com.melhive.zed.core.intelligence.ChatTurn
-import com.melhive.zed.core.intelligence.Role
 import com.melhive.zed.memory.TodoRepository
 import com.melhive.zed.tasks.TaskTypes
 import com.melhive.zed.tools.CapabilityChecker
@@ -206,6 +202,10 @@ fun registerExecutors(tm: ToolManager, c: AppContainer, context: Context) {
 
     // ---- Briefing, weather, agenda, routines ----
     tm.register("weather.get") { a, _ ->
+        if (!DeviceInfo.snapshot(context).online) {
+            c.pending.enqueue("weather", a.stringOrNull("place").orEmpty(), c.orchestrator.currentConversation)
+            return@register ok("No internet right now, so I can't check the weather. I'll check as soon as you're back online and let you know.")
+        }
         com.melhive.zed.agents.WeatherService(context).report(a.stringOrNull("place"), c.settings.current().weatherCity)
             .fold({ ok(it) }, { fail(it.message ?: "Weather is unavailable right now.") })
     }
@@ -431,23 +431,17 @@ fun registerExecutors(tm: ToolManager, c: AppContainer, context: Context) {
 
     // ---- Research ----
     tm.register("web.research") { a, _ ->
-        val provider = c.providers.research() ?: return@register fail("Online research needs Gemini, OpenAI or Claude configured in Model Manager.")
-        val sb = StringBuilder()
-        var error: String? = null
-        provider.generate(
-            GenerationRequest(
-                system = "You are a research assistant. Search the web, then give a concise, factual answer with the key sources (titles and URLs).",
-                turns = listOf(ChatTurn(Role.USER, a.string("query"))),
-                maxOutputTokens = 2048,
-                webSearch = true,
-            )
-        ).collect { e ->
-            when (e) {
-                is GenerationEvent.Delta -> sb.append(e.text)
-                is GenerationEvent.Error -> error = e.message
-                else -> Unit
-            }
+        if (!c.settings.current().webResearch) return@register fail("Web research is turned off (Settings → Intelligence).")
+        val query = com.melhive.zed.core.web.Research.query(a.string("query"))
+        if (!DeviceInfo.snapshot(context).online) {
+            c.pending.enqueue("research", query, c.orchestrator.currentConversation)
+            return@register ok("No internet right now. I saved “$query” and will look it up as soon as the connection is back, then notify you.")
         }
-        if (error != null && sb.isEmpty()) fail("Research failed: $error") else ok("Research results (${provider.label}):\n${sb.toString().trim()}")
+        try {
+            val found = com.melhive.zed.web.WebSearcher().research(query)
+            ok(com.melhive.zed.core.web.Research.toolResult(found.query, found.pages))
+        } catch (e: com.melhive.zed.web.WebSearcher.Unavailable) {
+            fail(e.message ?: "Web search is unavailable right now.")
+        }
     }
 }

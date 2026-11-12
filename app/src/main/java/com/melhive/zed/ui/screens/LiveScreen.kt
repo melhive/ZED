@@ -144,7 +144,7 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit) {
                 val interaction = remember { MutableInteractionSource() }
                 Box(Modifier.size(hud).clickable(interactionSource = interaction, indication = null) { live.tapOrb() }, contentAlignment = Alignment.Center) {
                     com.melhive.zed.ui.components.JarvisHud(state, Modifier.fillMaxSize())
-                    ZedOrb(state.orb, micLevel = state.micLevel, speechPulse = state.speechPulse, size = hud * 0.56f, glow = settings?.glow ?: true)
+                    ZedOrb(state.orb, micLevel = state.micLevel, speechPulse = state.speechPulse, size = hud * 0.56f, glow = (settings?.glow ?: true) && settings?.animationLevel != "light")
                 }
             }
             Text(state.orb.label.uppercase(), style = MaterialTheme.typography.titleMedium, color = com.melhive.zed.ui.components.hudColor(state.orb), letterSpacing = 4.sp)

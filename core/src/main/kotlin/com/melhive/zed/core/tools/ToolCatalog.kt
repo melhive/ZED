@@ -9,7 +9,6 @@ import com.melhive.zed.core.tools.Capability.NOTIFICATION_ACCESS
 import com.melhive.zed.core.tools.Capability.CLOCK_APP
 import com.melhive.zed.core.tools.Capability.NETWORK
 import com.melhive.zed.core.tools.Capability.NOTIFICATIONS
-import com.melhive.zed.core.tools.Capability.ONLINE_AI
 import com.melhive.zed.core.tools.Capability.STORAGE_ACCESS
 import com.melhive.zed.core.tools.ParamType.BOOLEAN
 import com.melhive.zed.core.tools.ParamType.DATETIME
@@ -188,7 +187,7 @@ class ToolCatalog(specs: List<ToolSpec>) {
                 ), READ_ONLY, setOf(NOTIFICATION_ACCESS)),
                 ToolSpec("weather.get", "Weather", "Current weather and today's forecast for a place (default: the user's city or location).", listOf(
                     p("place", STRING, "City or place; omit for the user's location", required = false),
-                ), READ_ONLY, setOf(NETWORK)),
+                ), READ_ONLY),
                 ToolSpec("calendar.today", "Calendar events", "Lists the user's calendar events for a day.", listOf(
                     p("date", STRING, "today, tomorrow, or a date like 2026-11-12 (default today)", required = false),
                 ), READ_ONLY, setOf(CALENDAR_READ)),
@@ -210,9 +209,9 @@ class ToolCatalog(specs: List<ToolSpec>) {
                 ), MODIFY, setOf(HOME_ASSISTANT, NETWORK), alwaysConfirm = true),
                 ToolSpec("device.status", "Phone status", "Reports battery, charging, network, storage, volume and Do Not Disturb.", emptyList(), READ_ONLY),
 
-                ToolSpec("web.research", "Research online", "Researches a question online using the configured online AI provider's web search.", listOf(
-                    p("query", STRING, "Research question"),
-                ), READ_ONLY, setOf(NETWORK, ONLINE_AI)),
+                ToolSpec("web.research", "Search the web", "Searches the web and reads the best pages, for facts that may have changed or that you don't know (news, prices, results, opening hours). Returns numbered sources to cite. Only the query leaves the phone; offline, the request waits for the connection.", listOf(
+                    p("query", STRING, "What to search for: a short search query"),
+                ), READ_ONLY),
             )
         )
     }

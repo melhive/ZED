@@ -60,7 +60,7 @@ class SkillRegistry(val catalog: ToolCatalog, skills: List<SkillDescriptor>) {
             SkillDescriptor("daily.briefing", "Briefing, Weather & Agenda", "Weather, today's calendar and your daily briefing.", listOf("weather.get", "calendar.today")),
             SkillDescriptor("automation.routines", "Routines", "Runs your routines (Good morning, Good night, Focus, Driving…).", listOf("routine.run")),
             SkillDescriptor("smart.home", "Smart Home", "Controls Home Assistant lights, switches, climate, locks and covers.", listOf("home.status", "home.control", "home.secure"), requiresOnline = true),
-            SkillDescriptor("research.online", "Online Research", "Researches questions using your online AI provider's web search.", listOf("web.research"), requiresOnline = true),
+            SkillDescriptor("research.online", "Web Research", "Searches the web without any account or key and answers with sources. Only the search question leaves the phone.", listOf("web.research")),
         )
 
         val DEFAULT = SkillRegistry(ToolCatalog.DEFAULT, DEFAULT_SKILLS)

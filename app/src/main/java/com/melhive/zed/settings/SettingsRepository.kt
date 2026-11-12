@@ -88,6 +88,14 @@ data class AppSettings(
     val autoBackupStatus: String = "",
     /** Synapse ticks and vibration when touching the Live Brain. */
     val brainSounds: Boolean = true,
+    /** Learn lasting facts from ordinary conversation (shown for review; always editable). */
+    val autoLearning: Boolean = true,
+    /** Search the web (no key needed) when a question needs fresh facts. Only the search question leaves the phone. */
+    val webResearch: Boolean = true,
+    /** Plan → answer → check on hard questions (slower, more careful). */
+    val thinkTwice: Boolean = true,
+    /** full | balanced | light — how much animation runs (performance mode). */
+    val animationLevel: String = "full",
 ) {
     fun modelFor(kind: OnlineProviderKind): String = onlineModels[kind]?.takeIf { it.isNotBlank() } ?: kind.defaultModel
 }
@@ -135,6 +143,10 @@ class SettingsRepository(private val context: Context) {
         val autoBackupFolder = stringPreferencesKey("auto_backup_folder")
         val autoBackupStatus = stringPreferencesKey("auto_backup_status")
         val brainSounds = booleanPreferencesKey("brain_sounds")
+        val autoLearning = booleanPreferencesKey("auto_learning")
+        val webResearch = booleanPreferencesKey("web_research")
+        val thinkTwice = booleanPreferencesKey("think_twice")
+        val animationLevel = stringPreferencesKey("animation_level")
         fun model(kind: OnlineProviderKind) = stringPreferencesKey("online_model_${kind.name.lowercase()}")
     }
 
@@ -182,6 +194,10 @@ class SettingsRepository(private val context: Context) {
             autoBackupFolder = p[K.autoBackupFolder] ?: "",
             autoBackupStatus = p[K.autoBackupStatus] ?: "",
             brainSounds = p[K.brainSounds] ?: true,
+            autoLearning = p[K.autoLearning] ?: true,
+            webResearch = p[K.webResearch] ?: true,
+            thinkTwice = p[K.thinkTwice] ?: true,
+            animationLevel = p[K.animationLevel] ?: "full",
         )
     }
 
@@ -223,6 +239,10 @@ class SettingsRepository(private val context: Context) {
     suspend fun setAutoBackupFolder(uri: String) = context.dataStore.edit { it[K.autoBackupFolder] = uri; it.remove(K.autoBackupStatus) }
     suspend fun setAutoBackupStatus(v: String) = context.dataStore.edit { it[K.autoBackupStatus] = v }
     suspend fun setBrainSounds(v: Boolean) = context.dataStore.edit { it[K.brainSounds] = v }
+    suspend fun setAutoLearning(v: Boolean) = context.dataStore.edit { it[K.autoLearning] = v }
+    suspend fun setWebResearch(v: Boolean) = context.dataStore.edit { it[K.webResearch] = v }
+    suspend fun setThinkTwice(v: Boolean) = context.dataStore.edit { it[K.thinkTwice] = v }
+    suspend fun setAnimationLevel(v: String) = context.dataStore.edit { it[K.animationLevel] = v }
     suspend fun setOnboardingDone() = context.dataStore.edit { it[K.onboarding] = true }
     suspend fun setSkillEnabled(id: String, enabled: Boolean) = context.dataStore.edit { p ->
         val all = AppSettings().enabledSkills

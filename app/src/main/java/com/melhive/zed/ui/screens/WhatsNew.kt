@@ -31,6 +31,15 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.25", "2026-11-12", "Learning and the internet", listOf(
+            "Web research without any key: ZED searches the web (DuckDuckGo, with Bing and Wikipedia as backups), reads the best pages and Gemma answers with numbered sources listed underneath. Only the search question leaves the phone — never your memories or conversations.",
+            "ZED researches on its own when a question needs fresh facts (news, prices, results, opening hours). Say “research …” to ask directly.",
+            "Offline? Requests that need the internet (research, weather) are kept. As soon as you're back online ZED looks them up, adds the answer to the conversation and notifies you. Home shows what's waiting.",
+            "Automatic learning: after conversations ZED picks up lasting facts you mentioned — people, preferences, allergies, work, home city. It runs only when ZED is idle and the phone is charging (or Gemma is already loaded), and stops the moment you speak.",
+            "Honest learning: Home shows “I learned 3 new things” — mark each Right, Fix it or Forget it. Until you confirm, ZED treats learned facts as less certain than what you told it. Memory marks them “learned”.",
+            "Think twice on hard questions (planning, comparing, deciding, multi-step maths): ZED plans, answers, then checks itself. Everyday questions are never slowed down.",
+            "Settings → Intelligence: switches for learning, web research and think twice, and an Animation level (Full, Balanced, Light) to save battery and leave more of the chip to Gemma.",
+        )),
         Release("0.1.24", "2026-11-12", "ZED understands you better", listOf(
             "Follows the conversation: “call her”, “text him that I'm late”, “remind me about it tomorrow”. “Call my sister” works when ZED knows who your sister is.",
             "Corrections and changes: after setting a reminder, say “move it to 6”, “no, I meant Friday” or “make it tomorrow at 9” — it moves the same reminder. Works for alarms and timers too (“make it 15 minutes”).",

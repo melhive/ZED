@@ -13,7 +13,7 @@ Native Android personal AI assistant (Kotlin, Jetpack Compose). Three intelligen
 | Default branch | `main` (stable merges) |
 | Latest commit | see `git log -1` (this file is updated with each milestone) |
 | Build status | ✅ GitHub Actions **Android Build** green: core tests, Android unit tests, debug APK |
-| Releases | ✅ Signed release **v0.1.24** published (latest). Install/share link: https://github.com/melhive/ZED/releases/latest/download/zed.apk. Every push to `main` publishes the version in `VERSION` (bump it for a new release; re-pushing the same version replaces that release). App id `com.melhive.zed`, signed with the key in `/root/zed-signing` (back it up — updates need the same key). |
+| Releases | ✅ Signed release **v0.1.25** published (latest). Install/share link: https://github.com/melhive/ZED/releases/latest/download/zed.apk. Every push to `main` publishes the version in `VERSION` (bump it for a new release; re-pushing the same version replaces that release). App id `com.melhive.zed`, signed with the key in `/root/zed-signing` (back it up — updates need the same key). |
 
 ## Milestones
 
@@ -59,6 +59,14 @@ Failed tests: none.
 | Model download (2–3 GB) with resume + SHA-256 | | ✅ | ✅ | |
 | Keystore secret storage | | ✅ | ✅ | |
 | STT / TTS / sentence streaming / barge-in / audio focus | VAD only | ✅ | ✅ | |
+
+## Learning and the internet (v0.1.25)
+
+- **Web research, no key** (`core/web/WebResearch.kt` — parsers for DuckDuckGo HTML, Bing and the Wikipedia API, readable-text extraction, source handling, unit-tested with fixtures; `web/WebSearcher.kt` — OkHttp, 15 s budget, parallel page reads, falls back to snippets). `web.research` no longer needs an online provider; offered automatically for questions about the world (`ToolSelector.looksFactual`). Answers get a source list (`Research.withSources`). Privacy: only `Research.query(...)` (one line, ≤120 chars) is sent. **Search pages can change or block automated requests; the three-service fallback and the error message need checking on the phone.**
+- **Offline queue** (`web/PendingQueue.kt`): `web.research` and `weather.get` queue into `pending_requests` when offline; `PendingWorker` (network constraint) answers, adds the reply to the conversation and notifies. Home shows the waiting count.
+- **Automatic learning** (`core/learning/Learning.kt`, `learning/Learner.kt`): pattern extraction always; Gemma extraction only when idle 75 s and charging, or model loaded and battery ≥ 40%; cancelled the moment the orchestrator becomes busy or LIVE opens. Facts saved with `source = learned` and confidence 0.8 (pattern) / 0.6 (model); sensitive text and duplicates filtered. Review card on Home; confirmed facts become `learned_confirmed`, confidence 1. Periodic worker every 12 h while charging.
+- **Think twice** (`HardQuestion`): plan (side generation) → answer with the plan in the brief → self-check that may replace the answer. Text chat on-device only; skipped for voice.
+- **Settings → Intelligence**: learning, web research, think twice, animation level (full / balanced / light).
 
 ## Understanding and reliable actions (v0.1.24)
 

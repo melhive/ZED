@@ -174,7 +174,7 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
         // Orb: tap to talk.
         val interaction = remember { MutableInteractionSource() }
         Box(Modifier.fillMaxWidth().clickable(interactionSource = interaction, indication = null) { onTab(Routes.LIVE) }, contentAlignment = Alignment.Center) {
-            ZedOrb(orbState, size = 190.dp, glow = settings?.glow ?: true)
+            ZedOrb(orbState, size = 190.dp, glow = (settings?.glow ?: true) && settings?.animationLevel != "light")
         }
         Text(nextLine, Modifier.fillMaxWidth(), textAlign = TextAlign.Center, color = if (activity.busy) ZedColors.Cyan else ZedColors.Muted,
             style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -255,6 +255,14 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
                         style = MaterialTheme.typography.labelSmall, color = if (recalls > 0) ZedColors.Teal else ZedColors.Muted)
                 }
             }
+        }
+
+        // What ZED learned from recent conversations, for review.
+        LearnedCard()
+        val waitingOnline by c.pending.waiting.collectAsStateWithLifecycle(initialValue = 0)
+        if (waitingOnline > 0) ZedCard(accent = ZedColors.Amber) {
+            SectionTitle("Waiting for the internet")
+            Text("$waitingOnline request${if (waitingOnline == 1) "" else "s"} will run as soon as you're back online — I'll notify you with the answer${if (waitingOnline == 1) "" else "s"}.", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
         }
 
         // Today

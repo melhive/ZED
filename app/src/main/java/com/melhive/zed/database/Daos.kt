@@ -71,6 +71,10 @@ interface MessageDao {
     @Query("SELECT * FROM messages WHERE conversationId = :conversationId ORDER BY id ASC")
     suspend fun all(conversationId: Long): List<MessageEntity>
 
+    /** What the user said after message [after], oldest first (automatic learning reads these). */
+    @Query("SELECT * FROM messages WHERE role = 'user' AND id > :after ORDER BY id ASC LIMIT :limit")
+    suspend fun userMessagesAfter(after: Long, limit: Int): List<MessageEntity>
+
     @Query("UPDATE messages SET status = 'cancelled' WHERE status = 'streaming'")
     suspend fun markInterruptedStreams()
 
@@ -271,4 +275,18 @@ interface AuditDao {
 
     @Query("DELETE FROM audit_log WHERE timestamp < :before")
     suspend fun prune(before: Long)
+}
+
+@Dao
+interface PendingRequestDao {
+    @Insert suspend fun insert(r: PendingRequestEntity): Long
+
+    @Query("SELECT * FROM pending_requests WHERE status = 'waiting' ORDER BY id ASC")
+    suspend fun waiting(): List<PendingRequestEntity>
+
+    @Query("SELECT COUNT(*) FROM pending_requests WHERE status = 'waiting'")
+    fun observeWaiting(): Flow<Int>
+
+    @Query("UPDATE pending_requests SET status = :status, result = :result WHERE id = :id")
+    suspend fun finish(id: Long, status: String, result: String?)
 }

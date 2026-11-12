@@ -205,6 +205,28 @@ fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
             }
         }
         item {
+            val ctx = LocalContext.current
+            ZedCard(accent = ZedColors.Teal) {
+                SectionTitle("Intelligence")
+                SwitchRow("Learn from conversations", "ZED picks up lasting facts you mention (people, preferences, allergies, work). You review each one on Home; nothing leaves the phone.", settings.autoLearning) {
+                    scope.launch { c.settings.setAutoLearning(it); com.melhive.zed.learning.Learner.schedule(ctx.applicationContext, it) }
+                }
+                SwitchRow("Search the web", "When a question needs fresh facts, ZED searches the web (no account or key) and answers with sources. Only the search question leaves the phone.", settings.webResearch) { scope.launch { c.settings.setWebResearch(it) } }
+                SwitchRow("Think twice on hard questions", "Plans, answers, then checks itself on planning, comparing and multi-step questions. Slower, more careful. Everyday questions are never slowed down.", settings.thinkTwice) { scope.launch { c.settings.setThinkTwice(it) } }
+                Text("Animation", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 6.dp))
+                WrapRow {
+                    listOf("full" to "Full", "balanced" to "Balanced", "light" to "Light").forEach { (id, label) ->
+                        androidx.compose.material3.FilterChip(selected = settings.animationLevel == id, onClick = { scope.launch { c.settings.setAnimationLevel(id) } }, label = { Text(label) })
+                    }
+                }
+                Text(when (settings.animationLevel) {
+                    "light" -> "Light: no glow or moving signals, mini brains still. Easiest on the battery and on the model."
+                    "balanced" -> "Balanced: glow stays, the brain's travelling signals stop and the mini brains run slower."
+                    else -> "Full: every animation, glow and signal."
+                }, style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
+            }
+        }
+        item {
             ZedCard {
                 SectionTitle("Knowledge")
                 SwitchRow("Use local documents as context", "Include matching excerpts from indexed documents in AI prompts", settings.useKnowledge) { scope.launch { c.settings.setUseKnowledge(it) } }

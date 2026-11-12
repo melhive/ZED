@@ -100,6 +100,11 @@ class AssistantOrchestrator(
     private val dialogues = java.util.concurrent.ConcurrentHashMap<Long, com.melhive.zed.core.understanding.DialogueState>()
     /** What the user said in the turn being answered (dates and durations in it beat the model's). */
     @Volatile private var currentUserText: String? = null
+    /** The conversation being answered (requests queued for the internet go back to it). */
+    @Volatile var currentConversation: Long? = null
+        private set
+    /** Sources from web research done in this turn, listed under the answer. */
+    @Volatile private var researchSources: List<String> = emptyList()
 
     fun dialogue(conversationId: Long): com.melhive.zed.core.understanding.DialogueState = dialogues[conversationId] ?: com.melhive.zed.core.understanding.DialogueState()
 
@@ -156,6 +161,8 @@ class AssistantOrchestrator(
                 return AssistantReply(msg, false, "system")
             }
             currentUserText = trimmed
+            currentConversation = conversationId
+            researchSources = emptyList()
             val plain = attachmentText == null && image == null
             val reply = if (plain) understood(conversationId, trimmed, modelAvailable = provider != null) else null
             val final = reply ?: if (provider != null) handleWithModel(conversationId, provider, voice, trimmed) else nativeConversation(conversationId, trimmed)
@@ -235,11 +242,14 @@ class AssistantOrchestrator(
                 conversations.addMessage(conversationId, "assistant", cmd.text, source = "native")
                 AssistantReply(cmd.text, true, "native")
             }
-            is ParsedCommand.Tool -> {
+            // With a model, "research …" goes to it: it searches, reads and answers with sources.
+            is ParsedCommand.Tool -> if (modelAvailable && cmd.request.tool == "web.research") null else {
                 val outcome = runTool(conversationId, cmd.request)
-                conversations.addMessage(conversationId, "assistant", outcome.message, source = "native", toolName = cmd.request.tool,
+                // Without a model, web findings are shown as they are (minus the instructions meant for a model).
+                val shown = if (cmd.request.tool == "web.research" && outcome.isSuccess()) com.melhive.zed.core.web.Research.forPeople(outcome.message) else outcome.message
+                conversations.addMessage(conversationId, "assistant", shown, source = "native", toolName = cmd.request.tool,
                     status = if (outcome.isSuccess()) "complete" else "error")
-                AssistantReply(outcome.message, outcome.isSuccess(), "native")
+                AssistantReply(shown, outcome.isSuccess(), "native")
             }
         }
     }
@@ -258,6 +268,7 @@ class AssistantOrchestrator(
             repair.repair(request, currentUserText).request else request
         val outcome = tools.execute(fixed)
         if (outcome.isSuccess()) dialogues[conversationId] = dialogue(conversationId).after(fixed, outcome.message)
+        if (fixed.tool == "web.research" && outcome.isSuccess()) researchSources = (researchSources + com.melhive.zed.core.web.Research.sourcesFrom(outcome.message)).distinct()
         return outcome
     }
 
@@ -277,7 +288,8 @@ class AssistantOrchestrator(
     private suspend fun handleWithModel(conversationId: Long, provider: IntelligenceProvider, voice: Boolean, userText: String): AssistantReply {
         val s = settings.current()
         val isLocal = provider.id == "local"
-        val researchAvailable = providers.research() != null
+        // Web research needs no key now; it is offered when the user allows it.
+        val researchAvailable = s.webResearch
         // Very small on-device windows (e.g. 1280 tokens) cannot hold the tool list; such models just converse.
         val localContext = (provider as? com.melhive.zed.intelligence.LocalLiteRtProvider)?.contextTokens
         val tinyContext = localContext != null && localContext < 2048
@@ -293,7 +305,10 @@ class AssistantOrchestrator(
         // On-device: only the few tools that fit this message (a small model chooses far better from four than from fifty).
         val toolSpecs = when {
             !useTools -> emptyList()
-            isLocal -> com.melhive.zed.core.understanding.ToolSelector.select(userText, enabled, max = if (tinyContext) 3 else 5, context = previousUser)
+            isLocal -> com.melhive.zed.core.understanding.ToolSelector.select(userText, enabled, max = if (tinyContext) 3 else 5, context = previousUser).ifEmpty {
+                // A question about the world: let Gemma search the web when its own knowledge may be stale or missing.
+                if (researchAvailable && com.melhive.zed.core.understanding.ToolSelector.looksFactual(userText)) enabled.filter { it.name == "web.research" } else emptyList()
+            }
             else -> enabled
         }
         val userName = memory.userName()
@@ -309,7 +324,10 @@ class AssistantOrchestrator(
             userName?.let { add("name $it") }
             allFacts.filter { it.pinned && ranked.none { r -> r.fact.id == it.id } }.take(3).forEach { add(it.text) }
         }
-        val memories = if (isLocal) ranked.map { it.fact.text } else (ranked.map { it.fact.text } + allFacts.filter { it.pinned }.map { it.text } + allFacts.take(12).map { it.text }).distinct().take(30)
+        // What ZED learned by itself is marked, so the model treats it as less certain than what the user said.
+        val sourceOf = allFacts.associate { it.id to it.source }
+        fun label(f: com.melhive.zed.core.understanding.MemoryFact) = if (sourceOf[f.id] == "learned") "${f.text} (learned, not confirmed)" else f.text
+        val memories = if (isLocal) ranked.map { label(it.fact) } else (ranked.map { it.fact.text } + allFacts.filter { it.pinned }.map { it.text } + allFacts.take(12).map { it.text }).distinct().take(30)
         // The memories this question touches grow stronger and light up in the Live Brain (off the reply path).
         if (ranked.isNotEmpty()) appScope.launch { runCatching { memory.markUsed(ranked.map { it.fact.id }) } }
         val environment = runCatching { awareness?.invoke() }.getOrNull()
@@ -325,6 +343,13 @@ class AssistantOrchestrator(
 
         if (nativeTools) return runNativeToolLoop(conversationId, provider, voice, toolSpecs, memories, userName, sourceTag, contextChars)
         val dialogueNote = dialogue(conversationId).describe()
+        // Think twice on hard questions: a short plan first, then the answer, then a check.
+        val thinkTwice = isLocal && !voice && s.thinkTwice && currentImage == null && com.melhive.zed.core.learning.HardQuestion.isHard(userText)
+        val plan = if (!thinkTwice) null else {
+            setPhase(AssistantPhase.THINKING, "Planning…", conversationId)
+            val env = (environment ?: com.melhive.zed.core.understanding.Awareness(ZonedDateTime.now())).copy(profile = profile, memories = memories, computed = computed)
+            generateText(provider, com.melhive.zed.core.learning.HardQuestion.PLAN_SYSTEM, env.render() + "\n\nQuestion: " + userText, 200, "think-$conversationId")
+        }
 
         var lastText = ""
         for (round in 1..MAX_ROUNDS) {
@@ -351,7 +376,7 @@ class AssistantOrchestrator(
                 userTitle = s.userTitle.ifBlank { null },
             )
             val brief = if (!isLocal) null else (environment ?: com.melhive.zed.core.understanding.Awareness(ZonedDateTime.now())).let { env ->
-                if (round == 1) env.copy(dialogue = dialogueNote, profile = profile, memories = memories, computed = computed, tools = toolSpecs, knowledge = knowledgeSnippets)
+                if (round == 1) env.copy(dialogue = dialogueNote, profile = profile, memories = memories, computed = computed, tools = toolSpecs, knowledge = knowledgeSnippets, plan = plan)
                 else env.copy(tools = toolSpecs) // after a tool result: just the time and the tools
             }.render()
             val request = GenerationRequest(
@@ -381,6 +406,19 @@ class AssistantOrchestrator(
             if (extraction.requests.isEmpty()) {
                 if (extraction.errors.isNotEmpty()) {
                     conversations.addMessage(conversationId, "tool", "Ignored malformed tool call(s): ${extraction.errors.joinToString("; ")}", source = "system")
+                }
+                if (thinkTwice && lastText.isNotBlank() && researchSources.isEmpty()) {
+                    setPhase(AssistantPhase.THINKING, "Checking…", conversationId)
+                    val check = generateText(provider, com.melhive.zed.core.learning.HardQuestion.CHECK_SYSTEM, com.melhive.zed.core.learning.HardQuestion.checkPrompt(userText, lastText), 500, "think-$conversationId")
+                    com.melhive.zed.core.learning.HardQuestion.correction(check, lastText)?.let { fixed ->
+                        lastText = fixed
+                        conversations.updateMessage(result.messageId, fixed, "complete")
+                    }
+                }
+                // Answers from the web always show where they came from.
+                if (researchSources.isNotEmpty()) {
+                    val withSources = com.melhive.zed.core.web.Research.withSources(lastText, researchSources)
+                    if (withSources != lastText) { lastText = withSources; conversations.updateMessage(result.messageId, withSources, "complete") }
                 }
                 return AssistantReply(lastText.ifBlank { "(no response)" }, true, sourceTag)
             }
@@ -455,6 +493,15 @@ class AssistantOrchestrator(
         val note = "I stopped after $MAX_NATIVE_STEPS steps to stay safe. Ask me to continue if there's more to do."
         conversations.addMessage(conversationId, "assistant", note, source = sourceTag)
         return AssistantReply(note, true, sourceTag)
+    }
+
+    /** A short side generation (a plan, a check) that isn't shown as a chat message. Null when it fails. */
+    private suspend fun generateText(provider: IntelligenceProvider, system: String, prompt: String, maxTokens: Int, session: String): String? {
+        val out = StringBuilder()
+        var failed = false
+        provider.generate(GenerationRequest(system = system, turns = listOf(com.melhive.zed.core.intelligence.ChatTurn(Role.USER, prompt)), maxOutputTokens = maxTokens, sessionKey = session))
+            .collect { e -> when (e) { is GenerationEvent.Delta -> out.append(e.text); is GenerationEvent.Error -> failed = true; else -> Unit } }
+        return out.toString().trim().takeIf { it.isNotEmpty() && !failed }
     }
 
     private data class StreamResult(

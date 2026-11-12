@@ -221,7 +221,10 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
     val allItems by c.brain.items.collectAsStateWithLifecycle(initialValue = emptyList())
     val recalls by c.brain.recalls.collectAsStateWithLifecycle()
     val settings by c.settings.settings.collectAsStateWithLifecycle(initialValue = null)
-    val glow = settings?.glow ?: true
+    // Performance mode: "balanced" drops the travelling signals, "light" also the glow.
+    val level = settings?.animationLevel ?: "full"
+    val glow = (settings?.glow ?: true) && level != "light"
+    val signals = level == "full"
     val sounds by rememberUpdatedState(settings?.brainSounds ?: true)
 
     var hidden by remember { mutableStateOf(emptySet<BrainNodeType>()) }
@@ -493,7 +496,7 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
                     val thin = (if (hot) 1.2f else 0.7f) * unit * persp[hi].coerceIn(0.7f, 1.5f)
                     synapse(ax, ay, bx, by, k, color.copy(alpha = alpha.coerceIn(0f, 1f)), wide, thin, segments)
 
-                    if ((!glow && !hot) || dim || grown < 0.9f) return@forEachIndexed
+                    if (((!glow || !signals) && !hot) || dim || grown < 0.9f) return@forEachIndexed
                     val period = if (hot) 0.9f else 2.2f + (e * 37 % 17) / 10f
                     val u = t / period + e * 0.618f
                     val cycle = floor(u).toInt()
@@ -753,6 +756,11 @@ private fun nodeRadius(node: BrainNode, apparentScale: Float, density: Float): F
 fun MiniBrain(modifier: Modifier = Modifier, glow: Boolean = true) {
     val c = rememberContainer()
     val snapshot by c.brain.snapshot.collectAsStateWithLifecycle()
+    val settings by c.settings.settings.collectAsStateWithLifecycle(initialValue = null)
+    // Performance mode: full ≈ 33 fps, balanced 15 fps, light one frame a second.
+    val frameGap = when (settings?.animationLevel) { "light" -> 1_000_000_000L; "balanced" -> 66_000_000L; else -> 30_000_000L }
+    val gap by rememberUpdatedState(frameGap)
+    val glowOn = glow && settings?.animationLevel != "light"
     val projection = remember { BrainProjection() }
     val flashes = remember { HashMap<String, Long>() }
     var frame by remember { mutableLongStateOf(0L) }
@@ -761,7 +769,7 @@ fun MiniBrain(modifier: Modifier = Modifier, glow: Boolean = true) {
     LaunchedEffect(Unit) {
         while (true) withFrameNanos { now ->
             if (startFrame == 0L) startFrame = now
-            if (now - frame >= 30_000_000L) frame = now
+            if (now - frame >= gap) frame = now
         }
     }
     LaunchedEffect(Unit) {
@@ -782,7 +790,7 @@ fun MiniBrain(modifier: Modifier = Modifier, glow: Boolean = true) {
         if (snap == null || snap.graph.nodes.size <= 1) {
             // Nothing stored yet: just the core, waiting.
             val r = min(size.width, size.height) * 0.09f * (1f + 0.1f * sin(t * 2f))
-            if (glow) drawCircle(Brush.radialGradient(listOf(ZedColors.Cyan.copy(alpha = 0.4f), Color.Transparent), centre, r * 4f), r * 4f, centre)
+            if (glowOn) drawCircle(Brush.radialGradient(listOf(ZedColors.Cyan.copy(alpha = 0.4f), Color.Transparent), centre, r * 4f), r * 4f, centre)
             drawCircle(Brush.radialGradient(listOf(Color.White, ZedColors.Cyan), centre, r), r, centre)
             return@Canvas
         }
@@ -818,7 +826,7 @@ fun MiniBrain(modifier: Modifier = Modifier, glow: Boolean = true) {
             val core = node.type == BrainNodeType.CORE
             val r = (if (core) 3.8f else if (node.type == BrainNodeType.CATEGORY) 2.5f else 1.2f + 1.6f * node.strength) * unit * persp[i].coerceIn(0.7f, 1.3f) * (1f + 0.05f * sin(t * 1.7f + i))
             val alpha = 0.85f * if (node.itemId != null) depth * (0.4f + 0.6f * node.strength) else depth
-            if (glow && (core || node.type == BrainNodeType.CATEGORY)) drawCircle(Brush.radialGradient(listOf(color.copy(alpha = (if (core) 0.3f else 0.15f) * alpha), Color.Transparent), p, r * 3f), r * 3f, p)
+            if (glowOn && (core || node.type == BrainNodeType.CATEGORY)) drawCircle(Brush.radialGradient(listOf(color.copy(alpha = (if (core) 0.3f else 0.15f) * alpha), Color.Transparent), p, r * 3f), r * 3f, p)
             if (lit[i] > 0f) {
                 val bloom = r * (3f + 5f * lit[i])
                 drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = 0.8f * lit[i]), color.copy(alpha = 0.4f * lit[i]), Color.Transparent), p, bloom), bloom, p)
