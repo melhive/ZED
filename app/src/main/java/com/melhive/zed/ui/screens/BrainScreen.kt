@@ -487,10 +487,10 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
                     val depthA = 0.3f + 0.7f * near[lo]; val depthB = 0.3f + 0.7f * near[hi]
                     val depth = (depthA + depthB) / 2f
                     val k = bend(lo, hi)
-                    val alpha = (when { hot -> 0.9f; dim -> 0.05f; else -> (0.12f + 0.16f * edge.strength) * depth }) * grown
+                    val alpha = (when { hot -> 0.9f; dim -> 0.05f; else -> (0.05f + 0.08f * edge.strength) * depth }) * grown
                     // Thick where it leaves the hub, thin where it reaches the memory.
-                    val wide = (if (hot) 2.4f else 1.7f) * unit * persp[lo].coerceIn(0.6f, 1.8f)
-                    val thin = (if (hot) 1.4f else 0.6f) * unit * persp[hi].coerceIn(0.6f, 1.8f)
+                    val wide = (if (hot) 1.6f else 0.9f) * unit * persp[lo].coerceIn(0.7f, 1.4f)
+                    val thin = (if (hot) 0.9f else 0.35f) * unit * persp[hi].coerceIn(0.7f, 1.4f)
                     synapse(ax, ay, bx, by, k, color.copy(alpha = alpha.coerceIn(0f, 1f)), wide, thin, segments)
 
                     if ((!glow && !hot) || dim || grown < 0.9f) return@forEachIndexed
@@ -507,20 +507,20 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
                     // A short trail behind the signal.
                     for (s in 1..3) {
                         val back = (if (forward) at - s * 0.045f else at + s * 0.045f).coerceIn(0f, 1f)
-                        drawCircle(color.copy(alpha = 0.32f * fade * (1f - s / 4f)), (2.6f - s * 0.5f) * unit, curve(ax, ay, bx, by, k, back))
+                        drawCircle(color.copy(alpha = 0.22f * fade * (1f - s / 4f)), (1.4f - s * 0.25f) * unit, curve(ax, ay, bx, by, k, back))
                     }
-                    drawCircle(color.copy(alpha = 0.18f * fade), 7f * unit, p)
-                    drawCircle(color.copy(alpha = 0.45f * fade), 3.5f * unit, p)
-                    drawCircle(Color.White.copy(alpha = (0.95f * fade).coerceIn(0f, 1f)), 1.5f * unit, p)
+                    drawCircle(color.copy(alpha = 0.10f * fade), 4f * unit, p)
+                    drawCircle(color.copy(alpha = 0.35f * fade), 1.8f * unit, p)
+                    drawCircle(Color.White.copy(alpha = (0.75f * fade).coerceIn(0f, 1f)), 0.9f * unit, p)
                     // A spark where it lands.
                     if (f > 0.86f) {
                         val end = if (forward) Offset(bx, by) else Offset(ax, ay)
                         val burst = (f - 0.86f) / 0.14f
                         for (s in 0 until 5) {
                             val angle = s * 1.2566f + e
-                            val from = end + Offset(cos(angle), sin(angle)) * (4f + 7f * burst) * unit
-                            val to = end + Offset(cos(angle), sin(angle)) * (7f + 12f * burst) * unit
-                            drawLine(Color.White.copy(alpha = (1f - burst) * 0.8f * depth), from, to, strokeWidth = unit, cap = StrokeCap.Round)
+                            val from = end + Offset(cos(angle), sin(angle)) * (3f + 4f * burst) * unit
+                            val to = end + Offset(cos(angle), sin(angle)) * (5f + 7f * burst) * unit
+                            drawLine(Color.White.copy(alpha = (1f - burst) * 0.45f * depth), from, to, strokeWidth = 0.7f * unit, cap = StrokeCap.Round)
                         }
                     }
                 }
@@ -537,8 +537,8 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
                     val lo = min(a, b); val hi = maxOf(a, b)
                     val f = at - hop
                     val p = curve(sx[lo], sy[lo], sx[hi], sy[hi], bend(lo, hi), if (a == lo) f else 1f - f)
-                    drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = 0.9f), ZedColors.Cyan.copy(alpha = 0.5f), Color.Transparent), p, 13f * unit), 13f * unit, p)
-                    drawCircle(Color.White, 2.6f * unit, p)
+                    drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = 0.7f), ZedColors.Cyan.copy(alpha = 0.3f), Color.Transparent), p, 8f * unit), 8f * unit, p)
+                    drawCircle(Color.White, 1.6f * unit, p)
                 }
 
                 // Neurons, far ones first so near ones are drawn over them.
@@ -554,9 +554,9 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
                     val isSelected = i == selected
                     val lit = focusSet == null || i in focusSet
                     val depth = 0.32f + 0.68f * near[i]
-                    var alpha = (if (lit) 1f else 0.2f) * depth
+                    var alpha = (if (lit) 0.8f else 0.15f) * depth
                     // Memories ZED hasn't touched in a long time fade; they are never removed.
-                    if (node.itemId != null) alpha *= 0.5f + 0.5f * node.strength
+                    if (node.itemId != null) alpha *= 0.4f + 0.6f * node.strength
                     if (node.done) alpha *= 0.6f
                     if (isSelected) alpha = 1f
                     var r = nodeRadius(node, scale * persp[i], density) * grown
@@ -566,7 +566,7 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
                         val age = (now - born) / 1e9f
                         if (age < 1.2f) {
                             r *= 1f + 0.35f * sin(PI.toFloat() * (age / 0.6f).coerceIn(0f, 1f))
-                            drawCircle(color.copy(alpha = (1f - age / 1.2f) * 0.7f), r + age * 70f * unit, p, style = Stroke(1.5f * unit))
+                            drawCircle(color.copy(alpha = (1f - age / 1.2f) * 0.5f), r + age * 40f * unit, p, style = Stroke(unit))
                         }
                     }
                     // A memory ZED just used lights up.
@@ -575,26 +575,34 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
                         val age = (now - at) / 1e9f
                         if (age in 0f..1.8f) {
                             flash = 1f - age / 1.8f
-                            drawCircle(Color.White.copy(alpha = flash * 0.8f), r + age * 46f * unit, p, style = Stroke(1.5f * unit))
-                            val bloom = r * (3f + 3f * flash)
+                            drawCircle(Color.White.copy(alpha = flash * 0.6f), r + age * 30f * unit, p, style = Stroke(unit))
+                            val bloom = r * (3f + 4f * flash)
                             drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = 0.55f * flash), color.copy(alpha = 0.3f * flash), Color.Transparent), p, bloom), bloom, p)
                         }
                     }
-                    val breathe = 1f + 0.07f * sin(t * 1.6f + i * 0.9f)
+                    val breathe = 1f + 0.05f * sin(t * 1.6f + i * 0.9f)
 
                     if (node.type == BrainNodeType.CORE) drawCore(p, r, color, t, glow)
                     else {
-                        if (glow) {
-                            val halo = r * (if (node.type == BrainNodeType.CATEGORY || node.type == BrainNodeType.CONCEPT || isSelected) 3.2f else 2.2f + 1.2f * node.strength) * breathe
-                            drawCircle(Brush.radialGradient(listOf(color.copy(alpha = (0.42f * alpha).coerceIn(0f, 1f)), Color.Transparent), p, halo), halo, p)
+                        // Glow is kept for what matters: the areas, strong memories, and whatever is selected.
+                        val haloAlpha = when {
+                            isSelected -> 0.3f
+                            node.type == BrainNodeType.CATEGORY -> 0.16f * alpha
+                            node.itemId != null && node.strength >= 0.75f -> 0.12f * alpha
+                            else -> 0f
+                        }
+                        if (glow && haloAlpha > 0f) {
+                            val halo = r * 2.6f * breathe
+                            drawCircle(Brush.radialGradient(listOf(color.copy(alpha = haloAlpha.coerceIn(0f, 1f)), Color.Transparent), p, halo), halo, p)
                         }
                         drawCircle(color.copy(alpha = alpha.coerceIn(0f, 1f)), r, p)
-                        // The nucleus: a bright centre, sharp on near neurons and soft on far ones.
-                        drawCircle(Color.White.copy(alpha = ((0.35f + 0.55f * near[i]) * alpha + flash * 0.5f).coerceIn(0f, 1f)), r * 0.45f, p)
-                        if (node.pinned) drawCircle(Color.White.copy(alpha = (0.8f * alpha).coerceIn(0f, 1f)), r + 2.5f * unit, p, style = Stroke(unit))
+                        // A small nucleus, only on the near side, so depth reads at a glance.
+                        val nucleus = (0.45f * near[i] * near[i] * alpha + flash * 0.5f).coerceIn(0f, 1f)
+                        if (nucleus > 0.04f) drawCircle(Color.White.copy(alpha = nucleus), r * 0.38f, p)
+                        if (node.pinned) drawCircle(Color.White.copy(alpha = (0.5f * alpha).coerceIn(0f, 1f)), r + 1.8f * unit, p, style = Stroke(0.8f * unit))
                     }
-                    if (i in matches) drawCircle(ZedColors.Amber, r + 5f * unit, p, style = Stroke(1.5f * unit))
-                    if (isSelected) drawCircle(Color.White, r + 5f * unit + 1.5f * unit * sin(t * 4f), p, style = Stroke(2f * unit))
+                    if (i in matches) drawCircle(ZedColors.Amber, r + 3.5f * unit, p, style = Stroke(1.2f * unit))
+                    if (isSelected) drawCircle(Color.White.copy(alpha = 0.85f), r + 4f * unit + 1f * unit * sin(t * 4f), p, style = Stroke(1.2f * unit))
 
                     val hub = node.type == BrainNodeType.CORE || node.type == BrainNodeType.CATEGORY
                     val apparent = scale * persp[i]
@@ -609,7 +617,7 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
                         val text = labels.getOrPut(node.key) {
                             measurer.measure(if (hub) node.label.uppercase() else node.label, if (hub) hubStyle else labelStyle, overflow = TextOverflow.Ellipsis, maxLines = 1)
                         }
-                        drawText(text, color = ZedColors.Text.copy(alpha = if (hub || isSelected) (0.45f + 0.55f * near[i]) else (0.35f + 0.5f * near[i])), topLeft = Offset(p.x - text.size.width / 2f, p.y + r + 4f * unit))
+                        drawText(text, color = ZedColors.Text.copy(alpha = if (hub || isSelected) (0.45f + 0.55f * near[i]) else (0.35f + 0.5f * near[i])), topLeft = Offset(p.x - text.size.width / 2f, p.y + r + 3f * unit))
                     }
                 }
             }
@@ -719,8 +727,20 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
     }
 }
 
-private fun nodeRadius(node: BrainNode, apparentScale: Float, density: Float): Float =
-    (4f + 20f * node.weight) * density * apparentScale.coerceIn(0.4f, 2.4f)
+/**
+ * Neurons are points of light, not balloons: a clear size order (core, areas,
+ * concepts, memories by strength) and only gentle growth when zooming in —
+ * flying closer spreads them apart rather than inflating them.
+ */
+private fun nodeRadius(node: BrainNode, apparentScale: Float, density: Float): Float {
+    val dp = when (node.type) {
+        BrainNodeType.CORE -> 7f
+        BrainNodeType.CATEGORY -> 3.6f + 2.4f * node.weight
+        BrainNodeType.CONCEPT -> 2.4f
+        else -> 1.6f + 2.2f * node.strength + if (node.pinned) 0.4f else 0f
+    }
+    return dp * density * sqrt(apparentScale.coerceAtLeast(0.01f)).coerceIn(0.65f, 1.7f)
+}
 
 /**
  * The brain in miniature, for Home, LIVE and the floating assistant: the same
@@ -785,7 +805,7 @@ fun MiniBrain(modifier: Modifier = Modifier, glow: Boolean = true) {
             val depth = 0.25f + 0.75f * (near[edge.a] + near[edge.b]) / 2f
             val hot = maxOf(lit[edge.a], lit[edge.b])
             val color = if (hot > 0f) Color.White else g.nodes[edge.b].type.color()
-            drawLine(color.copy(alpha = ((0.16f + 0.14f * edge.strength) * depth + 0.6f * hot).coerceIn(0f, 1f)), Offset(sx[edge.a], sy[edge.a]), Offset(sx[edge.b], sy[edge.b]), strokeWidth = (0.6f + hot) * unit)
+            drawLine(color.copy(alpha = ((0.08f + 0.08f * edge.strength) * depth + 0.5f * hot).coerceIn(0f, 1f)), Offset(sx[edge.a], sy[edge.a]), Offset(sx[edge.b], sy[edge.b]), strokeWidth = (0.5f + 0.6f * hot) * unit)
         }
         val order = projection.order
         for (slot in order.indices) {
@@ -795,14 +815,14 @@ fun MiniBrain(modifier: Modifier = Modifier, glow: Boolean = true) {
             val color = node.type.color()
             val depth = 0.3f + 0.7f * near[i]
             val core = node.type == BrainNodeType.CORE
-            val r = (if (core) 4.2f else 1.1f + 3.4f * node.weight) * unit * persp[i].coerceIn(0.6f, 1.6f) * (1f + 0.08f * sin(t * 1.7f + i))
-            val alpha = if (node.itemId != null) depth * (0.5f + 0.5f * node.strength) else depth
-            if (glow && (core || node.type == BrainNodeType.CATEGORY)) drawCircle(Brush.radialGradient(listOf(color.copy(alpha = 0.4f * alpha), Color.Transparent), p, r * 3.2f), r * 3.2f, p)
+            val r = (if (core) 3f else if (node.type == BrainNodeType.CATEGORY) 1.8f else 0.8f + 1.2f * node.strength) * unit * persp[i].coerceIn(0.7f, 1.3f) * (1f + 0.05f * sin(t * 1.7f + i))
+            val alpha = 0.85f * if (node.itemId != null) depth * (0.4f + 0.6f * node.strength) else depth
+            if (glow && (core || node.type == BrainNodeType.CATEGORY)) drawCircle(Brush.radialGradient(listOf(color.copy(alpha = (if (core) 0.3f else 0.15f) * alpha), Color.Transparent), p, r * 3f), r * 3f, p)
             if (lit[i] > 0f) {
                 val bloom = r * (3f + 5f * lit[i])
                 drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = 0.8f * lit[i]), color.copy(alpha = 0.4f * lit[i]), Color.Transparent), p, bloom), bloom, p)
             }
-            drawCircle(if (core) Color.White else color.copy(alpha = alpha.coerceIn(0f, 1f)), r, p)
+            drawCircle(if (core) Color.White.copy(alpha = 0.9f) else color.copy(alpha = alpha.coerceIn(0f, 1f)), r, p)
         }
     }
 }
@@ -811,16 +831,16 @@ fun MiniBrain(modifier: Modifier = Modifier, glow: Boolean = true) {
 private fun DrawScope.drawCore(p: Offset, r: Float, color: Color, t: Float, glow: Boolean) {
     val pulse = 1f + 0.08f * sin(t * 2.2f)
     if (glow) {
-        val halo = r * 3.4f * pulse
-        drawCircle(Brush.radialGradient(listOf(color.copy(alpha = 0.45f), ZedColors.Violet.copy(alpha = 0.12f), Color.Transparent), p, halo), halo, p)
+        val halo = r * 3f * pulse
+        drawCircle(Brush.radialGradient(listOf(color.copy(alpha = 0.26f), ZedColors.Violet.copy(alpha = 0.07f), Color.Transparent), p, halo), halo, p)
     }
-    drawCircle(Brush.radialGradient(listOf(Color.White, color, color.copy(alpha = 0.55f)), p, r), r, p)
+    drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = 0.9f), color.copy(alpha = 0.85f), color.copy(alpha = 0.4f)), p, r), r, p)
     val ring = r * 1.45f
-    drawArc(color.copy(alpha = 0.9f), t * 50f % 360f, 100f, false, Offset(p.x - ring, p.y - ring), Size(ring * 2, ring * 2), style = Stroke(1.5.dp.toPx(), cap = StrokeCap.Round))
-    drawArc(color.copy(alpha = 0.9f), t * 50f % 360f + 180f, 100f, false, Offset(p.x - ring, p.y - ring), Size(ring * 2, ring * 2), style = Stroke(1.5.dp.toPx(), cap = StrokeCap.Round))
+    drawArc(color.copy(alpha = 0.6f), t * 50f % 360f, 100f, false, Offset(p.x - ring, p.y - ring), Size(ring * 2, ring * 2), style = Stroke(1.dp.toPx(), cap = StrokeCap.Round))
+    drawArc(color.copy(alpha = 0.6f), t * 50f % 360f + 180f, 100f, false, Offset(p.x - ring, p.y - ring), Size(ring * 2, ring * 2), style = Stroke(1.dp.toPx(), cap = StrokeCap.Round))
     val outer = r * 1.9f
-    drawArc(ZedColors.Violet.copy(alpha = 0.8f), 360f - t * 32f % 360f, 60f, false, Offset(p.x - outer, p.y - outer), Size(outer * 2, outer * 2), style = Stroke(1.dp.toPx(), cap = StrokeCap.Round))
-    drawArc(ZedColors.Violet.copy(alpha = 0.8f), 360f - t * 32f % 360f + 180f, 60f, false, Offset(p.x - outer, p.y - outer), Size(outer * 2, outer * 2), style = Stroke(1.dp.toPx(), cap = StrokeCap.Round))
+    drawArc(ZedColors.Violet.copy(alpha = 0.5f), 360f - t * 32f % 360f, 60f, false, Offset(p.x - outer, p.y - outer), Size(outer * 2, outer * 2), style = Stroke(0.8.dp.toPx(), cap = StrokeCap.Round))
+    drawArc(ZedColors.Violet.copy(alpha = 0.5f), 360f - t * 32f % 360f + 180f, 60f, false, Offset(p.x - outer, p.y - outer), Size(outer * 2, outer * 2), style = Stroke(0.8.dp.toPx(), cap = StrokeCap.Round))
 }
 
 /** A small living network, used on the card that opens the Live Brain. */
