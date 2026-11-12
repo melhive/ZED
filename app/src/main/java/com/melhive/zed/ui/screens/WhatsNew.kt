@@ -31,6 +31,13 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.29", "2026-11-12", "Gemma only, steadier, and a keener “Hey Zed”", listOf(
+            "“Hey Zed” is much more sensitive: it wakes on “Zed” alone or in “Hey Zed”, even said quietly or from across the room. The new Maximum setting is the default (More → Voice → Sensitivity); words that sound alike, like “zero” or “Jed”, can wake it now and then — pick High for fewer false alarms.",
+            "Gemma only: online AI (Gemini, OpenAI, Claude) and real-time Gemini voice are gone. Everything you say is answered by the model on your phone, and API keys saved by older versions are deleted. Web research still works — only the search question leaves the phone.",
+            "Move calendar events: “move my meeting with Ana to 4”, “reschedule the dentist to Friday at 10”, or right after adding one, “move it to 5”. Its length stays the same; repeating events are left for your calendar app.",
+            "Easier on the battery: housekeeping (“dreaming”) runs at most every few hours, leave-now hints no longer wake the phone every 15 minutes, and Home's animations draw fewer frames. More → Permissions & Diagnostics → Background jobs shows what is scheduled and when.",
+            "Gemma isn't preloaded when the battery is below 15% and the phone isn't charging.",
+        )),
         Release("0.1.28", "2026-11-12", "Deeper intelligence", listOf(
             "Relationships in the Live Brain: ZED reads who and what connects — “Ana → sister”, “Dr. Cruz → dentist → Cebu” — and draws them as named connections. Tap a person to see how they relate to you.",
             "Dreaming: while the phone charges, ZED tidies its memory — duplicates are merged and relationships are read out (Gemma helps when it's allowed to run).",

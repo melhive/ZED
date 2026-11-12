@@ -56,6 +56,14 @@ class OrbAndLabelsTest {
         assertTrue(PlasmaShape.synapses(4.2f).all { (x, y, b) -> x in -0.7f..0.7f && y in -0.7f..0.7f && b in 0f..1f })
     }
 
+    @Test fun wakePhrasesAreCheckedAgainstTheModel() {
+        val known = setOf("▁", "Z", "ED", "▁HE", "Y", "▁HI")
+        val kw = "▁ Z ED @ZED\n▁HE Y ▁ Z ED @ZED\n▁OKAY ▁ Z ED @ZED\n▁HI ▁ Z ED @ZED"
+        assertEquals("▁ Z ED @ZED\n▁HE Y ▁ Z ED @ZED\n▁HI ▁ Z ED @ZED", com.melhive.zed.core.voice.WakeWords.safe(kw, known), "a phrase with an unknown token is dropped")
+        assertEquals(com.melhive.zed.core.voice.WakeWords.FALLBACK, com.melhive.zed.core.voice.WakeWords.safe("▁OKAY ▁ZED @ZED", known))
+        assertEquals(kw, com.melhive.zed.core.voice.WakeWords.safe(kw, emptySet()), "no token list: leave as is")
+    }
+
     @Test fun actionLabelsAndChips() {
         assertEquals("Setting alarm…", ActionLabels.progress("alarm.set"))
         assertEquals("Searching the web…", ActionLabels.progress("web.research"))

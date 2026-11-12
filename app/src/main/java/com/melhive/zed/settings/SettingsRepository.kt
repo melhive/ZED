@@ -57,8 +57,8 @@ data class AppSettings(
     val confirmMode: String = "NEVER",
     /** The user closed the "Allow everything" card in Settings. */
     val permissionsCardHidden: Boolean = false,
-    /** 0 = fewer false alarms, 1 = normal, 2 = hears it more easily. */
-    val wakeSensitivity: Int = 2,
+    /** 0 fewer false alarms … 3 maximum (default: wakes on “Zed” as readily as possible). */
+    val wakeSensitivity: Int = 3,
     val confirmAllChanges: Boolean = false,
     val useKnowledge: Boolean = true,
     val autoIndex: Boolean = false,
@@ -157,7 +157,7 @@ class SettingsRepository(private val context: Context) {
             // Users who had "confirm every change" on keep being asked.
             permissionsCardHidden = p[K.permsHidden] ?: false,
             confirmMode = p[K.confirmMode] ?: if (p[K.confirmAll] == true) "ALWAYS" else "NEVER",
-            wakeSensitivity = p[K.wakeSensitivity] ?: 2,
+            wakeSensitivity = p[K.wakeSensitivity] ?: 3,
             confirmAllChanges = p[K.confirmAll] ?: defaults.confirmAllChanges,
             useKnowledge = p[K.useKnowledge] ?: defaults.useKnowledge,
             autoIndex = p[K.autoIndex] ?: defaults.autoIndex,
@@ -199,7 +199,7 @@ class SettingsRepository(private val context: Context) {
     suspend fun setPermissionsCardHidden(v: Boolean) = context.dataStore.edit { it[K.permsHidden] = v }
     suspend fun setConfirmMode(mode: String) = context.dataStore.edit { it[K.confirmMode] = mode }
     suspend fun setWakeWordEnabled(v: Boolean) = context.dataStore.edit { it[K.wakeWord] = v }
-    suspend fun setWakeSensitivity(v: Int) = context.dataStore.edit { it[K.wakeSensitivity] = v.coerceIn(0, 2) }
+    suspend fun setWakeSensitivity(v: Int) = context.dataStore.edit { it[K.wakeSensitivity] = v.coerceIn(0, 3) }
     suspend fun setHomeAssistantUrl(v: String) = context.dataStore.edit { it[K.haUrl] = v.trim().trimEnd('/') }
     suspend fun setConfirmAllChanges(v: Boolean) = context.dataStore.edit { it[K.confirmAll] = v }
     suspend fun setUseKnowledge(v: Boolean) = context.dataStore.edit { it[K.useKnowledge] = v }

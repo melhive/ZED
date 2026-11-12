@@ -97,8 +97,11 @@ class WakeWordService : Service() {
 
     @SuppressLint("MissingPermission")
     private fun listenLoop(dir: File, sensitivity: Int) {
-        val keywordsFile = File(cacheDir, "wake-keywords.txt").apply { writeText(KEYWORDS + "\n") }
-        val (threshold, score) = when (sensitivity) { 0 -> THRESHOLD_LOW; 2 -> THRESHOLD_HIGH; else -> THRESHOLD_NORMAL }
+        // Only phrases whose every token the installed model knows: an unknown token makes the engine exit the whole app.
+        val known = runCatching { File(dir, "tokens.txt").readLines().map { it.substringBefore(' ') }.toHashSet() }.getOrDefault(hashSetOf())
+        val phrases = com.melhive.zed.core.voice.WakeWords.safe(KEYWORDS, known)
+        val keywordsFile = File(cacheDir, "wake-keywords.txt").apply { writeText(phrases + "\n") }
+        val level = LEVELS.getOrElse(sensitivity) { LEVELS.last() }
         val kws = try {
             KeywordSpotter(config = KeywordSpotterConfig(
                 featConfig = FeatureConfig(sampleRate = RATE, featureDim = 80),
@@ -110,7 +113,7 @@ class WakeWordService : Service() {
                     ),
                     tokens = File(dir, "tokens.txt").path, numThreads = 1, modelType = "zipformer2",
                 ),
-                keywordsFile = keywordsFile.path, keywordsThreshold = threshold, keywordsScore = score,
+                maxActivePaths = level.paths, keywordsFile = keywordsFile.path, keywordsThreshold = level.threshold, keywordsScore = level.score,
             ))
         } catch (e: Throwable) {
             com.melhive.zed.android.CrashReporter.recordNonFatal("wake word model", e)
@@ -222,10 +225,20 @@ class WakeWordService : Service() {
          * 1 false alarm: the letter Z said "zed").
          */
         const val KEYWORDS = "▁ Z ED @ZED\n▁HE Y ▁ Z ED @ZED\n▁WA KE ▁UP ▁ Z ED @ZED\n▁OKAY ▁ Z ED @ZED\n▁HI ▁ Z ED @ZED"
-        /** (threshold, boosting score) per sensitivity, from the test above. */
-        private val THRESHOLD_LOW = 0.12f to 2.0f
-        private val THRESHOLD_NORMAL = 0.05f to 3.0f
-        private val THRESHOLD_HIGH = 0.03f to 3.5f
+        /**
+         * Detector settings per sensitivity (0 fewest false alarms … 3 maximum), measured with the real
+         * engine on 34 spoken wake phrases × 5 conditions and 50 near-miss sentences (v0.1.29):
+         * a wider search ([Level.paths] 8) catches far more quiet and distant “Zed”s; 16 only adds
+         * false alarms; middle settings gained little; extra spellings ("Zet", "Z E D") made it worse.
+         */
+        data class Level(val threshold: Float, val score: Float, val paths: Int)
+        val LEVELS = listOf(
+            Level(0.12f, 2.0f, 4),  // fewer false alarms
+            Level(0.05f, 3.0f, 4),  // balanced
+            Level(0.03f, 3.5f, 4),  // high: 81/170 caught, 1 look-alike in 50 sentences
+            Level(0.01f, 4.5f, 8),  // maximum: 106/170 caught (62%), look-alikes ("zero", "Jed") wake it now and then
+        )
+
 
         /** True while ZED LIVE is using the microphone. */
         val paused = MutableStateFlow(false)

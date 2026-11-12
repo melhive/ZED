@@ -13,7 +13,7 @@ Native Android personal AI assistant (Kotlin, Jetpack Compose). Three intelligen
 | Default branch | `main` (stable merges) |
 | Latest commit | see `git log -1` (this file is updated with each milestone) |
 | Build status | ✅ GitHub Actions **Android Build** green: core tests, Android unit tests, debug APK |
-| Releases | ✅ Signed release **v0.1.28** published (latest). Install/share link: https://github.com/melhive/ZED/releases/latest/download/zed.apk. Every push to `main` publishes the version in `VERSION` (bump it for a new release; re-pushing the same version replaces that release). App id `com.melhive.zed`, signed with the key in `/root/zed-signing` (back it up — updates need the same key). |
+| Releases | ✅ Signed release **v0.1.29** published (latest). Install/share link: https://github.com/melhive/ZED/releases/latest/download/zed.apk. Every push to `main` publishes the version in `VERSION` (bump it for a new release; re-pushing the same version replaces that release). App id `com.melhive.zed`, signed with the key in `/root/zed-signing` (back it up — updates need the same key). |
 
 ## Milestones
 
@@ -59,6 +59,13 @@ Failed tests: none.
 | Model download (2–3 GB) with resume + SHA-256 | | ✅ | ✅ | |
 | Keystore secret storage | | ✅ | ✅ | |
 | STT / TTS / sentence streaming / barge-in / audio focus | VAD only | ✅ | ✅ | |
+
+## Stabilising: Gemma-only, battery, calendar moves, wake word (v0.1.29)
+
+- **Gemma-only**: `OnlineProviders.kt`, `GeminiLive.kt` and their tests removed; `ProviderRegistry` returns the on-device model or null; `IntelligenceMode.ONLINE` and the online/live settings removed; `SecretStore.removeLegacyAiKeys()` deletes old AI keys at start; Terms/Privacy updated.
+- **Battery**: `DreamLogic.duplicates` computes keys once per memory; `Dreamer.dream` runs at most every 6 h (2 h while charging); leave-now hints use a 3-hourly planner plus one wake-up 40 min before an event with a place (was every 15 min); Home orb idle 24 fps, particles 15 fps, mini brain 20 fps; no model warm-up below 15% battery unless charging; Diagnostics → Background jobs.
+- **Calendar moves**: `calendar.move` (parser rule with file/smart-home exclusions, follow-up from `calendar.create`, `CalendarMove` logic unit-tested; skips repeating events; keeps the event's length).
+- **Wake word**: measured with the real engine (34 phrases × 5 conditions, 50 near-miss sentences): `maxActivePaths` 8 is the lever; Maximum (0.01/4.5/8) 106/170 vs High — the old top setting, unchanged — 81/170, at the cost of more look-alike wakes (16 of 100 near-miss sentences); extra spellings lowered recall and were dropped. Keywords are checked against the model's tokens.txt before loading (`WakeWords.safe`). Old top setting migrates to Maximum once.
 
 ## Deeper intelligence (v0.1.28)
 

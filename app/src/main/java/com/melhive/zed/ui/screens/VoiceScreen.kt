@@ -144,13 +144,19 @@ fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
                 if (settings.wakeWordEnabled) {
                     Text("Sensitivity", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 6.dp))
                     WrapRow {
-                        listOf(0 to "Fewer false alarms", 1 to "Balanced", 2 to "Most sensitive").forEach { (v, l) ->
+                        listOf(0 to "Fewer false alarms", 1 to "Balanced", 2 to "High", 3 to "Maximum").forEach { (v, l) ->
                             FilterChip(selected = settings.wakeSensitivity == v, onClick = { safely {
                                 c.settings.setWakeSensitivity(v)
                                 com.melhive.zed.voice.WakeWordService.stop(context); com.melhive.zed.voice.WakeWordService.start(context)
                             } }, label = { Text(l) })
                         }
                     }
+                    Text(when (settings.wakeSensitivity) {
+                        3 -> "Maximum: wakes on “Zed” alone or in “Hey Zed”, even said quietly or from across the room. Words that sound like it (“zero”, “Jed”) can wake it now and then."
+                        2 -> "High: wakes on most “Zed”s, with only the odd false alarm."
+                        1 -> "Balanced: fewer false alarms; say “Zed” clearly."
+                        else -> "Fewer false alarms: say “Hey Zed” clearly and close to the phone."
+                    }, style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
                     if (!android.provider.Settings.canDrawOverlays(context)) {
                         Text("To open LIVE when another app is on screen, allow ZED to display over other apps. Without it, ZED answers hands-free and shows the reply as a notification.",
                             style = MaterialTheme.typography.bodySmall, color = ZedColors.Amber, modifier = Modifier.padding(top = 4.dp))

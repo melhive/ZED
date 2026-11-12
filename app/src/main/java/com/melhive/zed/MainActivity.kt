@@ -38,8 +38,16 @@ class MainActivity : ComponentActivity() {
         c.warmUpModel()
         c.appScope.launch {
             val s = c.settings.current()
+            // v0.1.29: "Hey Zed" became more sensitive; the old top setting moves up to the new Maximum once.
+            val migrations = getSharedPreferences("zed_migrations", MODE_PRIVATE)
+            var restartWake = false
+            if (!migrations.getBoolean("wake_maximum", false)) {
+                if (s.wakeSensitivity == 2) { c.settings.setWakeSensitivity(3); restartWake = true }
+                migrations.edit().putBoolean("wake_maximum", true).apply()
+            }
             if (s.wakeWordEnabled && c.voicePacks.isInstalled(com.melhive.zed.core.voice.VoiceCatalog.WAKE_WORD) &&
                 com.melhive.zed.android.PermissionCatalog.isGranted(this@MainActivity, com.melhive.zed.android.PermissionCatalog.MICROPHONE)) {
+                if (restartWake) com.melhive.zed.voice.WakeWordService.stop(this@MainActivity)
                 com.melhive.zed.voice.WakeWordService.start(this@MainActivity)
             }
         }
