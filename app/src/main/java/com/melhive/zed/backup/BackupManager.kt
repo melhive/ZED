@@ -111,7 +111,7 @@ class BackupManager(
     }
 
     /** Writes a complete backup to [out] and returns its manifest. */
-    suspend fun backup(out: OutputStream, options: BackupOptions): BackupManifest = withContext(Dispatchers.IO) {
+    suspend fun backup(out: OutputStream, options: BackupOptions, showProgress: Boolean = true): BackupManifest = withContext(Dispatchers.IO) {
         val tmp = File(context.cacheDir, "backup_tmp").apply { deleteRecursively(); mkdirs() }
         try {
             // A consistent snapshot of the database: copied while writers are held off.
@@ -140,7 +140,7 @@ class BackupManager(
                 models = models.map { it.name }, voices = packs.map { it.name }, totalBytes = total,
                 counts = runCatching { counts() }.getOrDefault(emptyMap()),
             )
-            val progress = Progress(false, total)
+            val progress = Progress(false, total, showProgress)
             val writer = BackupWriter(out)
             writer.entry(BackupFormat.MANIFEST, manifest.encode())
             if (keys != null) { writer.entry(BackupFormat.KEYS, keys); progress.add(keys.size.toLong(), "Saving API keys") }
@@ -294,6 +294,58 @@ class BackupManager(
         return true
     }
 
+    // ----------------------------------------------------- safety copies
+
+    /** Copies of the database ZED made by itself just before an update changed its format (newest first). */
+    fun safetyCopies(): List<File> = paths.safety.listFiles().orEmpty().filter { it.isFile && it.name.endsWith(".db") }.sortedByDescending { it.lastModified() }
+
+    /** Puts a safety copy back: staged like any restore and swapped in on restart. Settings, models and voices stay as they are. */
+    fun restoreSafetyCopy(copy: File, restart: () -> Unit) {
+        if (busy) return
+        _state.value = BackupState.Working(true, "Preparing", 0, 0)
+        scope.launch(Dispatchers.IO) {
+            try {
+                val staging = paths.staging
+                staging.deleteRecursively()
+                val db = File(staging, BackupFormat.DB).apply { parentFile?.mkdirs() }
+                copy.copyTo(db, overwrite = true)
+                File(copy.path + "-wal").takeIf { it.exists() }?.copyTo(File(staging, BackupFormat.DB_WAL), overwrite = true)
+                File(staging, NOTICE).writeText("Restored ZED's data as it was on ${java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT).format(java.util.Date(copy.lastModified()))}, just before an update.\n\nSettings, models and voices were left as they are.")
+                File(staging, READY).writeText("safety")
+                _state.value = BackupState.Finished(true, "Safety copy ready. Restarting ZED to finish…")
+                kotlinx.coroutines.delay(1000)
+                withContext(Dispatchers.Main) { restart() }
+            } catch (e: Throwable) {
+                paths.staging.deleteRecursively()
+                _state.value = BackupState.Failed(true, "Restore failed: ${describe(e)} Nothing was changed.")
+            }
+        }
+    }
+
+    // ------------------------------------------------------ weekly backup
+
+    /**
+     * Writes a data-and-settings backup into the folder the user chose and
+     * keeps the newest [keep]. Models, voices and API keys are left out: it
+     * stays small and needs no password. Returns the file name.
+     */
+    suspend fun autoBackup(folder: Uri, keep: Int = 4): String = withContext(Dispatchers.IO) {
+        val tree = androidx.documentfile.provider.DocumentFile.fromTreeUri(context, folder)?.takeIf { it.canWrite() }
+            ?: throw java.io.IOException("ZED can no longer write to the backup folder. Choose it again.")
+        val name = "$AUTO_PREFIX${java.time.LocalDate.now()}.${BackupFormat.EXTENSION}"
+        tree.findFile(name)?.delete()
+        val file = tree.createFile(MIME, name) ?: throw java.io.IOException("Couldn't create the backup file.")
+        try {
+            val out = context.contentResolver.openOutputStream(file.uri, "w") ?: throw java.io.IOException("Couldn't open the backup file.")
+            BufferedOutputStream(out, 1 shl 16).use { backup(it, BackupOptions(models = false, voices = false, password = ""), showProgress = false) }
+        } catch (e: Throwable) {
+            runCatching { file.delete() }
+            throw e
+        }
+        tree.listFiles().filter { it.name?.startsWith(AUTO_PREFIX) == true }.sortedByDescending { it.name }.drop(keep).forEach { runCatching { it.delete() } }
+        file.name ?: name
+    }
+
     // ----------------------------------------------------------------- helpers
 
     private fun modelFiles(): List<File> = paths.models.listFiles().orEmpty()
@@ -311,10 +363,11 @@ class BackupManager(
         .filter { (rel, _) -> BackupFormat.isSafeName("${BackupFormat.VOICES}${pack.name}/$rel") }
         .sortedBy { it.first }.toList()
 
-    private inner class Progress(val restoring: Boolean, val total: Long) {
+    private inner class Progress(val restoring: Boolean, val total: Long, val show: Boolean = true) {
         private var done = 0L
         private var shown = -1L
         fun add(n: Long, label: String) {
+            if (!show) return
             done += n
             val current = _state.value as? BackupState.Working
             if (done - shown >= (1L shl 20) || done >= total || current?.label != label) {
@@ -341,6 +394,7 @@ class BackupManager(
         val voices = File(context.filesDir, "voices")
         val staging = File(context.filesDir, "restore_staging")
         val notice = File(context.filesDir, "restore_notice.txt")
+        val safety = File(context.filesDir, "safety_copies")
     }
 
     companion object {
@@ -350,6 +404,31 @@ class BackupManager(
         private const val READY = "READY"
         private const val NOTICE = "NOTICE"
         private const val MARKER = ".installed"
+
+        const val AUTO_PREFIX = "ZED-auto-backup-"
+
+        /**
+         * Before an update changes the database format, keep a copy of the
+         * database as it was (the newest three are kept). Runs at process
+         * start, before the database is opened and migrated. Returns the copy
+         * when one was made.
+         */
+        fun safetyCopyBeforeUpgrade(context: Context, currentVersion: Int): File? {
+            val p = Paths(context)
+            if (!p.db.exists()) return null
+            val version = runCatching {
+                android.database.sqlite.SQLiteDatabase.openDatabase(p.db.path, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY).use { it.version }
+            }.getOrNull() ?: return null
+            if (version <= 0 || version >= currentVersion) return null
+            p.safety.mkdirs()
+            val copy = File(p.safety, "zed-v$version-${java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.US).format(java.util.Date())}.db")
+            p.db.copyTo(copy, overwrite = true)
+            if (p.wal.exists() && p.wal.length() > 0) p.wal.copyTo(File(copy.path + "-wal"), overwrite = true)
+            p.safety.listFiles().orEmpty().filter { it.name.endsWith(".db") }.sortedByDescending { it.lastModified() }.drop(3).forEach {
+                it.delete(); File(it.path + "-wal").delete()
+            }
+            return copy
+        }
 
         fun suggestedName(now: java.time.LocalDate = java.time.LocalDate.now()) = "ZED-backup-$now.${BackupFormat.EXTENSION}"
 

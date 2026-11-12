@@ -58,6 +58,28 @@ object SoundSynth {
         }
     }
 
+    /**
+     * A synapse tick for the Live Brain: a few hundredths of a second of click
+     * and glassy ping. [pitch] 0..4 picks one of five notes so repeated ticks
+     * don't sound mechanical-identical.
+     */
+    fun tick(pitch: Int = 0): ShortArray {
+        val o = buffer(0.07)
+        val f = doubleArrayOf(2093.0, 2349.0, 2637.0, 3136.0, 3520.0)[pitch.mod(5)]
+        click(o, 0.0, 3600.0, 0.5)
+        for (k in o.indices) {
+            val t = k.toDouble() / RATE
+            o[k] += 0.8 * min(1.0, t / 0.001) * exp(-t / 0.014) * (sin(2 * PI * f * t) + 0.4 * sin(2 * PI * f * 2.41 * t))
+        }
+        highPass(o, 400.0)
+        val peak = o.maxOf { abs(it) }.takeIf { it > 0 } ?: 1.0
+        val fade = RATE / 1000
+        return ShortArray(o.size) { i ->
+            val edge = min(1.0, min(i, o.size - 1 - i).toDouble() / fade)
+            (o[i] * 0.32 / peak * edge * Short.MAX_VALUE).toInt().toShort()
+        }
+    }
+
     // ---------------------------------------------------------------- styles
 
     private fun arcUp(): DoubleArray {

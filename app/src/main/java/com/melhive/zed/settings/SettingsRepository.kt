@@ -82,6 +82,12 @@ data class AppSettings(
     val checkUpdates: Boolean = true,
     /** On-device context window in tokens; 0 = choose automatically from device RAM. */
     val localContextTokens: Int = 0,
+    /** Folder (tree URI) for the weekly automatic backup; blank = off. */
+    val autoBackupFolder: String = "",
+    /** What the last automatic backup did. */
+    val autoBackupStatus: String = "",
+    /** Synapse ticks and vibration when touching the Live Brain. */
+    val brainSounds: Boolean = true,
 ) {
     fun modelFor(kind: OnlineProviderKind): String = onlineModels[kind]?.takeIf { it.isNotBlank() } ?: kind.defaultModel
 }
@@ -126,6 +132,9 @@ class SettingsRepository(private val context: Context) {
         val onboarding = booleanPreferencesKey("onboarding_done")
         val checkUpdates = booleanPreferencesKey("check_updates")
         val contextTokens = androidx.datastore.preferences.core.intPreferencesKey("local_context_tokens")
+        val autoBackupFolder = stringPreferencesKey("auto_backup_folder")
+        val autoBackupStatus = stringPreferencesKey("auto_backup_status")
+        val brainSounds = booleanPreferencesKey("brain_sounds")
         fun model(kind: OnlineProviderKind) = stringPreferencesKey("online_model_${kind.name.lowercase()}")
     }
 
@@ -170,6 +179,9 @@ class SettingsRepository(private val context: Context) {
             onboardingDone = p[K.onboarding] ?: false,
             checkUpdates = p[K.checkUpdates] ?: defaults.checkUpdates,
             localContextTokens = p[K.contextTokens] ?: 0,
+            autoBackupFolder = p[K.autoBackupFolder] ?: "",
+            autoBackupStatus = p[K.autoBackupStatus] ?: "",
+            brainSounds = p[K.brainSounds] ?: true,
         )
     }
 
@@ -208,6 +220,9 @@ class SettingsRepository(private val context: Context) {
     suspend fun setGlow(v: Boolean) = context.dataStore.edit { it[K.glow] = v }
     suspend fun setLocalContextTokens(v: Int) = context.dataStore.edit { it[K.contextTokens] = v }
     suspend fun setCheckUpdates(v: Boolean) = context.dataStore.edit { it[K.checkUpdates] = v }
+    suspend fun setAutoBackupFolder(uri: String) = context.dataStore.edit { it[K.autoBackupFolder] = uri; it.remove(K.autoBackupStatus) }
+    suspend fun setAutoBackupStatus(v: String) = context.dataStore.edit { it[K.autoBackupStatus] = v }
+    suspend fun setBrainSounds(v: Boolean) = context.dataStore.edit { it[K.brainSounds] = v }
     suspend fun setOnboardingDone() = context.dataStore.edit { it[K.onboarding] = true }
     suspend fun setSkillEnabled(id: String, enabled: Boolean) = context.dataStore.edit { p ->
         val all = AppSettings().enabledSkills

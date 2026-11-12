@@ -129,6 +129,8 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("ZED LIVE", style = MaterialTheme.typography.titleMedium, color = ZedColors.Muted, modifier = Modifier.weight(1f))
                 TaskIndicator(activeTasks, onOpenTasks)
+                // ZED's memory at work: a memory flashes when it is used to answer.
+                MiniBrain(Modifier.padding(start = 8.dp).size(52.dp), glow = settings?.glow ?: true)
                 if (state.orb == OrbState.LISTENING) {
                     Spacer(Modifier.size(8.dp))
                     StatusPill("Mic on", ZedColors.Red)

@@ -19,23 +19,29 @@ object ZedSounds {
     private fun pcm(style: SoundSynth.Style, start: Boolean): ShortArray =
         cache.getOrPut("${style.id}/$start") { SoundSynth.render(style, start) }
 
+    /** A tiny synapse tick for the Live Brain. [pitch] varies the note. */
+    fun tick(context: Context, pitch: Int = 0) {
+        runCatching { playPcm(cache.getOrPut("tick/${pitch.mod(5)}") { SoundSynth.tick(pitch) }) }
+    }
+
+    private fun playPcm(pcm: ShortArray): Long {
+        val track = AudioTrack.Builder()
+            .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
+            .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(SoundSynth.RATE).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
+            .setBufferSizeInBytes(pcm.size * 2)
+            .setTransferMode(AudioTrack.MODE_STATIC)
+            .build()
+        track.write(pcm, 0, pcm.size)
+        track.play()
+        val ms = pcm.size * 1000L / SoundSynth.RATE
+        Handler(Looper.getMainLooper()).postDelayed({ runCatching { track.release() } }, ms + 200)
+        return ms
+    }
+
     /** Plays the start or stop sound and returns its length in milliseconds (0 when off). */
     fun play(context: Context, style: SoundSynth.Style, start: Boolean): Long {
         if (style == SoundSynth.Style.OFF) return 0
-        return runCatching {
-            val pcm = pcm(style, start)
-            val track = AudioTrack.Builder()
-                .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
-                .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(SoundSynth.RATE).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
-                .setBufferSizeInBytes(pcm.size * 2)
-                .setTransferMode(AudioTrack.MODE_STATIC)
-                .build()
-            track.write(pcm, 0, pcm.size)
-            track.play()
-            val ms = pcm.size * 1000L / SoundSynth.RATE
-            Handler(Looper.getMainLooper()).postDelayed({ runCatching { track.release() } }, ms + 200)
-            ms
-        }.getOrDefault(0L)
+        return runCatching { playPcm(pcm(style, start)) }.getOrDefault(0L)
     }
 }
 

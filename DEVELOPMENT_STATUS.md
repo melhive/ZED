@@ -13,7 +13,7 @@ Native Android personal AI assistant (Kotlin, Jetpack Compose). Three intelligen
 | Default branch | `main` (stable merges) |
 | Latest commit | see `git log -1` (this file is updated with each milestone) |
 | Build status | ✅ GitHub Actions **Android Build** green: core tests, Android unit tests, debug APK |
-| Releases | ✅ Signed release **v0.1.20** published (latest). Install/share link: https://github.com/melhive/ZED/releases/latest/download/zed.apk. Every push to `main` publishes the version in `VERSION` (bump it for a new release; re-pushing the same version replaces that release). App id `com.melhive.zed`, signed with the key in `/root/zed-signing` (back it up — updates need the same key). |
+| Releases | ✅ Signed release **v0.1.21** published (latest). Install/share link: https://github.com/melhive/ZED/releases/latest/download/zed.apk. Every push to `main` publishes the version in `VERSION` (bump it for a new release; re-pushing the same version replaces that release). App id `com.melhive.zed`, signed with the key in `/root/zed-signing` (back it up — updates need the same key). |
 
 ## Milestones
 
@@ -59,6 +59,15 @@ Failed tests: none.
 | Model download (2–3 GB) with resume + SHA-256 | | ✅ | ✅ | |
 | Keystore secret storage | | ✅ | ✅ | |
 | STT / TTS / sentence streaming / barge-in / audio focus | VAD only | ✅ | ✅ | |
+
+## Foundation and Live Brain 2.0 (v0.1.21)
+
+- **Database v2** (`ZedDatabase.MIGRATION_1_2`, schema `app/schemas/.../2.json`): memory strength (`uses`, `lastUsedAt`, `confidence`), reply timings on messages, and the `relations` and `pending_requests` tables later releases use — one upgrade instead of several. `MigrationTest` upgrades a v1 database and validates the result.
+- **Safety copies:** `BackupManager.safetyCopyBeforeUpgrade` copies the database at process start, before Room migrates it (newest three kept; Backup & restore → Safety copies → Put back). **Weekly automatic backup** to a user-chosen folder (`AutoBackupWorker`, newest four kept, data and settings only).
+- **Speed test** (Diagnostics): first-word wait and words per second with the model already loaded; the first result is the baseline; every run is appended to `Downloads/ZED reports/ZED-speed-*.txt` (`diagnostics/Diagnostics.kt`). **The baseline has to be recorded on the phone.**
+- **Report** on any reply: the exchange, timings, audit-log actions and device/model state in one text file in `Downloads/ZED reports`. Nothing leaves the phone.
+- **Recall signal:** when the model answers, the memories that share a meaningful word with the question are marked used (`MemoryRepository.markUsed`) and a `BrainEvent.Recalled` is emitted.
+- **Live Brain 2.0** (`ui/screens/BrainScreen.kt`, layout in `core/brain/BrainGraph.kt`): 3D layout and perspective projection, drag to rotate, pinch to fly in, depth dimming, curved tapering connections, signal trails and sparks, boot sequence with HUD readout, recall pulses from the core, memory strength (brightness and distance from the core, unit-tested), time-lapse replay, synapse ticks and haptics, and `MiniBrain` on Home, in LIVE and in the floating assistant. **Looks, sounds and frame rate need device validation.**
 
 ## Live Brain, backup & restore, machine sounds (v0.1.20)
 

@@ -1,5 +1,6 @@
 package com.melhive.zed.database
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Fts4
 import androidx.room.ForeignKey
@@ -33,6 +34,12 @@ data class MessageEntity(
     val source: String? = null,
     val toolName: String? = null,
     val attachmentName: String? = null,
+    /** Milliseconds from the request to the first word of this reply (model replies only). */
+    val firstTokenMs: Long? = null,
+    /** Milliseconds from the request to the finished reply. */
+    val totalMs: Long? = null,
+    /** Length of the generated text, for words-per-second. */
+    val outputChars: Int? = null,
 )
 
 @Entity(tableName = "memory_facts")
@@ -40,9 +47,41 @@ data class MemoryFactEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val text: String,
     val createdAt: Long,
-    /** user_command | model_request | manual */
+    /** user_command | model_request | manual | learned */
     val source: String,
     val pinned: Boolean = false,
+    /** How many times ZED has used this memory to answer. */
+    @ColumnInfo(defaultValue = "0") val uses: Int = 0,
+    /** When ZED last used it (0 = never). */
+    @ColumnInfo(defaultValue = "0") val lastUsedAt: Long = 0,
+    /** 1.0 = the user said it; lower = ZED inferred it. */
+    @ColumnInfo(defaultValue = "1.0") val confidence: Float = 1f,
+)
+
+/** A labelled link between two things ZED knows ("Ana" —sister of→ "me"). */
+@Entity(tableName = "relations")
+data class RelationEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val subject: String,
+    val relation: String,
+    val target: String,
+    /** The memory this was read from, if any. */
+    val factId: Long? = null,
+    val createdAt: Long,
+    /** learned | manual */
+    val source: String,
+)
+
+/** A request that needs the internet, kept until the phone is back online. */
+@Entity(tableName = "pending_requests")
+data class PendingRequestEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val text: String,
+    val conversationId: Long? = null,
+    val createdAt: Long,
+    /** waiting | done | failed | cancelled */
+    val status: String,
+    val result: String? = null,
 )
 
 @Entity(tableName = "todos")

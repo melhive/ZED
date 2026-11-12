@@ -143,7 +143,7 @@ fun ChatScreen(initialConversationId: Long?, onOpenLive: () -> Unit, onOpenModel
                 LazyColumn(state = listState, contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
                     val lastAssistantId = messages.lastOrNull { it.role == "assistant" }?.id
                     items(messages, key = { it.id }) { m ->
-                        MessageBubble(m, showRegenerate = !busy && m.id == lastAssistantId && m.source != "native", onRegenerate = vm::regenerate)
+                        MessageBubble(m, showRegenerate = !busy && m.id == lastAssistantId && m.source != "native", onRegenerate = vm::regenerate, onReport = { vm.report(m) })
                     }
                 }
             }
@@ -233,7 +233,7 @@ fun ChatScreen(initialConversationId: Long?, onOpenLive: () -> Unit, onOpenModel
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun MessageBubble(m: MessageEntity, showRegenerate: Boolean = false, onRegenerate: () -> Unit = {}) {
+private fun MessageBubble(m: MessageEntity, showRegenerate: Boolean = false, onRegenerate: () -> Unit = {}, onReport: () -> Unit = {}) {
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     val isUser = m.role == "user"
     if (m.role == "tool") {
@@ -270,6 +270,12 @@ private fun MessageBubble(m: MessageEntity, showRegenerate: Boolean = false, onR
                 m.source?.let { add(when { it == "native" -> "native"; it.startsWith("local") -> "on-device"; it.startsWith("online:") -> it.removePrefix("online:"); else -> it }) }
                 if (m.status == "cancelled") add("stopped")
                 if (m.status == "error") add("error")
+                // How long the reply took: the wait for the first word, then the whole answer.
+                val total = m.totalMs
+                if (total != null && m.status == "complete") {
+                    val first = m.firstTokenMs
+                    add(if (first != null && total >= 1000) "%.1f s to first word · %.1f s".format(first / 1000f, total / 1000f) else if (total >= 1000) "%.1f s".format(total / 1000f) else "instant")
+                }
             }
             if (!isUser && meta.isNotEmpty()) Text(meta.joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted)
             if (!isUser && m.status != "streaming") Row {
@@ -278,6 +284,9 @@ private fun MessageBubble(m: MessageEntity, showRegenerate: Boolean = false, onR
                 }
                 if (showRegenerate) TextButton(onClick = onRegenerate, contentPadding = PaddingValues(horizontal = 6.dp)) {
                     Text("Regenerate", style = MaterialTheme.typography.labelSmall, color = ZedColors.Cyan)
+                }
+                TextButton(onClick = onReport, contentPadding = PaddingValues(horizontal = 6.dp)) {
+                    Text("Report", style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted)
                 }
             }
         }

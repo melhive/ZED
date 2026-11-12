@@ -112,6 +112,14 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
     fun stop() { c.orchestrator.cancelCurrent(); c.chatTts.stop() }
 
+    /** "Report" on a reply: writes what was asked, what ZED did and how long it took to a file in Downloads. */
+    fun report(m: MessageEntity) {
+        viewModelScope.launch {
+            notice.value = runCatching { "Report saved to " + com.melhive.zed.diagnostics.ReplyReport.save(getApplication<Application>(), c, m) + ". Share that file so this can be fixed." }
+                .getOrElse { "Couldn't save the report: ${it.message ?: it.javaClass.simpleName}" }
+        }
+    }
+
     fun setMode(mode: IntelligenceMode) { viewModelScope.launch { c.settings.setMode(mode) } }
 
     fun attach(uri: Uri) {

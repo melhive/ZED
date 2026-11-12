@@ -82,4 +82,4 @@ FAILED/CANCELLED → QUEUED (explicit retry)
 
 ## Data
 
-All data is local. Room database `zed.db` (version 1, schema exported). Settings in DataStore. Secrets in a separate SharedPreferences file, encrypted with an AES-256-GCM key held in Android Keystore. Backups and device transfer are disabled.
+All data is local. Room database `zed.db` (version 2, schema exported; a safety copy is kept before each upgrade). Settings in DataStore. Secrets in a separate SharedPreferences file, encrypted with an AES-256-GCM key held in Android Keystore. Backups and device transfer are disabled.

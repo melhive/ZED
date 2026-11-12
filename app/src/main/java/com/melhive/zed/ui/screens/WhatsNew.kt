@@ -31,6 +31,19 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.21", "2026-11-12", "Live Brain 2.0, speed test, report a reply", listOf(
+            "Live Brain is now a 3D hologram: it turns slowly, near neurons are big and bright while far ones are small and dim, connections curve and taper, and signals leave a trail and spark where they land. Drag to turn it, pinch to fly in.",
+            "It boots up when you open it — the core ignites, the areas unfold, the memories link — with a readout of neurons, synapses and activity.",
+            "It's really live: when ZED uses a memory to answer you, a signal travels from the core and that memory flashes. When ZED saves something new, a neuron grows and connects.",
+            "Memory strength: memories ZED uses often and recently glow brighter and sit near the core; ones it never touches fade outward (nothing is deleted). Tap a memory to see how often it has been used.",
+            "Time-lapse (the clock button in the brain): watch the brain grow from the first memory to today.",
+            "A mini brain on Home, in LIVE and in the floating assistant, flashing when ZED remembers. Soft synapse ticks and a light vibration when you touch the brain (Settings → Appearance to turn off).",
+            "Speed test (More → Permissions & Diagnostics): measures the wait before the first word and the words per second on your phone. The first result becomes the baseline every later version is compared with.",
+            "Report on any reply in Chat: saves what you asked, what ZED did, what it answered and how long each step took to Downloads/ZED reports. Nothing is sent anywhere — share the file when something goes wrong.",
+            "Replies now show how long they took.",
+            "Safety copies: before an update changes how your data is stored, ZED keeps a copy of it as it was (Backup & restore → Safety copies).",
+            "Weekly automatic backup to a folder you choose (Backup & restore). Keeps the newest four.",
+        )),
         Release("0.1.20", "2026-11-11", "Live Brain, backup & restore, machine sounds", listOf(
             "Live Brain (Memory → Live Brain, or More): everything ZED knows as a glowing, moving network. Areas like People, Work and Health orbit the core, every memory, task, reminder, document and conversation hangs off its area, and shared ideas (a name, a place) link them together. Signals run along the connections and new memories pop in as you save them.",
             "In the brain: pinch to zoom, drag to move, tap anything to read it and see what it's connected to, search, and filter by type. Pin or forget a memory right there.",

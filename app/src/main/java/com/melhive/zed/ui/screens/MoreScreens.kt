@@ -214,6 +214,7 @@ fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
             ZedCard {
                 SectionTitle("Appearance")
                 SwitchRow("Glow effects", "Orb and card glow (turn off to save battery)", settings.glow) { scope.launch { c.settings.setGlow(it) } }
+                SwitchRow("Live Brain sounds", "Soft synapse ticks and a light vibration when you touch the brain", settings.brainSounds) { scope.launch { c.settings.setBrainSounds(it) } }
             }
         }
         item {
@@ -292,6 +293,7 @@ fun DiagnosticsScreen(onBack: () -> Unit) {
                 }
             }
         }
+        item { SpeedTestCard() }
         item { SectionTitle("Permissions") }
         items(PermissionCatalog.ALL.filter { PermissionCatalog.applicable(it) }) { p ->
             val granted = remember(refresh) { PermissionCatalog.isGranted(context, p) }
@@ -378,6 +380,56 @@ fun DiagnosticsScreen(onBack: () -> Unit) {
         if (showAudit) items(audit, key = { it.id }) { a ->
             Text("${formatTime(a.timestamp)} ${a.outcome.uppercase()} ${a.tool} [${a.origin.lowercase()}] ${a.argsSummary} → ${a.detail}", style = MonoStyle,
                 color = when (a.outcome) { "executed" -> ZedColors.Text; "failed", "invalid" -> ZedColors.Red; else -> ZedColors.Amber })
+        }
+    }
+}
+
+/** Diagnostics → Speed test: how long the model takes to start answering, and how fast it writes. */
+@Composable
+private fun SpeedTestCard() {
+    val c = rememberContainer()
+    val state by c.speedTest.state.collectAsStateWithLifecycle()
+    val running = state as? com.melhive.zed.diagnostics.SpeedTest.State.Running
+    val history = remember(state) { c.speedTest.history() }
+    val baseline = remember(state) { c.speedTest.baseline() }
+    val stamp = remember { java.text.SimpleDateFormat("d MMM HH:mm", java.util.Locale.getDefault()) }
+    ZedCard(accent = ZedColors.Teal) {
+        SectionTitle("Speed test")
+        Text("Measures the AI model on this phone: the wait before the first word, and words per second after it. Your first result is kept as the baseline that later versions are compared with.",
+            style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
+        when (val s = state) {
+            is com.melhive.zed.diagnostics.SpeedTest.State.Running -> {
+                Text(s.label, style = MaterialTheme.typography.bodyMedium, color = ZedColors.Amber, modifier = Modifier.padding(top = 6.dp))
+                com.melhive.zed.ui.components.RealProgress(null, null, Modifier.padding(top = 6.dp), ZedColors.Amber)
+            }
+            is com.melhive.zed.diagnostics.SpeedTest.State.Done -> {
+                Text(s.result.summary(), style = MaterialTheme.typography.titleMedium, color = ZedColors.Teal, modifier = Modifier.padding(top = 6.dp))
+                Text("${s.result.model} (${s.result.backend}) · ${s.result.words} words in ${"%.1f".format(s.result.totalMs / 1000f)} s" + (s.result.loadMs?.let { " · model loaded in ${"%.1f".format(it / 1000f)} s" } ?: ""),
+                    style = MaterialTheme.typography.bodySmall)
+                val base = baseline
+                if (base != null && base.at != s.result.at) {
+                    val firstDelta = (s.result.firstWordMs - base.firstWordMs) / 1000f
+                    val speedDelta = if (base.wordsPerSecond > 0f) (s.result.wordsPerSecond / base.wordsPerSecond - 1f) * 100f else 0f
+                    val slower = firstDelta > 0.5f || speedDelta < -10f
+                    Text(
+                        "Against the baseline (ZED ${base.version}): first word ${if (firstDelta >= 0) "+" else "−"}${"%.1f".format(kotlin.math.abs(firstDelta))} s, writing ${if (speedDelta >= 0) "+" else "−"}${"%.0f".format(kotlin.math.abs(speedDelta))}%",
+                        style = MaterialTheme.typography.bodySmall, color = if (slower) ZedColors.Red else ZedColors.Green,
+                    )
+                } else if (base != null) Text("This is now the baseline.", style = MaterialTheme.typography.bodySmall, color = ZedColors.Green)
+                s.savedTo?.let { Text("Saved to $it", style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted) }
+            }
+            is com.melhive.zed.diagnostics.SpeedTest.State.Failed -> Text(s.message, style = MaterialTheme.typography.bodySmall, color = ZedColors.Red, modifier = Modifier.padding(top = 6.dp))
+            com.melhive.zed.diagnostics.SpeedTest.State.Idle -> Unit
+        }
+        WrapRow {
+            // Runs outside this screen's lifetime so leaving the page doesn't cut the measurement short.
+            Button(enabled = running == null, onClick = { c.appScope.launch { c.speedTest.run() } }) { Text(if (history.isEmpty()) "Run speed test" else "Run again") }
+        }
+        if (history.isNotEmpty()) {
+            Text("HISTORY", style = MaterialTheme.typography.labelSmall, color = ZedColors.Cyan, modifier = Modifier.padding(top = 4.dp))
+            history.takeLast(5).reversed().forEach { r ->
+                Text("${stamp.format(java.util.Date(r.at))} · ${r.version} · ${"%.1f".format(r.firstWordMs / 1000f)} s · ${"%.1f".format(r.wordsPerSecond)} w/s" + if (baseline?.at == r.at) " · baseline" else "", style = MonoStyle, color = ZedColors.Muted)
+            }
         }
     }
 }

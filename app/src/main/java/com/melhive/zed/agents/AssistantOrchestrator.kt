@@ -85,6 +85,9 @@ class AssistantOrchestrator(
     /** Photo attached to the request being answered (sent with every step of this turn). */
     @Volatile private var currentImage: com.melhive.zed.intelligence.ImageInput? = null
 
+    /** When the turn being answered began (elapsed-realtime nanoseconds), for reply timings. */
+    @Volatile private var turnStartedAt = 0L
+
     /** Returns a routine name when the message is one of the user's routine phrases ("good night"). */
     var routineMatcher: (suspend (String) -> String?)? = null
 
@@ -127,6 +130,7 @@ class AssistantOrchestrator(
         val userContent = if (attachmentText != null) "$trimmed\n\n[Attached file: $attachmentName]\n$attachmentText" else trimmed
         conversations.addMessage(conversationId, "user", userContent, attachmentName = attachmentName ?: if (image != null) "📷 Photo" else null)
         currentImage = image
+        turnStartedAt = System.nanoTime()
         setPhase(AssistantPhase.THINKING, conv = conversationId)
         _streamingText.value = ""
         return try {
@@ -141,6 +145,8 @@ class AssistantOrchestrator(
             }
             val reply = if (attachmentText == null && image == null) handleNative(conversationId, trimmed, modelAvailable = provider != null) else null
             val final = reply ?: if (provider != null) handleWithModel(conversationId, provider, voice, trimmed) else nativeConversation(conversationId, trimmed)
+            // Instant (native) replies record how long the whole turn took; model replies are timed while streaming.
+            runCatching { conversations.setTotalOnLastReply(conversationId, (System.nanoTime() - turnStartedAt) / 1_000_000) }
             setPhase(if (final.ok) AssistantPhase.COMPLETED else AssistantPhase.ERROR, if (final.ok) null else final.text, conversationId)
             final
         } catch (e: CancellationException) {
@@ -232,6 +238,8 @@ class AssistantOrchestrator(
         val toolSpecs = if (!useTools) emptyList() else skills.enabledTools(s.enabledSkills).filter { it.name != "web.research" || researchAvailable }
         val userName = memory.userName()
         val memories = memory.list(if (tinyContext) 5 else 30).map { it.text }
+        // The memories this question touches grow stronger and light up in the Live Brain (off the reply path).
+        appScope.launch { runCatching { memory.markUsed(memory.related(userText).map { it.id }) } }
         val origin = if (isLocal) ToolRequest.Origin.LOCAL_MODEL else ToolRequest.Origin.ONLINE_MODEL
         val sourceTag = if (isLocal) "local" else "online:${provider.id}"
         val contextChars = if (isLocal) ((localContext ?: 4096) * 3) else 60_000
@@ -374,12 +382,14 @@ class AssistantOrchestrator(
         var lastFlush = 0L
         var error: GenerationEvent.Error? = null
         var first = true
+        var firstTokenMs: Long? = null
+        fun elapsedMs() = (System.nanoTime() - turnStartedAt) / 1_000_000
         val calls = mutableListOf<com.melhive.zed.intelligence.ToolCall>()
         try {
             provider.generate(request).collect { e ->
                 when (e) {
                     is GenerationEvent.Delta -> {
-                        if (first) { first = false; setPhase(AssistantPhase.THINKING, provider.label, conversationId) }
+                        if (first) { first = false; firstTokenMs = elapsedMs(); setPhase(AssistantPhase.THINKING, provider.label, conversationId) }
                         sb.append(e.text)
                         _streamingText.value = sb.toString()
                         val now = System.currentTimeMillis()
@@ -402,6 +412,7 @@ class AssistantOrchestrator(
         } else {
             if (err != null) sb.append("\n\n[Interrupted: ${err.message}]")
             conversations.updateMessage(id, sb.toString(), "complete")
+            runCatching { conversations.setTiming(id, firstTokenMs, elapsedMs(), sb.length) }
             StreamResult(id, sb.toString(), true, calls = calls.toList())
         }
     }

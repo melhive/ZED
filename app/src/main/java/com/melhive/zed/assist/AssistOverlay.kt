@@ -169,6 +169,7 @@ private fun AssistOverlay(onClose: () -> Unit, onOpenApp: () -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text("ZED", style = MaterialTheme.typography.titleMedium, color = ZedColors.Cyan, letterSpacing = 8.sp, modifier = Modifier.padding(top = 8.dp))
+                com.melhive.zed.ui.screens.MiniBrain(Modifier.padding(top = 6.dp).size(64.dp))
                 Spacer(Modifier.weight(1f))
                 // The orb in the middle of the screen, as large as the screen allows.
                 androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {

@@ -40,5 +40,24 @@ class MigrationTest {
         for (v in 1 until ZedDatabase.VERSION) assertEquals(true, (v to v + 1) in steps, "Missing migration $v → ${v + 1}")
     }
 
+    /** 1 → 2 (v0.1.21): what was stored stays, and the result is exactly the schema the app expects. */
+    @Test fun upgradeFrom1KeepsDataAndMatchesTheSchema() {
+        val name = "$TEST_DB-1to2"
+        helper.createDatabase(name, 1).use { db ->
+            db.execSQL("INSERT INTO memory_facts (text, createdAt, source, pinned) VALUES ('My sister is Ana', 1, 'manual', 0)")
+        }
+        helper.runMigrationsAndValidate(name, 2, true, ZedDatabase.MIGRATION_1_2).use { db ->
+            db.query("SELECT text, uses, lastUsedAt, confidence FROM memory_facts").use { c ->
+                assertEquals(true, c.moveToFirst())
+                assertEquals("My sister is Ana", c.getString(0))
+                assertEquals(0, c.getInt(1))
+                assertEquals(0L, c.getLong(2))
+                assertEquals(1.0, c.getDouble(3))
+            }
+            db.query("SELECT COUNT(*) FROM relations").use { c -> c.moveToFirst(); assertEquals(0, c.getInt(0)) }
+            db.query("SELECT COUNT(*) FROM pending_requests").use { c -> c.moveToFirst(); assertEquals(0, c.getInt(0)) }
+        }
+    }
+
     companion object { const val TEST_DB = "migration-test.db" }
 }

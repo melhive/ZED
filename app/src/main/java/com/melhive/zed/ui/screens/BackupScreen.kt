@@ -81,6 +81,36 @@ fun BackupScreen(onBack: () -> Unit) {
         }
     }
 
+    // Weekly automatic backup into a folder the user picks once.
+    val settings by c.settings.settings.collectAsStateWithLifecycle(initialValue = null)
+    val autoFolder = settings?.autoBackupFolder.orEmpty()
+    val autoFolderName = remember(autoFolder) {
+        if (autoFolder.isBlank()) "" else runCatching { androidx.documentfile.provider.DocumentFile.fromTreeUri(context, android.net.Uri.parse(autoFolder))?.name }.getOrNull() ?: "the folder you chose"
+    }
+    var autoRunning by remember { mutableStateOf(false) }
+    fun autoBackupNow(folder: String) {
+        if (autoRunning) return
+        autoRunning = true
+        scope.launch {
+            runCatching { com.melhive.zed.backup.AutoBackupWorker.runNow(c, folder) }
+            autoRunning = false
+        }
+    }
+    val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) {
+            // Keep access across restarts, or next week's backup would have nowhere to go.
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            }
+            scope.launch {
+                c.settings.setAutoBackupFolder(uri.toString())
+                com.melhive.zed.backup.AutoBackupWorker.schedule(context.applicationContext, true)
+                autoBackupNow(uri.toString())
+            }
+        }
+    }
+    val safetyCopies = remember(state) { c.backup.safetyCopies() }
+
     ListScreen("Backup & restore", onBack = onBack, subtitle = "Save everything to one file — and move ZED to another phone") {
         if (state !is BackupState.Idle) item(key = "status") {
             when (val s = state) {
@@ -172,6 +202,57 @@ fun BackupScreen(onBack: () -> Unit) {
                             }
                         }) { Text("Restore now") }
                         Text("ZED checks the whole file first, then restarts by itself. If it doesn't reopen, open it again.", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted, modifier = Modifier.padding(top = 4.dp))
+                    }
+                }
+            }
+        }
+
+        item(key = "auto") {
+            ZedCard(accent = ZedColors.Teal) {
+                SectionTitle("Weekly automatic backup")
+                Text("Once a week ZED saves your data and settings into a folder you choose and keeps the newest four files. Models, voices and API keys are left out, so each file stays small.",
+                    style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
+                if (autoFolder.isBlank()) {
+                    Button(onClick = { pickFolder.launch(null) }, modifier = Modifier.padding(top = 8.dp)) { Text("Choose a folder") }
+                } else {
+                    Text("On · saving to $autoFolderName", style = MaterialTheme.typography.titleSmall, color = ZedColors.Teal, modifier = Modifier.padding(top = 6.dp))
+                    Text(
+                        if (autoRunning) "Backing up now…" else settings?.autoBackupStatus.orEmpty().ifBlank { "The first backup runs within the hour." },
+                        style = MaterialTheme.typography.bodySmall, color = if (settings?.autoBackupStatus.orEmpty().startsWith("Last attempt failed")) ZedColors.Red else ZedColors.Muted,
+                    )
+                    com.melhive.zed.ui.components.WrapRow {
+                        TextButton(enabled = !autoRunning, onClick = { autoBackupNow(autoFolder) }) { Text("Back up now") }
+                        TextButton(onClick = { pickFolder.launch(null) }) { Text("Change folder") }
+                        TextButton(onClick = {
+                            scope.launch {
+                                c.settings.setAutoBackupFolder("")
+                                com.melhive.zed.backup.AutoBackupWorker.schedule(context.applicationContext, false)
+                            }
+                        }) { Text("Turn off", color = ZedColors.Red) }
+                    }
+                }
+            }
+        }
+
+        if (safetyCopies.isNotEmpty()) item(key = "safety") {
+            ZedCard(accent = ZedColors.Amber) {
+                SectionTitle("Safety copies")
+                Text("Before an update changes how ZED stores your data, it keeps a copy of the data as it was. If something looks wrong after an update, put a copy back. Settings, models and voices stay as they are.",
+                    style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
+                safetyCopies.forEach { copy ->
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
+                        Column(Modifier.weight(1f)) {
+                            Text(formatTime(copy.lastModified()), style = MaterialTheme.typography.titleSmall)
+                            Text(BackupManager.formatBytes(copy.length()), style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted)
+                        }
+                        TextButton(enabled = working == null && (state as? BackupState.Finished)?.restoring != true, onClick = {
+                            val app = context.applicationContext
+                            c.backup.restoreSafetyCopy(copy) {
+                                runCatching { com.melhive.zed.voice.WakeWordService.stop(app) }
+                                runCatching { c.voice.unload() }
+                                BackupManager.restartApp(app)
+                            }
+                        }) { Text("Put back") }
                     }
                 }
             }

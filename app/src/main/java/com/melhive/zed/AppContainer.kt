@@ -163,6 +163,12 @@ class AppContainer(private val context: Context) {
         if (active != null && models.get(active) == null) settings.setActiveLocalModel(models.firstInstalled()?.id)
     }
 
+    /** Diagnostics → Speed test. */
+    val speedTest by lazy { com.melhive.zed.diagnostics.SpeedTest(context, this) }
+
+    /** Everything ZED stores, as items for the Live Brain (full screen and the mini brains). */
+    val brain by lazy { com.melhive.zed.brain.BrainHub(appScope, this) }
+
     /** Reads chat replies aloud with the selected voice. */
     val chatTts: com.melhive.zed.voice.TextToSpeechEngine get() = voice
 }

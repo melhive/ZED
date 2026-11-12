@@ -38,6 +38,9 @@ class ConversationRepository(private val db: ZedDatabase) {
     }
 
     suspend fun updateMessage(id: Long, content: String, status: String) = db.messages().updateContent(id, content, status)
+    suspend fun setTiming(id: Long, firstTokenMs: Long?, totalMs: Long, chars: Int) = db.messages().setTiming(id, firstTokenMs, totalMs, chars)
+    suspend fun setTotalOnLastReply(conversationId: Long, totalMs: Long) = db.messages().setTotalOnLastReply(conversationId, totalMs)
+    suspend fun allMessages(conversationId: Long) = db.messages().all(conversationId)
     suspend fun deleteMessage(id: Long) = db.messages().delete(id)
 
     /** Recent turns for model context. Tool results are included; failed/cancelled partials are skipped. */
@@ -65,11 +68,33 @@ class ConversationRepository(private val db: ZedDatabase) {
 class MemoryRepository(private val db: ZedDatabase) {
     val facts: Flow<List<MemoryFactEntity>> = db.memory().observeAll()
 
+    /** What just happened in memory (saved, recalled) — the Live Brain listens to this. */
+    val events = kotlinx.coroutines.flow.MutableSharedFlow<com.melhive.zed.core.brain.BrainEvent>(extraBufferCapacity = 64)
+
     suspend fun remember(text: String, source: String): MemoryFactEntity {
         val existing = db.memory().find(likeEscape(text.trim())).firstOrNull { it.text.equals(text.trim(), ignoreCase = true) }
         if (existing != null) return existing
         val f = MemoryFactEntity(text = text.trim(), createdAt = System.currentTimeMillis(), source = source)
-        return f.copy(id = db.memory().insert(f))
+        return f.copy(id = db.memory().insert(f)).also { events.tryEmit(com.melhive.zed.core.brain.BrainEvent.Saved("FACT:${it.id}")) }
+    }
+
+    /** Records that ZED used these memories: they grow stronger and the Live Brain lights them up. */
+    suspend fun markUsed(ids: List<Long>) {
+        if (ids.isEmpty()) return
+        db.memory().markUsed(ids, System.currentTimeMillis())
+        events.tryEmit(com.melhive.zed.core.brain.BrainEvent.Recalled(ids.map { "FACT:$it" }))
+    }
+
+    /**
+     * The memories that share a meaningful word with [text] ("Ana", "dentist"),
+     * best match first. Used to light up what a question touches.
+     */
+    suspend fun related(text: String, limit: Int = 6): List<MemoryFactEntity> {
+        val words = com.melhive.zed.core.brain.BrainRecall.keys(text)
+        if (words.isEmpty()) return emptyList()
+        return db.memory().list(300)
+            .map { it to com.melhive.zed.core.brain.BrainRecall.keys(it.text).count { w -> w in words } }
+            .filter { it.second > 0 }.sortedByDescending { it.second }.take(limit).map { it.first }
     }
 
     suspend fun list(limit: Int = 100) = db.memory().list(limit)

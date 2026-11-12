@@ -61,6 +61,16 @@ interface MessageDao {
     @Query("DELETE FROM messages WHERE conversationId = :conversationId AND id >= :fromId")
     suspend fun deleteFrom(conversationId: Long, fromId: Long)
 
+    @Query("UPDATE messages SET firstTokenMs = :first, totalMs = :total, outputChars = :chars WHERE id = :id")
+    suspend fun setTiming(id: Long, first: Long?, total: Long, chars: Int)
+
+    /** Replies that didn't come from a model (instant native answers) only have a total time. */
+    @Query("UPDATE messages SET totalMs = :total WHERE totalMs IS NULL AND id = (SELECT id FROM messages WHERE conversationId = :conversationId AND role = 'assistant' ORDER BY id DESC LIMIT 1)")
+    suspend fun setTotalOnLastReply(conversationId: Long, total: Long)
+
+    @Query("SELECT * FROM messages WHERE conversationId = :conversationId ORDER BY id ASC")
+    suspend fun all(conversationId: Long): List<MessageEntity>
+
     @Query("UPDATE messages SET status = 'cancelled' WHERE status = 'streaming'")
     suspend fun markInterruptedStreams()
 
@@ -90,6 +100,9 @@ interface MemoryDao {
 
     @Query("DELETE FROM memory_facts WHERE id IN (:ids)")
     suspend fun delete(ids: List<Long>)
+
+    @Query("UPDATE memory_facts SET uses = uses + 1, lastUsedAt = :now WHERE id IN (:ids)")
+    suspend fun markUsed(ids: List<Long>, now: Long)
 
     @Query("DELETE FROM memory_facts")
     suspend fun clear()
@@ -249,6 +262,9 @@ interface KnowledgeDao {
 @Dao
 interface AuditDao {
     @Insert suspend fun insert(a: AuditLogEntity): Long
+
+    @Query("SELECT * FROM audit_log WHERE timestamp BETWEEN :from AND :to ORDER BY id ASC")
+    suspend fun between(from: Long, to: Long): List<AuditLogEntity>
 
     @Query("SELECT * FROM audit_log ORDER BY id DESC LIMIT :limit")
     fun observeRecent(limit: Int = 200): Flow<List<AuditLogEntity>>

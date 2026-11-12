@@ -24,6 +24,9 @@ class ZedApp : Application() {
         // A verified restore waiting from Backup & restore is swapped in now, before the database or settings are opened.
         runCatching { com.melhive.zed.backup.BackupManager.applyPendingRestore(this) }
             .onFailure { CrashReporter.recordNonFatal("restore", it) }
+        // Before an update upgrades the database, keep a copy of it as it was (Backup & restore → Safety copies).
+        runCatching { com.melhive.zed.backup.BackupManager.safetyCopyBeforeUpgrade(this, com.melhive.zed.database.ZedDatabase.VERSION) }
+            .onFailure { CrashReporter.recordNonFatal("safety-copy", it) }
         // If ZED stopped while the recognizer beep was muted, put the volume back.
         runCatching { com.melhive.zed.voice.BeepSuppressor.restore(this) }
         Notifications.createChannels(this)
@@ -35,6 +38,7 @@ class ZedApp : Application() {
             runCatching { container.reminderScheduler.rescheduleAll() }
             runCatching { container.routines.scheduleAll() }
             runCatching { container.audit.prune() }
+            runCatching { com.melhive.zed.backup.AutoBackupWorker.schedule(this@ZedApp, container.settings.current().autoBackupFolder.isNotBlank()) }
             // Keep the home-screen widget's next reminder and task count current.
             launch {
                 kotlinx.coroutines.flow.combine(container.db.reminders().observeAll(), container.db.todos().observeAll()) { r, t -> r.size to t.hashCode() + r.hashCode() }

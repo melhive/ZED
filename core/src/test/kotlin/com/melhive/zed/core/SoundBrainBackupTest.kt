@@ -73,6 +73,15 @@ class SoundSynthTest {
         }
     }
 
+    @Test fun brainTickIsTinyQuietAndVaried() {
+        val tick = SoundSynth.tick(0)
+        assertTrue(tick.size.toDouble() / SoundSynth.RATE < 0.08)
+        assertTrue(tick.maxOf { abs(it.toInt()) } in 8_000..11_000, "quieter than the LIVE sounds")
+        assertEquals(0, tick.first().toInt()); assertEquals(0, tick.last().toInt())
+        assertFalse(tick.contentEquals(SoundSynth.tick(1)))
+        assertContentEquals(SoundSynth.tick(2), SoundSynth.tick(7))
+    }
+
     @Test fun offIsSilentAndRetiredIdsFallBackToArc() {
         assertEquals(0, SoundSynth.render(SoundSynth.Style.OFF, true).size)
         assertEquals(SoundSynth.Style.ARC, SoundSynth.Style.parse("pulse"))
@@ -160,18 +169,59 @@ class BrainTest {
         val layout = BrainLayout()
         assertTrue(layout.setGraph(g).isEmpty(), "the first graph has no 'new' nodes to animate")
         layout.settle(1800)
-        for (i in g.nodes.indices) assertTrue(layout.x[i].isFinite() && layout.y[i].isFinite())
+        for (i in g.nodes.indices) assertTrue(layout.x[i].isFinite() && layout.y[i].isFinite() && layout.z[i].isFinite())
         assertTrue(layout.radius() in 200f..1400f, "radius ${layout.radius()}")
         var closest = Float.MAX_VALUE
         for (i in g.nodes.indices) for (j in i + 1 until g.nodes.size) {
-            val dx = layout.x[i] - layout.x[j]; val dy = layout.y[i] - layout.y[j]
-            closest = minOf(closest, sqrt(dx * dx + dy * dy))
+            val dx = layout.x[i] - layout.x[j]; val dy = layout.y[i] - layout.y[j]; val dz = layout.z[i] - layout.z[j]
+            closest = minOf(closest, sqrt(dx * dx + dy * dy + dz * dz))
         }
+        // It really uses the third dimension.
+        assertTrue(layout.z.maxOf { abs(it) } > 80f, "the brain is flat")
         assertTrue(closest > 12f, "nodes overlap: $closest")
         // It has come to rest: one more second moves nothing far.
         val bx = layout.x.copyOf(); val by = layout.y.copyOf()
         layout.settle(60)
         for (i in g.nodes.indices) assertTrue(abs(layout.x[i] - bx[i]) < 25f && abs(layout.y[i] - by[i]) < 25f, "node $i still moving")
+    }
+
+    @Test fun strongMemoriesSitNearerTheCoreAndLookBigger() {
+        val now = 1_000L * 86_400_000
+        val fresh = com.melhive.zed.core.brain.BrainStrength.of(uses = 12, lastUsedAt = now, createdAt = 0, pinned = false, now = now)
+        val stale = com.melhive.zed.core.brain.BrainStrength.of(uses = 0, lastUsedAt = 0, createdAt = now - 400L * 86_400_000, pinned = false, now = now)
+        val pinnedOld = com.melhive.zed.core.brain.BrainStrength.of(0, 0, now - 400L * 86_400_000, pinned = true, now = now)
+        assertTrue(fresh > 0.9f && stale < 0.2f && pinnedOld >= 0.85f, "$fresh $stale $pinnedOld")
+        assertTrue(com.melhive.zed.core.brain.BrainStrength.of(0, 0, now, false, now) in 0.5f..0.6f, "a brand-new memory starts in the middle")
+
+        // Same area, same wording pattern: half strong, half faint.
+        val list = (1..40L).map { fact(it, "Random note $it zq$it").copy(strength = if (it % 2 == 0L) 1f else 0f) }
+        val g = BrainBuilder.build(list)
+        val layout = BrainLayout().also { it.setGraph(g); it.settle(2500) }
+        fun avg(strong: Boolean) = g.nodes.indices.filter { g.nodes[it].itemId != null && (g.nodes[it].strength > 0.5f) == strong }.map { layout.distance(it) }.average()
+        assertTrue(avg(true) < avg(false) - 15, "strong ${avg(true)} vs faint ${avg(false)}")
+        assertTrue(g.nodes.first { it.key == "FACT:2" }.weight > g.nodes.first { it.key == "FACT:1" }.weight)
+    }
+
+    @Test fun timeLapseShowsTheBrainAsItWas() {
+        val g = BrainBuilder.build(items)
+        assertEquals(1L to 13L, g.timeRange())
+        fun keysAt(t: Long) = g.visibleAt(t).let { v -> g.nodes.indices.filter { v[it] }.map { g.nodes[it].key }.toSet() }
+        assertEquals(setOf("core"), keysAt(0))
+        assertEquals(setOf("core", "area:You", "FACT:1", "area:People", "FACT:2"), keysAt(2))
+        // "Ana" becomes a concept only once a second item mentions her.
+        assertFalse("concept:ana" in keysAt(2))
+        assertTrue("concept:ana" in keysAt(3))
+        assertEquals(g.nodes.size, keysAt(13).size)
+        assertNull(BrainBuilder.build(emptyList()).timeRange())
+    }
+
+    @Test fun signalsTravelFromTheCoreThroughTheArea() {
+        val g = BrainBuilder.build(items)
+        val path = g.pathFromCore(g.indexOf("FACT:3")).map { g.nodes[it].key }
+        assertEquals(listOf("core", "area:Preferences", "FACT:3"), path)
+        assertEquals(listOf("core"), g.pathFromCore(0).map { g.nodes[it].key })
+        assertEquals(4, g.pathFromCore(g.indexOf("concept:ana")).size) // core → area → item → concept
+        assertTrue(g.pathFromCore(-5).isEmpty())
     }
 
     @Test fun layoutKeepsPositionsWhenTheGraphGrows() {

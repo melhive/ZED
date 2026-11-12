@@ -238,6 +238,25 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
             }
         }
 
+        // The Live Brain in miniature: it flashes when ZED uses a memory.
+        val brain by c.brain.snapshot.collectAsStateWithLifecycle()
+        val recalls by c.brain.recalls.collectAsStateWithLifecycle()
+        ZedCard(onClick = { onNavigate(Routes.BRAIN) }, accent = ZedColors.Violet) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                MiniBrain(Modifier.padding(end = 14.dp).height(92.dp).fillMaxWidth(0.3f), glow = settings?.glow ?: true)
+                Column(Modifier.weight(1f)) {
+                    Text("LIVE BRAIN", style = MaterialTheme.typography.titleMedium, color = ZedColors.Cyan, letterSpacing = androidx.compose.ui.unit.TextUnit(2f, androidx.compose.ui.unit.TextUnitType.Sp))
+                    val g = brain?.graph
+                    Text(
+                        if (g == null || g.itemCount == 0) "Waiting for its first memory" else "${g.itemCount} things known · ${g.edges.size} connections",
+                        style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted,
+                    )
+                    Text(if (recalls > 0) "Recalled $recalls ${if (recalls == 1) "memory" else "times"} since ZED opened" else "Tap to step inside",
+                        style = MaterialTheme.typography.labelSmall, color = if (recalls > 0) ZedColors.Teal else ZedColors.Muted)
+                }
+            }
+        }
+
         // Today
         ZedCard(onClick = { onNavigate(Routes.MEMORY) }, accent = ZedColors.Teal) {
             SectionTitle("Today")
