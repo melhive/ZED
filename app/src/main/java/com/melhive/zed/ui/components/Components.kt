@@ -63,7 +63,8 @@ fun ZedCard(
     val shape = RoundedCornerShape(22.dp)
     // Scans in once: a band of light passes over the panel as it appears (kept across scrolling).
     var seen by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
-    val sweep = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(if (seen || LocalMotion.current != "full") 1f else 0f) }
+    val motion = LocalMotion.current
+    val sweep = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(if (seen || motion != "full") 1f else 0f) }
     androidx.compose.runtime.LaunchedEffect(Unit) {
         if (sweep.value < 1f) sweep.animateTo(1f, androidx.compose.animation.core.tween(650, easing = androidx.compose.animation.core.FastOutSlowInEasing))
         seen = true
