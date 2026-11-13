@@ -207,4 +207,12 @@ class CommandParserTest {
         assertEquals("settings.set" to mapOf("key" to "headset_audio", "value" to "auto"), tool("talk through my earphones"))
         assertEquals("reminder.create", tool("remind me to stretch in 10 minutes").first, "new reminders still work")
     }
+
+    @Test fun fullControlOfTheRest() {
+        assertEquals("chats.clear" to mapOf("which" to "all"), tool("clear my chat history"))
+        assertEquals("chats.clear" to mapOf("which" to "the budget"), tool("delete the conversation about the budget"))
+        assertEquals("memory.pin" to mapOf("query" to "Ana", "pinned" to "true"), tool("pin the memory about Ana"))
+        assertEquals("memory.confirm" to mapOf("query" to "my sister"), tool("you're right about my sister"))
+        assertEquals("history.search", tool("search history for budget").first)
+    }
 }

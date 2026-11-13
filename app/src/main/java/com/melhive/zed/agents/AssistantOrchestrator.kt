@@ -388,7 +388,7 @@ class AssistantOrchestrator(
         val userName = memory.userName()
         // Memories connected to the question (through shared names and ideas), not just the newest ones.
         val now0 = System.currentTimeMillis()
-        val allFacts = memory.list(300)
+        val allFacts = memory.list(1000)
         val ranked = com.melhive.zed.core.understanding.MemoryRanker.rank(
             userText,
             allFacts.map { com.melhive.zed.core.understanding.MemoryFact(it.id, it.text, it.pinned, com.melhive.zed.core.brain.BrainStrength.of(it.uses, it.lastUsedAt, it.createdAt, it.pinned, now0)) },
@@ -409,7 +409,9 @@ class AssistantOrchestrator(
             else -> f.text
         }
         // How the user wants ZED to answer: always included, whatever the question.
-        val rules = allFacts.filter { it.source == "preference" }.take(8).map { "${it.text} (the user's rule for how you answer — always follow it)" }
+        // Every rule, newest first; when two disagree the newer one wins (the latest correction counts).
+        val rules = allFacts.filter { it.source == "preference" }.sortedByDescending { it.createdAt }.take(25)
+            .mapIndexed { i, f -> "${f.text} (the user's rule for how you answer — always follow it${if (i == 0) "; newest rule, it overrides older ones that disagree" else ""})" }
         val memories = rules + if (isLocal) ranked.filter { sourceOf[it.fact.id] != "preference" }.map { label(it.fact) } else (ranked.map { it.fact.text } + allFacts.filter { it.pinned }.map { it.text } + allFacts.take(12).map { it.text }).distinct().take(30)
         // The memories this question touches grow stronger and light up in the Live Brain (off the reply path).
         if (ranked.isNotEmpty()) appScope.launch { runCatching { memory.markUsed(ranked.map { it.fact.id }) } }

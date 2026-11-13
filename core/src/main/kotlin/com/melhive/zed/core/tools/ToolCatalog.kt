@@ -41,6 +41,7 @@ class ToolCatalog(specs: List<ToolSpec>) {
             "voice_responses", "speech_rate", "speech_pitch", "voice", "wake_word", "wake_sensitivity", "barge_in", "auto_index", "use_knowledge",
             "theme_glow", "animation", "auto_learning", "web_research", "think_twice", "proactive_hints", "brain_sounds", "ask_before",
             "user_title", "weather_city", "briefing", "briefing_time", "check_updates", "persona", "greeting", "headset_audio",
+            "live_sound", "hide_beep", "speech_recognition", "announce_reminders", "event_announce", "alarm_briefing", "ai_model", "model_backend",
         )
 
         /** Screens of the ZED app that [app.show] can open. */
@@ -161,10 +162,20 @@ class ToolCatalog(specs: List<ToolSpec>) {
                 ToolSpec("memory.forget", "Forget fact", "Deletes remembered facts matching the text; everything forgets all facts.", listOf(
                     p("query", STRING, "Text of the fact(s) to forget"),
                 ), DESTRUCTIVE),
+                ToolSpec("memory.pin", "Pin memory", "Pins (or unpins) remembered facts so they always count, by words from the fact.", listOf(
+                    p("query", STRING, "Words from the fact"),
+                    p("pinned", BOOLEAN, "false to unpin", required = false),
+                ), MODIFY),
+                ToolSpec("memory.confirm", "Confirm learned memory", "Marks things ZED learned by itself as right (confirmed by the user).", listOf(
+                    p("query", STRING, "Words from the learned fact, or all"),
+                ), MODIFY),
+                ToolSpec("chats.clear", "Clear chat history", "Deletes conversations: all of them, or those whose title or messages match. Can be undone.", listOf(
+                    p("which", STRING, "all, or words from the conversation"),
+                ), DESTRUCTIVE),
                 ToolSpec("history.search", "Search history", "Searches previous conversations.", listOf(
                     p("query", STRING, "Search terms"),
                 ), READ_ONLY),
-                ToolSpec("settings.set", "Change setting", "Changes any ZED setting: on/off switches, voice (a voice name such as Atlas), speech_rate/speech_pitch (0.5–2, or faster/slower), wake_sensitivity (low, balanced, high, maximum), animation (full, balanced, light), ask_before (never, risky, always), user_title, weather_city, briefing (on/off), briefing_time (HH:mm), persona.", listOf(
+                ToolSpec("settings.set", "Change setting", "Changes any ZED setting: on/off switches, voice (a voice name such as Atlas), speech_rate/speech_pitch (0.5–2, or faster/slower), wake_sensitivity (low, balanced, high, maximum), animation (full, balanced, light), ask_before (never, risky, always), user_title, weather_city, briefing (on/off), briefing_time (HH:mm), persona, live_sound (hologram, reactor, neural, scanner, armor, sonar, core, command, off), speech_recognition (on-device/phone), event_announce (minutes before, or off), ai_model (a downloaded model's name), model_backend (gpu/cpu).", listOf(
                     p("key", ENUM, "Setting key", enumValues = SETTING_KEYS),
                     p("value", STRING, "New value"),
                 ), MODIFY),

@@ -31,6 +31,12 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.37", "2026-11-13", "ZED controls all of ZED", listOf(
+            "Every rule you teach now counts: all of them reach Gemma (before, only the newest 8 did), newest first — when you change your mind, the newer rule wins.",
+            "What you teach is safe in backups: pronunciations and shortcuts are now saved with your settings, so a backup and restore keeps them.",
+            "More by voice: “switch to Gemma E4B”, “run Gemma on the GPU”, “change the LIVE sound to Reactor”, “use on-device speech recognition”, “announce events 15 minutes before”, “turn off the alarm briefing”.",
+            "Your chats and memories: “clear my chat history”, “delete the conversation about the budget” (both can be undone), “pin the memory about Ana”, and “you're right about my sister” to confirm something ZED learned by itself.",
+        )),
         Release("0.1.36", "2026-11-13", "Stability", listOf(
             "Fixed a crash while talking to ZED: when the phone ran low on memory, ZED could free Gemma while it was still answering. It now waits for the answer to finish, and never frees models while you're talking to it or the floating orb is open.",
             "On-device speech recognition can no longer be used by two listeners at once or freed while it's listening (another possible crash).",

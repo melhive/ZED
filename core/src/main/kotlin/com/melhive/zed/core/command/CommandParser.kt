@@ -256,6 +256,12 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         Rule(rx("what (?:have you|did you) learn(?:ed)?(?: from me)?|what did i teach you|(?:list|show)(?: me)? (?:the |my |your )?(?:lessons|shortcuts|pronunciations|rules)")) { tool("teach.list") },
         Rule(rx("(?:forget|unlearn|remove|delete) (?:all )?(?:the |my |that |your )?(?:pronunciations?|shortcuts?|rules?|lessons?)(?: (?:of|for|about|called|that says))? ?(.*)")) { m -> tool("teach.forget", "what" to m.groupValues[1].ifBlank { "all" }) },
 
+        // Chat history and memory care.
+        Rule(rx("(?:clear|delete|erase|wipe) (?:all (?:of )?)?(?:my |the )?(?:chat history|chats|conversations|conversation history|history)")) { tool("chats.clear", "which" to "all") },
+        Rule(rx("(?:delete|remove|erase) (?:the |my )?(?:chat|conversation)s? (?:about|with|called|named) (.+)")) { m -> tool("chats.clear", "which" to m.groupValues[1]) },
+        Rule(rx("(unpin|pin) (?:the |my )?(?:memory|fact)(?: about| that says)? (.+)")) { m -> tool("memory.pin", "query" to m.groupValues[2], "pinned" to if (m.groupValues[1].equals("unpin", true)) "false" else "true") },
+        Rule(rx("(?:that'?s|you(?:'re| are)) right about (.+)|confirm (?:what you learned|the learned (?:fact|memory))(?: about (.+))?")) { m -> tool("memory.confirm", "query" to m.groupValues[1].ifEmpty { m.groupValues[2] }.ifEmpty { "all" }) },
+
         // Memory.
         Rule(rx("(?:forget|delete|erase|clear|wipe) (?:all (?:of )?)?(?:everything(?: you know)?(?: about me)?|(?:all )?(?:my |your |the )?(?:memories|facts))")) { tool("memory.forget", "query" to "everything") },
         Rule(rx("(?:delete|remove|erase) (?:the )?(?:memory|memories|fact)(?: about)? (.+)")) { m -> tool("memory.forget", "query" to m.groupValues[1]) },

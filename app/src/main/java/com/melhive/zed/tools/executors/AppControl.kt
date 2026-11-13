@@ -166,6 +166,33 @@ fun registerAppControl(tm: ToolManager, c: AppContainer, context: Context) {
         else fail("This phone doesn't allow that.")
     }
 
+    // ---- Memory care and chat history ----
+    tm.register("memory.pin") { a, _ ->
+        val q = a.string("query").trim()
+        val pin = a.boolOrNull("pinned") ?: true
+        val found = c.memory.list(1000).filter { it.source != "preference" && matches(q, it.text) }
+        if (found.isEmpty()) return@register fail("I don't remember anything about “$q”.")
+        found.forEach { c.memory.update(it.copy(pinned = pin)) }
+        ok((if (pin) "Pinned " else "Unpinned ") + if (found.size == 1) "“${found[0].text}”." else "${found.size} memories.")
+    }
+    tm.register("memory.confirm") { a, _ ->
+        val q = a.string("query").trim()
+        val learned = c.memory.list(1000).filter { it.source == "learned" && (q.lowercase() in ALL || matches(q, it.text)) }
+        if (learned.isEmpty()) return@register ok("There's nothing I learned by myself to confirm" + if (q.lowercase() !in ALL) " about “$q”." else ".")
+        learned.forEach { c.learner.confirm(it.id) }
+        ok(if (learned.size == 1) "Thanks — “${learned[0].text}” is confirmed." else "Thanks — ${learned.size} things I learned are confirmed.")
+    }
+    tm.register("chats.clear") { a, _ ->
+        val q = a.string("which").trim()
+        val all = c.db.conversations().observeAll().first()
+        val current = c.orchestrator.currentConversation
+        val gone = if (q.lowercase() in ALL || q.lowercase() in setOf("history", "chat history")) all.filter { it.id != current }
+            else all.filter { it.id != current && (matches(q, it.title) || c.conversations.search(q).any { m -> m.conversationId == it.id }) }
+        if (gone.isEmpty()) return@register ok(if (q.lowercase() in ALL) "There's no other chat history to clear." else "No conversation matches “$q”.")
+        c.deleter.conversations(gone)
+        ok("Deleted ${if (gone.size == 1) "1 conversation" else "${gone.size} conversations"} (this one stays). Say “undo” to bring ${if (gone.size == 1) "it" else "them"} back.")
+    }
+
     // ---- Undo ----
     tm.register("app.undo") { _, _ -> c.undo.undo()?.let { ok(it) } ?: ok("There's nothing to undo.") }
 
@@ -224,6 +251,44 @@ fun registerAppControl(tm: ToolManager, c: AppContainer, context: Context) {
             "think_twice" -> toggle("Think twice", { c.settings.setThinkTwice(it) })
             "brain_sounds" -> toggle("Brain sounds", { c.settings.setBrainSounds(it) })
             "check_updates" -> toggle("Update checks", { c.settings.setCheckUpdates(it) })
+            "live_sound" -> {
+                val style = com.melhive.zed.core.voice.SoundSynth.Style.entries.firstOrNull { it.id == value || it.label.equals(raw, true) || it.label.lowercase().startsWith(value) }
+                    ?: return@register fail("LIVE sounds: " + com.melhive.zed.core.voice.SoundSynth.Style.entries.joinToString { it.label } + ".")
+                c.settings.setLiveSound(style.id)
+                if (style != com.melhive.zed.core.voice.SoundSynth.Style.OFF) com.melhive.zed.voice.ZedSounds.play(context, style, start = true)
+                ok(if (style == com.melhive.zed.core.voice.SoundSynth.Style.OFF) "LIVE sounds off." else "LIVE sound set to ${style.label}.")
+            }
+            "hide_beep" -> toggle("Hiding the recognizer beep", { c.settings.setHideRecognizerBeep(it) })
+            "speech_recognition" -> {
+                val phone = value.contains("phone") || value.contains("google") || value.contains("android") || value == "off"
+                if (!phone && !c.voicePacks.isInstalled(VoiceCatalog.SPEECH)) return@register fail("On-device speech recognition isn't downloaded yet — get it in More → Voice (${VoiceCatalog.SPEECH.sizeBytes / 1_000_000} MB).")
+                c.settings.setSpeechEngine(if (phone) "android" else "auto")
+                ok(if (phone) "I'll use the phone's speech service to hear you." else "I'll hear you on the phone itself — offline, no beep.")
+            }
+            "announce_reminders" -> toggle("Announcing reminders", { c.settings.setAnnounceReminders(it) })
+            "alarm_briefing" -> toggle("The briefing after your alarm", { c.settings.setAlarmBriefing(it) })
+            "event_announce" -> {
+                val minutes = if (value in setOf("off", "no", "false", "none", "0")) 0 else Regex("\\d+").find(value)?.value?.toIntOrNull() ?: 10
+                c.settings.setEventAnnounceMinutes(minutes)
+                com.melhive.zed.agents.Announcer.planEvents(context)
+                ok(if (minutes == 0) "I won't announce calendar events." else "I'll announce calendar events $minutes minutes before they start.")
+            }
+            "ai_model" -> {
+                val models = c.models.installed.first().filter { c.models.fileFor(it).exists() }
+                if (models.isEmpty()) return@register fail("No AI model is downloaded yet (Model Manager).")
+                val q = value.replace("gemma", "gemma ").replace(Regex("\\s+"), " ").trim()
+                val pick = models.firstOrNull { it.displayName.equals(raw, true) } ?: models.firstOrNull { m -> q.split(' ').filter { it.length > 1 }.all { w -> m.displayName.lowercase().contains(w) } }
+                    ?: return@register fail("Downloaded models: " + models.joinToString { it.displayName } + ".")
+                c.settings.setActiveLocalModel(pick.id)
+                c.warmUpModel()
+                ok("Switched to ${pick.displayName}.")
+            }
+            "model_backend" -> {
+                val gpu = value.contains("gpu") || value.contains("graphics")
+                c.settings.setLocalBackend(if (gpu) com.melhive.zed.settings.LocalBackend.GPU else com.melhive.zed.settings.LocalBackend.CPU)
+                runCatching { c.localRuntime.unload() }
+                ok("Gemma will run on the ${if (gpu) "GPU" else "CPU"} from the next answer.")
+            }
             "headset_audio" -> {
                 val earMic = value.contains("phone") || value.contains("speaker") || value.contains("earphone_mic") || value == "mic"
                 c.settings.setHeadsetAudio(if (earMic) "earphone_mic" else "auto")

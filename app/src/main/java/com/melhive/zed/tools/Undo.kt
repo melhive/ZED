@@ -7,6 +7,7 @@ import com.melhive.zed.database.ReminderEntity
 import com.melhive.zed.database.TodoEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -140,6 +141,20 @@ class Deleter(private val c: AppContainer) {
             "Brought back “$path”."
         }
         return true
+    }
+
+    /** Conversations with all their messages. */
+    suspend fun conversations(items: List<com.melhive.zed.database.ConversationEntity>) {
+        if (items.isEmpty()) return
+        val saved = items.map { it to c.db.messages().observe(it.id).first() }
+        items.forEach { c.conversations.delete(it.id) }
+        c.undo.record(if (items.size == 1) "the conversation “${items[0].title}”" else plural(items.size, "conversation")) {
+            for ((conv, msgs) in saved) runCatching {
+                c.db.conversations().insert(conv)
+                msgs.forEach { m -> runCatching { c.db.messages().insert(m) } }
+            }
+            if (items.size == 1) "Brought back “${items[0].title}”." else "Brought back ${plural(items.size, "conversation")}."
+        }
     }
 
     /** Lessons: answering rules, pronunciations and shortcuts. */

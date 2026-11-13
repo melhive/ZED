@@ -76,6 +76,9 @@ data class AppSettings(
     val eventAnnounceMinutes: Int = 10,
     /** After an alarm is turned off, ZED appears with a good-morning briefing. */
     val alarmBriefing: Boolean = true,
+    /** Taught pronunciations and shortcuts (JSON), kept here too so backups include them. */
+    val taughtPronunciations: String = "{}",
+    val taughtAliases: String = "{}",
     val glow: Boolean = true,
     val onboardingDone: Boolean = false,
     val checkUpdates: Boolean = true,
@@ -137,6 +140,8 @@ class SettingsRepository(private val context: Context) {
         val announceReminders = booleanPreferencesKey("announce_reminders")
         val eventAnnounceMinutes = androidx.datastore.preferences.core.intPreferencesKey("event_announce_minutes")
         val alarmBriefing = booleanPreferencesKey("alarm_briefing")
+        val taughtPronunciations = stringPreferencesKey("taught_pronunciations")
+        val taughtAliases = stringPreferencesKey("taught_aliases")
         val glow = booleanPreferencesKey("glow")
         val onboarding = booleanPreferencesKey("onboarding_done")
         val checkUpdates = booleanPreferencesKey("check_updates")
@@ -188,6 +193,8 @@ class SettingsRepository(private val context: Context) {
             announceReminders = p[K.announceReminders] ?: defaults.announceReminders,
             eventAnnounceMinutes = p[K.eventAnnounceMinutes] ?: defaults.eventAnnounceMinutes,
             alarmBriefing = p[K.alarmBriefing] ?: defaults.alarmBriefing,
+            taughtPronunciations = p[K.taughtPronunciations] ?: defaults.taughtPronunciations,
+            taughtAliases = p[K.taughtAliases] ?: defaults.taughtAliases,
             glow = p[K.glow] ?: defaults.glow,
             onboardingDone = p[K.onboarding] ?: false,
             checkUpdates = p[K.checkUpdates] ?: defaults.checkUpdates,
@@ -235,6 +242,7 @@ class SettingsRepository(private val context: Context) {
     suspend fun setAnnounceReminders(v: Boolean) = context.dataStore.edit { it[K.announceReminders] = v }
     suspend fun setEventAnnounceMinutes(v: Int) = context.dataStore.edit { it[K.eventAnnounceMinutes] = v.coerceIn(0, 120) }
     suspend fun setAlarmBriefing(v: Boolean) = context.dataStore.edit { it[K.alarmBriefing] = v }
+    suspend fun setTaught(pronunciations: String, aliases: String) = context.dataStore.edit { it[K.taughtPronunciations] = pronunciations; it[K.taughtAliases] = aliases }
     suspend fun setGlow(v: Boolean) = context.dataStore.edit { it[K.glow] = v }
     suspend fun setLocalContextTokens(v: Int) = context.dataStore.edit { it[K.contextTokens] = v }
     suspend fun setCheckUpdates(v: Boolean) = context.dataStore.edit { it[K.checkUpdates] = v }

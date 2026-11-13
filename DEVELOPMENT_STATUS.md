@@ -60,6 +60,12 @@ Failed tests: none.
 | Keystore secret storage | | ✅ | ✅ | |
 | STT / TTS / sentence streaming / barge-in / audio focus | VAD only | ✅ | ✅ | |
 
+## Full self-control (v0.1.37)
+
+- All answering rules (≤25, newest first, newest overrides) reach the model; facts considered raised to 1000.
+- Taught pronunciations/aliases mirrored into DataStore settings (`taughtPronunciations`/`taughtAliases`) so backups include them; restored on start when local copies are empty.
+- `settings.set` adds live_sound, hide_beep, speech_recognition, announce_reminders, event_announce, alarm_briefing, ai_model, model_backend. New tools `memory.pin`, `memory.confirm`, `chats.clear` (undoable via `Deleter.conversations`).
+
 ## Stability (v0.1.36)
 
 - `LocalModelRuntime.unload` cancels and then takes `generationLock` (closing the engine under a running generation was a native use-after-free); `onTrimMemory` frees nothing while the orchestrator is busy or LIVE is open.

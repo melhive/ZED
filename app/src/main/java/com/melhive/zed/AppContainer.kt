@@ -144,7 +144,7 @@ class AppContainer(val context: Context) {
     val undo by lazy { com.melhive.zed.tools.UndoLog(appScope, context) }
     val deleter by lazy { com.melhive.zed.tools.Deleter(this) }
     /** Pronunciations and shortcuts the user taught (loaded before the voice so taught words are said right). */
-    val teaching by lazy { com.melhive.zed.learning.TeachingStore(context) }
+    val teaching by lazy { com.melhive.zed.learning.TeachingStore(context, settings, appScope) }
     val voice by lazy { teaching; com.melhive.zed.voice.VoiceManager(context, settings, voicePacks, appScope) }
 
     /** Backup to a file and restore from one (More → Backup & restore). */
