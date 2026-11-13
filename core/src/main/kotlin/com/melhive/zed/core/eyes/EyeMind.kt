@@ -34,6 +34,13 @@ class EyeMind(seed: Long = System.nanoTime()) {
         private set
     var drowsy = false
         private set
+    /** Fully asleep after a long quiet time: eyes shut, light almost out. */
+    var asleep = false
+        private set
+    /** The iris colour the user chose; moods shift it a little. */
+    var baseTint = CYAN
+    /** 0 normal … 1 dark room: the glow is turned down so it doesn't glare. */
+    var dim = 0f
 
     // ---- What the screen tells the eyes ----
     var activity = EyeActivity.IDLE
@@ -105,6 +112,12 @@ class EyeMind(seed: Long = System.nanoTime()) {
     /** A word was just spoken: the eyes pulse with the voice. */
     fun speechPulse() { speech = 1f }
 
+    /** A slow, contented closing of the eyes (after "thank you" or "good night"). */
+    fun contentBlink() { blinkAt = time; blinkLen = 0.95f; secondBlink = -1f; nextBlink = time + 3f }
+
+    /** A touch on the screen: wake up. */
+    fun wake() { if (drowsy || asleep) { quietFor = 0f; drowsy = false; asleep = false; blinkSoon(0.05f) } }
+
     /** Advances the eyes by [dt] seconds. */
     fun update(dt: Float) {
         val d = dt.coerceIn(0f, 0.1f)
@@ -137,6 +150,9 @@ class EyeMind(seed: Long = System.nanoTime()) {
         val quiet = activity == EyeActivity.IDLE && !faceHeld && !attending && !noticed
         quietFor = if (quiet) quietFor + d else 0f
         drowsy = quietFor > 22f
+        asleep = quietFor > 75f
+        // You started talking: the eyes come back to you.
+        if (activity == EyeActivity.LISTENING && micLevel > 0.3f && time < awayUntil) { awayUntil = 0f; nextAway = time + range(3f, 6f) }
         speech *= exp(-d * 7f)
         greet *= exp(-d * 2.2f)
     }
@@ -247,12 +263,16 @@ class EyeMind(seed: Long = System.nanoTime()) {
 
     private fun express(d: Float) {
         preset(mood, goal)
-        var tint = TINTS[mood.ordinal]
+        var tint = if (mood == EyeMood.NEUTRAL || mood == EyeMood.CURIOUS) baseTint else EyeColor.mix(baseTint, TINTS[mood.ordinal], 0.55f)
         var tilt = ROLLS[mood.ordinal]
         when (activity) {
             EyeActivity.THINKING -> { goal[UPPER] += 0.07f; goal[BROW_TILT] += 0.18f; goal[PUPIL] -= 0.06f; tint = EyeColor.mix(tint, VIOLET, 0.4f) }
             EyeActivity.WORKING -> { goal[UPPER] += 0.1f; goal[LOWER] += 0.1f; goal[BROW_TILT] += 0.35f; goal[BROW] -= 0.15f; goal[PUPIL] -= 0.15f; tint = EyeColor.mix(tint, AMBER, 0.3f) }
-            EyeActivity.LISTENING -> { goal[UPPER] -= 0.05f; goal[PUPIL] += 0.08f; goal[BROW] += 0.08f }
+            EyeActivity.LISTENING -> {
+                goal[UPPER] -= 0.05f; goal[PUPIL] += 0.08f; goal[BROW] += 0.08f
+                // A loud sound makes the eyes narrow a little.
+                if (micLevel > 0.8f) { goal[LOWER] += 0.16f; goal[UPPER] += 0.1f; goal[BROW] -= 0.15f }
+            }
             EyeActivity.SPEAKING -> { goal[BROW] += 0.07f * speech; goal[PUPIL] += 0.04f * speech }
             EyeActivity.DONE -> { goal[LOWER] += 0.2f; goal[BROW] += 0.15f }
             EyeActivity.ERROR -> { goal[BROW_TILT] -= 0.5f; goal[UPPER] += 0.06f; goal[PUPIL] += 0.05f; tint = EyeColor.mix(tint, RED, 0.45f) }
@@ -270,6 +290,7 @@ class EyeMind(seed: Long = System.nanoTime()) {
             goal[UPPER] = max(goal[UPPER], 0.56f + 0.05f * sin(time * 0.6f)); goal[BROW] -= 0.25f; goal[LOWER] += 0.05f; goal[PUFF] = 0f
             tint = EyeColor.scale(tint, 0.8f)
         }
+        if (asleep) { goal[UPPER] = 1f; goal[LOWER] = 0.5f; goal[BROW] = -0.35f }
         // Lids follow the gaze: looking down lowers the upper lid, looking up lifts it.
         goal[UPPER] += 0.12f * gy
 
@@ -297,8 +318,8 @@ class EyeMind(seed: Long = System.nanoTime()) {
             EyeActivity.SPEAKING -> 0.34f + 0.55f * speech
             EyeActivity.LISTENING -> 0.3f + 0.45f * micLevel.coerceIn(0f, 1f)
             EyeActivity.THINKING, EyeActivity.WORKING -> 0.3f + 0.12f * sin(time * 3.2f)
-            else -> if (drowsy) 0.14f else 0.26f
-        }
+            else -> if (asleep) 0.04f else if (drowsy) 0.14f else 0.26f
+        } * (1f - 0.45f * dim.coerceIn(0f, 1f))
         for (side in 0..1) {
             val p = if (side == 0) left else right
             // Both eyes turn slightly toward each other when looking at something close.
@@ -317,7 +338,7 @@ class EyeMind(seed: Long = System.nanoTime()) {
             p.membrane = membrane
             p.spin = spin
             p.glow = glow.coerceIn(0f, 1f)
-            p.energy = (0.45f + 0.5f * speech + (if (activity == EyeActivity.LISTENING) 0.3f * micLevel else 0f) - if (drowsy) 0.25f else 0f).coerceIn(0f, 1f)
+            p.energy = (0.45f + 0.5f * speech + (if (activity == EyeActivity.LISTENING) 0.3f * micLevel else 0f) - (if (drowsy) 0.25f else 0f) - 0.3f * dim.coerceIn(0f, 1f)).coerceIn(0f, 1f)
             p.tint = tintNow
         }
     }

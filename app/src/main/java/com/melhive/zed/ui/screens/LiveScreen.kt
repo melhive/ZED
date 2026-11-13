@@ -28,7 +28,6 @@ import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.MicOff
 import androidx.compose.material.icons.outlined.StopCircle
 import androidx.compose.material.icons.outlined.PhotoCamera
-import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.automirrored.outlined.VolumeOff
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
@@ -59,6 +58,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.melhive.zed.android.PermissionCatalog
 import com.melhive.zed.tasks.statusEnum
@@ -72,7 +73,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit, onOpenEye: () -> Unit = {}) {
+fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit, onOpenEye: () -> Unit = {}, onOpenChat: (Long?) -> Unit = {}) {
     val c = rememberContainer()
     val context = LocalContext.current
     val live = c.live
@@ -124,8 +125,7 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit, onOpenEye: () -> Un
     // Switching to Eye mode keeps the same session going.
     DisposableEffect(Unit) { c.voiceScreens.incrementAndGet(); onDispose { if (c.voiceScreens.decrementAndGet() <= 0) live.end() } }
 
-    val listState = rememberLazyListState()
-    LaunchedEffect(state.transcript.size) { if (state.transcript.isNotEmpty()) listState.animateScrollToItem(state.transcript.size - 1) }
+    var history by remember { mutableStateOf(false) }
 
     Box(
         Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF070B16), ZedColors.Background, Color(0xFF02030A))))
@@ -135,7 +135,6 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit, onOpenEye: () -> Un
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("ZED LIVE", style = MaterialTheme.typography.titleMedium, color = ZedColors.Muted, modifier = Modifier.weight(1f))
-                IconButton(onClick = onOpenEye) { Icon(Icons.Outlined.Visibility, "Eye mode", tint = ZedColors.Cyan) }
                 TaskIndicator(activeTasks, onOpenTasks)
                 // ZED's memory at work: a memory flashes when it is used to answer.
                 MiniBrain(Modifier.padding(start = 8.dp).size(52.dp), glow = settings?.glow ?: true)
@@ -144,6 +143,9 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit, onOpenEye: () -> Un
                     StatusPill("Mic on", ZedColors.Red)
                 }
             }
+
+            // Orb, eyes or chat: the same conversation in three forms.
+            com.melhive.zed.ui.components.VoiceModeSwitch("orb", onSelect = { if (it == "eyes") onOpenEye() else onOpenChat(live.conversation) }, modifier = Modifier.padding(top = 6.dp))
 
             // The orb sits in the middle of the screen inside its HUD; the conversation lives below.
             Spacer(Modifier.weight(1f))
@@ -162,19 +164,21 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit, onOpenEye: () -> Un
                 modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp).padding(top = 4.dp), maxLines = 3,
             )
             Spacer(Modifier.weight(1f))
-            if (state.transcript.isNotEmpty()) LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxWidth().heightIn(max = if (compact) 110.dp else 150.dp)
-                    .background(ZedColors.Surface.copy(alpha = 0.6f), androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                items(state.transcript.takeLast(30)) { turn ->
-                    Text(
-                        (if (turn.fromUser) "YOU  " else "ZED  ") + turn.text,
-                        color = if (turn.fromUser) ZedColors.Text else ZedColors.Cyan.copy(alpha = 0.9f),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
+            // Captions: the last thing you said and what ZED is saying. Tap or swipe up for the whole conversation.
+            if (state.transcript.isNotEmpty()) {
+                val lastUser = state.transcript.lastOrNull { it.fromUser }?.text?.removePrefix("📷 ")
+                val zedLine = if (state.orb == OrbState.SPEAKING && state.spoken.isNotBlank()) state.spoken.trim() else state.transcript.lastOrNull { !it.fromUser }?.text
+                Column(
+                    Modifier.fillMaxWidth()
+                        .background(ZedColors.Surface.copy(alpha = 0.6f), androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                        .swipeUp { history = true }
+                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { history = true }
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    if (!lastUser.isNullOrBlank()) Text(lastUser, color = ZedColors.Muted, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                    if (!zedLine.isNullOrBlank()) Text(zedLine, color = ZedColors.Cyan.copy(alpha = 0.9f), style = MaterialTheme.typography.bodyMedium, maxLines = if (compact) 2 else 3, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 2.dp))
+                    Text("Tap or swipe up for the conversation", color = ZedColors.Muted.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 4.dp))
                 }
             }
 
@@ -236,6 +240,7 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit, onOpenEye: () -> Un
                 TextButton(onClick = { permission.launch(Manifest.permission.RECORD_AUDIO) }) { Text("Grant microphone access") }
             }
         }
+        if (history) com.melhive.zed.ui.components.VoiceHistoryPanel(state.conversationId, state.transcript) { history = false }
     }
 }
 
@@ -247,3 +252,9 @@ private fun hintFor(o: OrbState) = when (o) {
     else -> ""
 }
 
+
+/** Calls [onSwipe] when the finger moves up across this element. */
+private fun Modifier.swipeUp(onSwipe: () -> Unit): Modifier = pointerInput(Unit) {
+    var moved = 0f
+    detectVerticalDragGestures(onDragStart = { moved = 0f }, onDragEnd = { if (moved < -40f) onSwipe() }) { _, dy -> moved += dy }
+}

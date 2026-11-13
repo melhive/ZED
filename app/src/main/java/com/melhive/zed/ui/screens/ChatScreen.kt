@@ -127,8 +127,10 @@ fun ChatScreen(initialConversationId: Long?, onOpenLive: () -> Unit, onOpenModel
             }
             IconButton(onClick = { showHistory = true }) { Icon(Icons.Outlined.History, "Conversations") }
             IconButton(onClick = vm::newConversation) { Icon(Icons.Outlined.Add, "New conversation") }
-            IconButton(onClick = onOpenLive) { Icon(Icons.Outlined.GraphicEq, "ZED LIVE") }
-            IconButton(onClick = onOpenEye) { Icon(Icons.Outlined.Visibility, "Eye mode") }
+            // A call opened from here carries on this conversation.
+            val voice = com.melhive.zed.ui.navigation.rememberContainer().live
+            IconButton(onClick = { voice.continueWith = currentId; onOpenLive() }) { Icon(Icons.Outlined.GraphicEq, "ZED LIVE") }
+            IconButton(onClick = { voice.continueWith = currentId; onOpenEye() }) { Icon(Icons.Outlined.Visibility, "Eye mode") }
         }
 
         Box(Modifier.weight(1f).fillMaxWidth()) {

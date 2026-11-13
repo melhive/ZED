@@ -62,6 +62,11 @@ class EyeCamera(private val context: Context) {
         private set
     @Volatile var running = false
         private set
+    /** Average brightness of the view, 0..255 (a dark room is below about 45). */
+    @Volatile var brightness = 128f
+        private set
+    /** Which way the screen is turned (degrees), to know which end of the phone the camera is at. */
+    @Volatile private var screenTurn = 0
 
     private var thread: HandlerThread? = null
     private var handler: Handler? = null
@@ -210,6 +215,7 @@ class EyeCamera(private val context: Context) {
     private fun rotation(): Int {
         val display = (context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager).getDisplay(Display.DEFAULT_DISPLAY)
         val screen = when (display?.rotation) { Surface.ROTATION_90 -> 90; Surface.ROTATION_180 -> 180; Surface.ROTATION_270 -> 270; else -> 0 }
+        screenTurn = screen
         return if (front) (sensorOrientation + screen) % 360 else (sensorOrientation - screen + 360) % 360
     }
 
@@ -262,10 +268,14 @@ class EyeCamera(private val context: Context) {
         }
         watcher.update(grid, dt, if (seen) face else null)
         if (watcher.dark) seen = false
+        brightness = watcher.brightness
 
         if (seen) {
             val fx = (face[0] + face[2]) / 2f; val fy = (face[1] + face[3]) / 2f
-            val tx = gazeX(fx); val ty = gazeY(fy)
+            // In landscape the camera sits at one end of the phone, not behind the eyes: someone straight in front of the
+            // screen looks off to one side to the camera. The closer the face (the wider it appears), the bigger the shift.
+            val shift = if (front) (0.93f * (face[2] - face[0])).coerceIn(0f, 0.45f) * (when (screenTurn) { 90 -> 1f; 270 -> -1f; else -> 0f }) else 0f
+            val tx = (gazeX(fx) - shift * 1.5f).coerceIn(-1f, 1f); val ty = gazeY(fy)
             // Smooth, so the eyes don't twitch with every small error.
             faceX = if (faceSeen) faceX + (tx - faceX) * 0.5f else tx
             faceY = if (faceSeen) faceY + (ty - faceY) * 0.5f else ty

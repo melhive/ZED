@@ -674,10 +674,33 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
                         Spacer(Modifier.weight(1f))
                         IconButton(onClick = { selectedKey = null }) { Icon(Icons.Outlined.Close, "Close", tint = ZedColors.Muted) }
                     }
-                    Column(Modifier.heightIn(max = 230.dp).verticalScroll(rememberScrollState())) {
+                    Column(Modifier.heightIn(max = if (node.type == BrainNodeType.CONVERSATION || node.type == BrainNodeType.DOCUMENT) 340.dp else 230.dp).verticalScroll(rememberScrollState())) {
                         Text(if (node.type == BrainNodeType.CATEGORY) node.label else node.text, style = MaterialTheme.typography.bodyLarge)
                         if (node.type == BrainNodeType.CATEGORY || node.type == BrainNodeType.CONCEPT)
                             Text(node.text, style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
+                        // What is inside: the messages of a conversation, the text of a document.
+                        val inside = node.itemId
+                        if (inside != null && (node.type == BrainNodeType.CONVERSATION || node.type == BrainNodeType.DOCUMENT)) {
+                            val content by androidx.compose.runtime.produceState<List<Pair<String, String>>?>(null, node.key) {
+                                value = runCatching {
+                                    if (node.type == BrainNodeType.CONVERSATION)
+                                        c.conversations.allMessages(inside).filter { (it.role == "user" || it.role == "assistant") && it.content.isNotBlank() }
+                                            .takeLast(60).map { (if (it.role == "user") "You" else "ZED") to it.content.take(1200) }
+                                    else c.db.knowledge().chunks(inside).take(10).map { "" to it.text }
+                                }.getOrDefault(emptyList())
+                            }
+                            content?.let { parts ->
+                                if (parts.isEmpty()) Text(if (node.type == BrainNodeType.CONVERSATION) "Nothing was said in this conversation." else "No text was read from this document.", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
+                                parts.forEach { (who, text) ->
+                                    Text(
+                                        if (who.isEmpty()) text else "$who  $text",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (who == "ZED") ZedColors.Cyan.copy(alpha = 0.9f) else ZedColors.Text,
+                                        modifier = Modifier.padding(top = 4.dp),
+                                    )
+                                }
+                            }
+                        }
                         if (node.itemId != null && node.timestamp > 0)
                             Text(formatTime(node.timestamp) + if (node.done) " · done" else "", style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted, modifier = Modifier.padding(top = 2.dp))
                         if (node.type == BrainNodeType.FACT) {

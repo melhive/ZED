@@ -170,12 +170,13 @@ fun ZedRoot(requestedRoute: String?, onRouteConsumed: () -> Unit) {
                     val id = entry.arguments?.getLong("id")?.takeIf { it > 0 }
                     ChatScreen(initialConversationId = id, onOpenLive = { nav.navigateTab(Routes.LIVE) }, onOpenModels = { nav.navigate(Routes.MODELS) }, onOpenEye = { nav.navigate(Routes.EYE) { launchSingleTop = true } })
                 }
-                screen(Routes.LIVE) { LiveScreen(onClose = { if (!nav.popBackStack()) nav.navigateTab(Routes.HOME) }, onOpenTasks = { nav.navigateTab(Routes.TASKS) }, onOpenEye = { nav.navigate(Routes.EYE) { launchSingleTop = true } }) }
+                screen(Routes.LIVE) { LiveScreen(onClose = { if (!nav.popBackStack()) nav.navigateTab(Routes.HOME) }, onOpenTasks = { nav.navigateTab(Routes.TASKS) }, onOpenEye = { nav.navigate(Routes.EYE) { launchSingleTop = true } },
+                    onOpenChat = { id -> if (id != null) nav.navigate(Routes.chat(id)) { popUpTo(Routes.LIVE) { inclusive = true }; launchSingleTop = true } else nav.navigateTab(Routes.CHAT) }) }
                 // Eye mode: ZED's eyes on the whole screen, in landscape.
                 screen(Routes.EYE) {
                     com.melhive.zed.ui.screens.EyeScreen(
                         onClose = { if (!nav.popBackStack()) nav.navigateTab(Routes.HOME) },
-                        onOpenChat = { id -> nav.navigate(Routes.chat(id)) { popUpTo(Routes.EYE) { inclusive = true }; launchSingleTop = true } },
+                        onOpenChat = { id -> if (id != null) nav.navigate(Routes.chat(id)) { popUpTo(Routes.EYE) { inclusive = true }; launchSingleTop = true } else nav.navigateTab(Routes.CHAT) },
                         onOpenLive = { nav.navigateTab(Routes.LIVE) },
                     )
                 }

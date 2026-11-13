@@ -259,6 +259,17 @@ fun registerAppControl(tm: ToolManager, c: AppContainer, context: Context) {
                 if (style != com.melhive.zed.core.voice.SoundSynth.Style.OFF) com.melhive.zed.voice.ZedSounds.play(context, style, start = true)
                 ok(if (style == com.melhive.zed.core.voice.SoundSynth.Style.OFF) "LIVE sounds off." else "LIVE sound set to ${style.label}.")
             }
+            "eye_color" -> {
+                val colour = com.melhive.zed.core.eyes.EyeColors.parse(value) ?: return@register fail("Eye colours: cyan, amber, green or violet.")
+                c.settings.setEyeColor(colour)
+                ok("My eyes are $colour now.")
+            }
+            "stop_word" -> toggle("Saying “stop” to interrupt me", { c.settings.setVoiceStop(it) })
+            "listening_time" -> {
+                val v = when { value.startsWith("short") || value == "less" -> "short"; value.startsWith("long") || value == "more" -> "long"; else -> "normal" }
+                c.settings.setListenPatience(v)
+                ok(when (v) { "short" -> "I'll stop listening sooner after I answer."; "long" -> "I'll keep listening longer after I answer."; else -> "Listening time is back to normal." })
+            }
             "eye_captions" -> toggle("Eye mode captions", { c.settings.setEyeCaptions(it) })
             "hide_beep" -> toggle("Hiding the recognizer beep", { c.settings.setHideRecognizerBeep(it) })
             "speech_recognition" -> {

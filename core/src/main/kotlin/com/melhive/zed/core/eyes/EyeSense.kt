@@ -46,6 +46,43 @@ object EyeEmotion {
     }
 }
 
+/** Thanks and goodnights: the eyes answer with a slow, contented blink. */
+object KindWords {
+    private val kind = Regex("\\b(?:thank you|thanks|thank u|good ?night|sweet dreams|love you|well done|good job|good boy|good girl|you'?re the best|appreciate (?:it|you))\\b", RegexOption.IGNORE_CASE)
+    fun matches(text: String): Boolean = kind.containsMatchIn(text)
+}
+
+/**
+ * Cutting ZED off by voice on the loudspeaker. The microphone hears ZED too, so a
+ * stop word only counts when ZED itself isn't saying it.
+ */
+object VoiceInterrupt {
+    private val stop = Regex("\\b(stop|wait|enough|quiet|silence|pause|cancel|hold on|shut up|be quiet|never ?mind|that'?s enough)\\b", RegexOption.IGNORE_CASE)
+
+    /** [heard]: what the recognizer picked up while ZED was talking. [speaking]: everything ZED is saying in this answer. */
+    fun heard(heard: String, speaking: String): Boolean {
+        val own = speaking.lowercase()
+        return stop.findAll(heard).any { m ->
+            val word = m.value.lowercase().replace(Regex("\\s+"), " ")
+            !Regex("\\b" + Regex.escape(word).replace(" ", "\\E\\s+\\Q") + "\\b").containsMatchIn(own)
+        }
+    }
+}
+
+/** Iris colours the user can choose. */
+object EyeColors {
+    val all = listOf("cyan" to 0x5CE1FF, "amber" to 0xFFB547, "green" to 0x4CFFA0, "violet" to 0x9B8CFF)
+    fun of(name: String?): Int = all.firstOrNull { it.first == name?.lowercase() }?.second ?: all[0].second
+    fun parse(said: String): String? = when (said.lowercase().trim()) {
+        "cyan", "blue", "default", "normal", "aqua" -> "cyan"
+        "amber", "orange", "yellow", "gold", "golden" -> "amber"
+        "green", "emerald" -> "green"
+        "violet", "purple", "lilac" -> "violet"
+        else -> null
+    }
+    fun next(name: String?): String { val i = all.indexOfFirst { it.first == name }; return all[(i + 1).mod(all.size)].first }
+}
+
 /** Questions that only make sense if ZED looks through the camera. */
 object VisualAsk {
     private val look = Regex(

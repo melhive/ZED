@@ -92,6 +92,12 @@ data class AppSettings(
     val brainSounds: Boolean = true,
     /** Eye mode shows what is being said as a line of text under the eyes. */
     val eyeCaptions: Boolean = false,
+    /** Iris colour in Eye mode: cyan, amber, green or violet. */
+    val eyeColor: String = "cyan",
+    /** Saying "stop" cuts ZED off on the loudspeaker (needs on-device speech recognition). */
+    val voiceStop: Boolean = true,
+    /** How long LIVE keeps listening after silence: short, normal or long. */
+    val listenPatience: String = "normal",
     /** Learn lasting facts from ordinary conversation (shown for review; always editable). */
     val autoLearning: Boolean = true,
     /** Search the web (no key needed) when a question needs fresh facts. Only the search question leaves the phone. */
@@ -152,6 +158,9 @@ class SettingsRepository(private val context: Context) {
         val autoBackupStatus = stringPreferencesKey("auto_backup_status")
         val brainSounds = booleanPreferencesKey("brain_sounds")
         val eyeCaptions = booleanPreferencesKey("eye_captions")
+        val eyeColor = stringPreferencesKey("eye_color")
+        val voiceStop = booleanPreferencesKey("voice_stop")
+        val listenPatience = stringPreferencesKey("listen_patience")
         val autoLearning = booleanPreferencesKey("auto_learning")
         val webResearch = booleanPreferencesKey("web_research")
         val thinkTwice = booleanPreferencesKey("think_twice")
@@ -206,6 +215,9 @@ class SettingsRepository(private val context: Context) {
             autoBackupStatus = p[K.autoBackupStatus] ?: "",
             brainSounds = p[K.brainSounds] ?: true,
             eyeCaptions = p[K.eyeCaptions] ?: false,
+            eyeColor = p[K.eyeColor] ?: "cyan",
+            voiceStop = p[K.voiceStop] ?: true,
+            listenPatience = p[K.listenPatience] ?: "normal",
             autoLearning = p[K.autoLearning] ?: true,
             webResearch = p[K.webResearch] ?: true,
             thinkTwice = p[K.thinkTwice] ?: true,
@@ -252,6 +264,9 @@ class SettingsRepository(private val context: Context) {
     suspend fun setCheckUpdates(v: Boolean) = context.dataStore.edit { it[K.checkUpdates] = v }
     suspend fun setAutoBackupFolder(uri: String) = context.dataStore.edit { it[K.autoBackupFolder] = uri; it.remove(K.autoBackupStatus) }
     suspend fun setAutoBackupStatus(v: String) = context.dataStore.edit { it[K.autoBackupStatus] = v }
+    suspend fun setEyeColor(v: String) = context.dataStore.edit { it[K.eyeColor] = v }
+    suspend fun setVoiceStop(v: Boolean) = context.dataStore.edit { it[K.voiceStop] = v }
+    suspend fun setListenPatience(v: String) = context.dataStore.edit { it[K.listenPatience] = v }
     suspend fun setEyeCaptions(v: Boolean) = context.dataStore.edit { it[K.eyeCaptions] = v }
     suspend fun setBrainSounds(v: Boolean) = context.dataStore.edit { it[K.brainSounds] = v }
     suspend fun setAutoLearning(v: Boolean) = context.dataStore.edit { it[K.autoLearning] = v }

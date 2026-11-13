@@ -57,6 +57,8 @@ data class LiveUiState(
     val spoken: String = "",
     /** ZED is looking through the camera to answer ("what is this?" in Eye mode). */
     val looking: Boolean = false,
+    /** The conversation this call is saved in (null until something is said). */
+    val conversationId: Long? = null,
 )
 
 /**
@@ -107,6 +109,12 @@ class LiveSessionController(
     /** Eye mode's camera: when set, questions like "what is this?" are answered from what it sees. */
     @Volatile var frameSource: (suspend () -> com.melhive.zed.intelligence.ImageInput?)? = null
     private val utteranceText = HashMap<String, String>()
+    /** A chat to carry on with when the call starts (LIVE or Eye mode opened from that chat). Used once. */
+    @Volatile var continueWith: Long? = null
+    /** Listening for "stop" while ZED talks on the loudspeaker. */
+    private var eavesdropping = false
+    private var stopWordEnabled = true
+    private var quietRounds = 2
     private var requestJob: Job? = null
 
     // Sentence streaming bookkeeping.
@@ -155,9 +163,14 @@ class LiveSessionController(
             hideBeep = cfg.hideRecognizerBeep
             val soundMs = ZedSounds.play(context, soundStyle, start = true)
             bargeInEnabled = cfg.bargeIn
+            stopWordEnabled = cfg.voiceStop
+            quietRounds = when (cfg.listenPatience) { "short" -> 1; "long" -> 4; else -> 2 }
             _state.update { it.copy(speakerOn = cfg.voiceResponses) }
             tts?.setRate(cfg.speechRate)
-            conversationId = conversations.create("ZED LIVE session")
+            // Carry on a chat when the call was opened from one; otherwise the conversation is created with the first thing said.
+            conversationId = continueWith?.takeIf { runCatching { conversations.get(it) }.getOrNull() != null }
+            continueWith = null
+            _state.update { it.copy(conversationId = conversationId) }
             if (tts?.awaitReady() != true) _state.update { it.copy(speakerOn = false, statusDetail = "Text-to-speech is unavailable; replies will be shown only") }
             delay(soundMs) // let the start sound finish before the microphone opens
             if (!recognitionAvailable()) {
@@ -184,6 +197,7 @@ class LiveSessionController(
 
     /** Ends the voice session. Background tasks keep running. */
     fun end() {
+        eavesdropping = false
         if (_state.value.active) ZedSounds.play(context, soundStyle, start = false)
         BeepSuppressor.restore(context)
         AudioRoute.endSession(context)
@@ -205,6 +219,7 @@ class LiveSessionController(
         val muted = !_state.value.micMuted
         _state.update { it.copy(micMuted = muted) }
         if (muted) {
+            eavesdropping = false
             stt?.cancel(); monitor?.stop()
             if (_state.value.orb == OrbState.LISTENING) setOrb(OrbState.IDLE, "Microphone muted")
         } else if (_state.value.orb == OrbState.IDLE) listen()
@@ -213,7 +228,7 @@ class LiveSessionController(
     fun toggleSpeaker() {
         val on = !_state.value.speakerOn
         _state.update { it.copy(speakerOn = on) }
-        if (!on) { tts?.stop(); pendingUtterances.clear(); monitor?.stop(); focus?.release(); if (replyFinished) listen() }
+        if (!on) { stopEavesdrop(); tts?.stop(); pendingUtterances.clear(); monitor?.stop(); focus?.release(); if (replyFinished) listen() }
     }
 
     /** Tap on the orb: interrupt speech, cancel the pending request, or start listening. */
@@ -237,6 +252,7 @@ class LiveSessionController(
     /** Something new to announce while LIVE is already open (a reminder comes due mid-conversation). */
     fun announce(text: String) {
         if (!_state.value.active) return
+        eavesdropping = false
         listenJob?.cancel(); stt?.cancel(); monitor?.stop()
         say(text)
     }
@@ -244,6 +260,7 @@ class LiveSessionController(
     /** Sends typed text or text from the system voice-input popup (fallbacks when live recognition fails). */
     fun submitText(text: String) {
         if (!_state.value.active || text.isBlank()) return
+        eavesdropping = false
         listenJob?.cancel(); stt?.cancel(); monitor?.stop()
         tts?.stop(); pendingUtterances.clear()
         if (!replyFinished) { requestJob?.cancel(); orchestrator.cancelCurrent() }
@@ -259,13 +276,44 @@ class LiveSessionController(
     fun cancelRequest() {
         requestJob?.cancel()
         orchestrator.cancelCurrent()
+        stopEavesdrop()
         tts?.stop(); pendingUtterances.clear(); replyFinished = true
         monitor?.stop()
         _state.update { it.copy(looking = false) }
         setOrb(OrbState.IDLE, "Request cancelled")
     }
 
+    /** Stops listening for "stop" (ZED finished or was cut off). */
+    private fun stopEavesdrop() {
+        if (!eavesdropping) return
+        eavesdropping = false
+        stt?.cancel()
+    }
+
+    /** While ZED talks on the loudspeaker: the on-device recognizer listens for a stop word that ZED isn't saying itself. */
+    private fun startEavesdrop() {
+        if (!stopWordEnabled || eavesdropping || _state.value.micMuted || stt !is OnDeviceSpeechToText) return
+        eavesdropping = true
+        listenJob?.cancel()
+        stt?.start()
+    }
+
+    private fun onEavesdrop(e: SttEvent) {
+        when (e) {
+            is SttEvent.Partial, is SttEvent.Final -> {
+                val heard = if (e is SttEvent.Partial) e.text else (e as SttEvent.Final).text
+                val speaking = streamText + " " + utteranceText.values.joinToString(" ") + " " + _state.value.spoken
+                if (com.melhive.zed.core.eyes.VoiceInterrupt.heard(heard, speaking)) { interrupt(); return }
+                if (e is SttEvent.Final) scope?.launch { delay(150); if (eavesdropping && _state.value.orb == OrbState.SPEAKING) stt?.start() }
+            }
+            // Nothing heard for a while, or a hiccup: keep listening for as long as ZED talks.
+            is SttEvent.Error -> scope?.launch { delay(if (e.recoverable) 300 else 3000); if (eavesdropping && _state.value.orb == OrbState.SPEAKING && e.recoverable) stt?.start() }
+            else -> Unit
+        }
+    }
+
     private fun interrupt() {
+        stopEavesdrop()
         monitor?.stop()
         tts?.stop()
         pendingUtterances.clear()
@@ -279,6 +327,7 @@ class LiveSessionController(
 
     private fun listen() {
         if (!_state.value.active || _state.value.micMuted) return
+        eavesdropping = false
         _state.update { it.copy(partial = "", micLevel = 0f, followUp = exchanges > 0, finished = false, looking = false, spoken = "") }
         setOrb(OrbState.LISTENING)
         listenJob?.cancel()
@@ -295,6 +344,9 @@ class LiveSessionController(
     }
 
     private fun onStt(e: SttEvent) {
+        if (eavesdropping) { onEavesdrop(e); return }
+        // Leftovers from a recognizer that was just stopped are not a request.
+        if (_state.value.orb != OrbState.LISTENING && (e is SttEvent.Partial || e is SttEvent.Final || e is SttEvent.EndOfSpeech)) return
         when (e) {
             is SttEvent.Level -> if (_state.value.orb == OrbState.LISTENING) _state.update { it.copy(micLevel = e.level) }
             is SttEvent.Partial -> _state.update { it.copy(partial = e.text) }
@@ -331,7 +383,7 @@ class LiveSessionController(
     private fun onNothingHeard() {
         emptyResults++
         // Conversation mode: after an answer, silence means the user is done.
-        if (_state.value.followUp || emptyResults >= 2) {
+        if (emptyResults >= quietRounds) {
             emptyResults = 0
             setOrb(OrbState.IDLE, "Tap the orb to talk")
             _state.update { it.copy(followUp = false, finished = true) }
@@ -341,6 +393,7 @@ class LiveSessionController(
     /** "What am I looking at?": sends a photo with a question. */
     fun submitImage(image: com.melhive.zed.intelligence.ImageInput, prompt: String) {
         if (!_state.value.active) return
+        eavesdropping = false
         listenJob?.cancel(); stt?.cancel(); monitor?.stop()
         tts?.stop(); pendingUtterances.clear()
         if (!replyFinished) { requestJob?.cancel(); orchestrator.cancelCurrent() }
@@ -348,7 +401,6 @@ class LiveSessionController(
     }
 
     private fun submit(text: String, image: com.melhive.zed.intelligence.ImageInput? = null) {
-        val conv = conversationId ?: return
         _state.update { it.copy(transcript = it.transcript + LiveTurn(true, text)) }
         setOrb(OrbState.THINKING)
         // Instant acknowledgement: a low thunk the moment ZED has the request, before any answer exists.
@@ -358,6 +410,11 @@ class LiveSessionController(
         val camera = frameSource?.takeIf { image == null && com.melhive.zed.core.eyes.VisualAsk.matches(text) }
         if (camera != null) _state.update { it.copy(looking = true) }
         requestJob = scope?.launch {
+            // The call is saved under its first words, marked as a voice conversation.
+            val conv = conversationId ?: conversations.create("🎙 " + text.removePrefix("📷 ").lineSequence().first().take(46).ifBlank { "Voice conversation" }).also { id ->
+                conversationId = id
+                _state.update { it.copy(conversationId = id) }
+            }
             val seen = image ?: camera?.let { runCatching { it() }.getOrNull() }
             val reply = try { orchestrator.respond(conv, text.removePrefix("📷 "), voice = true, image = seen) } catch (e: kotlinx.coroutines.CancellationException) { throw e }
             onReply(reply)
@@ -432,6 +489,7 @@ class LiveSessionController(
                 utteranceText.remove(id)
                 if (pendingUtterances.isEmpty()) focus?.release()
                 if (pendingUtterances.isEmpty() && replyFinished && _state.value.orb == OrbState.SPEAKING) {
+                    stopEavesdrop()
                     monitor?.stop()
                     setOrb(OrbState.COMPLETED)
                     scope?.launch { delay(400); if (pendingUtterances.isEmpty() && replyFinished) listen() }
@@ -447,7 +505,7 @@ class LiveSessionController(
     private fun startBargeIn() {
         // On the loudspeaker ZED would hear itself; talk-over interruption needs headphones. Tap the orb otherwise.
         // Also not when ZED speaks from the loudspeaker in earphone-mic mode (the mic would hear it).
-        if (!bargeInEnabled || _state.value.micMuted || focus?.headphonesConnected() != true || AudioRoute.speakerForced()) return
+        if (!bargeInEnabled || _state.value.micMuted || focus?.headphonesConnected() != true || AudioRoute.speakerForced()) { startEavesdrop(); return }
         val m = monitor ?: return
         m.start(
             onLevel = { lvl -> _state.update { it.copy(micLevel = lvl) } },
@@ -459,6 +517,7 @@ class LiveSessionController(
     private fun onInterrupted(reason: String) {
         if (!_state.value.active) return
         listenJob?.cancel()
+        eavesdropping = false
         tts?.stop(); pendingUtterances.clear(); monitor?.stop(); stt?.cancel(); focus?.release()
         setOrb(OrbState.IDLE, "$reason. Tap the orb to continue.")
     }

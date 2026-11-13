@@ -8,7 +8,10 @@ import com.melhive.zed.core.eyes.EyeMind
 import com.melhive.zed.core.eyes.EyeMood
 import com.melhive.zed.core.eyes.GazeMode
 import com.melhive.zed.core.eyes.SceneWatcher
+import com.melhive.zed.core.eyes.EyeColors
+import com.melhive.zed.core.eyes.KindWords
 import com.melhive.zed.core.eyes.VisualAsk
+import com.melhive.zed.core.eyes.VoiceInterrupt
 import java.io.File
 import kotlin.math.abs
 import kotlin.test.Test
@@ -87,6 +90,28 @@ class EyesTest {
         assertEquals(EyeMood.NEUTRAL, EyeEmotion.of("It is 3 pm."))
         assertEquals(EyeMood.CONCERNED, EyeEmotion.hearing("my dog died yesterday"))
         assertEquals(EyeMood.NEUTRAL, EyeEmotion.hearing("what time is it?"))
+    }
+
+    @Test fun `stop words cut in only when ZED isn't saying them`() {
+        assertTrue(VoiceInterrupt.heard("the weather today stop", "The weather today is sunny with a high of 30."))
+        assertTrue(VoiceInterrupt.heard("okay that's enough", "Here is a long story."))
+        assertTrue(VoiceInterrupt.heard("hold on", "First, open the box."))
+        assertFalse(VoiceInterrupt.heard("the bus will stop at the corner", "The bus will stop at the corner."))
+        assertFalse(VoiceInterrupt.heard("it is sunny today", "It is sunny today."))
+        assertTrue(KindWords.matches("thanks Zed")); assertTrue(KindWords.matches("good night"))
+        assertFalse(KindWords.matches("what time is it"))
+        assertEquals("amber", EyeColors.next("cyan")); assertEquals("cyan", EyeColors.next("violet"))
+    }
+
+    @Test fun `eyes fall asleep after a long quiet time and wake on touch`() {
+        val m = EyeMind(5)
+        run(m, 80f)
+        assertTrue(m.asleep)
+        assertTrue(m.left.upper > 0.95f)
+        m.wake()
+        run(m, 1.5f)
+        assertFalse(m.asleep)
+        assertTrue(m.left.upper < 0.6f)
     }
 
     @Test fun `questions that need the camera`() {

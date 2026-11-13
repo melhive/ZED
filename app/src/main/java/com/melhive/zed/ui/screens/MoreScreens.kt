@@ -182,6 +182,16 @@ fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
                 SectionTitle("Voice")
                 SwitchRow("Voice responses", "Speak replies in ZED LIVE and after voice input", settings.voiceResponses) { scope.launch { c.settings.setVoiceResponses(it) } }
                 SwitchRow("Interrupt by talking", "With headphones or earbuds, start talking to cut ZED off. On the loudspeaker, tap the orb instead.", settings.bargeIn) { scope.launch { c.settings.setBargeIn(it) } }
+                SwitchRow("Say “stop” to interrupt", "On the loudspeaker, say “stop”, “wait” or “enough” to cut ZED off. Needs on-device speech recognition (More → Voice). Turn it off if answers feel slower.", settings.voiceStop) { scope.launch { c.settings.setVoiceStop(it) } }
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+                        Text("Keep listening", style = MaterialTheme.typography.titleSmall)
+                        Text("How long ZED waits for you to speak again after it answers", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
+                    }
+                    listOf("short" to "Short", "normal" to "Normal", "long" to "Long").forEach { (id, label) ->
+                        androidx.compose.material3.FilterChip(selected = settings.listenPatience == id, onClick = { scope.launch { c.settings.setListenPatience(id) } }, label = { Text(label) }, modifier = Modifier.padding(start = 4.dp))
+                    }
+                }
                 val voiceLabel = when (val sel = com.melhive.zed.core.voice.VoiceSelection.parse(settings.voiceId)) {
                     com.melhive.zed.core.voice.VoiceSelection.SystemDefault -> "Phone default voice"
                     is com.melhive.zed.core.voice.VoiceSelection.System -> "Phone voice"

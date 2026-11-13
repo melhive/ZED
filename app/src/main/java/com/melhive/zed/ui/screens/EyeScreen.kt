@@ -22,10 +22,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Chat
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ClosedCaption
-import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.MicOff
 import androidx.compose.material.icons.outlined.Videocam
@@ -89,7 +89,7 @@ import kotlinx.coroutines.launch
  * Tap: show the controls. Double-tap: interrupt ZED or start talking.
  */
 @Composable
-fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long) -> Unit, onOpenLive: () -> Unit) {
+fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long?) -> Unit, onOpenLive: () -> Unit) {
     val c = rememberContainer()
     val context = LocalContext.current
     val view = LocalView.current
@@ -107,6 +107,8 @@ fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long) -> Unit, onOpenLive: () ->
     var controls by remember { mutableStateOf(false) }
     var touched by remember { mutableIntStateOf(0) }
     var closing by remember { mutableStateOf(false) }
+    var history by remember { mutableStateOf(false) }
+    var asleep by remember { mutableStateOf(false) }
 
     // Landscape, nothing but the eyes, and the screen stays on.
     DisposableEffect(Unit) {
@@ -186,6 +188,19 @@ fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long) -> Unit, onOpenLive: () ->
     }
     LaunchedEffect(state.speechPulse) { if (state.speechPulse > 0) mind.speechPulse() }
     LaunchedEffect(state.looking) { mind.attending = state.looking }
+    // The iris colour you chose.
+    LaunchedEffect(settings?.eyeColor) { mind.baseTint = com.melhive.zed.core.eyes.EyeColors.of(settings?.eyeColor) }
+    // "Thank you", "good night": a slow, contented closing of the eyes.
+    LaunchedEffect(state.transcript.size) {
+        val last = state.transcript.lastOrNull()
+        if (last != null && last.fromUser && com.melhive.zed.core.eyes.KindWords.matches(last.text)) { mind.mood = EyeMood.HAPPY; mind.contentBlink() }
+    }
+    // Asleep: the screen itself dims until you come back or touch it.
+    DisposableEffect(asleep) {
+        val window = (context as? Activity)?.window
+        window?.attributes = window?.attributes?.apply { screenBrightness = if (asleep) 0.02f else android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE }
+        onDispose { window?.attributes = window?.attributes?.apply { screenBrightness = android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE } }
+    }
 
     // When the conversation has gone quiet and you are in view, ZED listens again by itself.
     LaunchedEffect(state.orb, state.micMuted) {
@@ -212,7 +227,10 @@ fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long) -> Unit, onOpenLive: () ->
                 mind.faceX = camera.faceX; mind.faceY = camera.faceY
                 mind.objectSeen = camera.objectSeen
                 mind.objectX = camera.objectX; mind.objectY = camera.objectY
+                // A dark room: turn the glow down.
+                mind.dim += ((if (camera.running && camera.brightness < 45f) 1f else 0f) - mind.dim) * 0.03f
                 mind.update(dt)
+                if (mind.asleep != asleep) asleep = mind.asleep
                 tick++
             }
         }
@@ -225,7 +243,7 @@ fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long) -> Unit, onOpenLive: () ->
     Box(
         Modifier.fillMaxSize().background(Color.Black).pointerInput(Unit) {
             detectTapGestures(
-                onTap = { controls = !controls; touched++ },
+                onTap = { if (mind.asleep || mind.drowsy) mind.wake() else { controls = !controls; touched++ } },
                 onDoubleTap = { live.tapOrb() },
             )
         },
@@ -251,7 +269,8 @@ fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long) -> Unit, onOpenLive: () ->
         if (line.isNotEmpty()) Text(
             line, color = (if (state.orb == OrbState.ERROR) ZedColors.Red else ZedColors.Cyan).copy(alpha = 0.78f),
             style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(0.72f).padding(bottom = 14.dp),
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(0.72f).padding(bottom = 14.dp)
+                .pointerInput(Unit) { detectTapGestures(onTap = { history = true }) },
         )
 
         AnimatedVisibility(controls, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.TopEnd)) {
@@ -270,16 +289,22 @@ fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long) -> Unit, onOpenLive: () ->
                         touched++
                         if (!cameraAllowed) permissions.launch(arrayOf(Manifest.permission.CAMERA)) else cameraOn = !cameraOn
                     }
-                    EyeButton(Icons.AutoMirrored.Outlined.Chat, "Chat mode", true) { closing = true; live.conversation?.let(onOpenChat) ?: onClose() }
-                    EyeButton(Icons.Outlined.GraphicEq, "Live mode", true) { onOpenLive() }
+                    EyeButton(Icons.Outlined.History, "Conversation so far", true) { controls = false; history = true }
+                    EyeButton(Icons.Outlined.Palette, "Eye colour", true) {
+                        touched++; scope.launch { c.settings.setEyeColor(com.melhive.zed.core.eyes.EyeColors.next(settings?.eyeColor ?: "cyan")) }
+                    }
                     EyeButton(Icons.Outlined.Close, "Close Eye mode", true) { close() }
                 }
+                com.melhive.zed.ui.components.VoiceModeSwitch("eyes", onSelect = {
+                    if (it == "orb") onOpenLive() else { closing = true; onOpenChat(live.conversation) }
+                }, modifier = Modifier.padding(top = 8.dp))
                 Text(
                     "Double-tap to interrupt or talk", color = ZedColors.Muted.copy(alpha = 0.8f),
                     style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 6.dp, end = 10.dp),
                 )
             }
         }
+        if (history) com.melhive.zed.ui.components.VoiceHistoryPanel(state.conversationId, state.transcript) { history = false }
     }
 }
 

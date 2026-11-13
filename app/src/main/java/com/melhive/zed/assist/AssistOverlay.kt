@@ -45,6 +45,7 @@ import androidx.compose.material.icons.automirrored.outlined.VolumeOff
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Keyboard
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.MicOff
 import androidx.compose.material.icons.outlined.OpenInFull
@@ -293,6 +294,12 @@ private fun AssistOverlay(onClose: () -> Unit, onOpenApp: () -> Unit) {
                                 gallery.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                             })
                         }
+                    }
+                    // Eye mode: opens in the app, carrying on this conversation.
+                    HudButton(Icons.Outlined.Visibility, "Eye mode") {
+                        live.continueWith = live.conversation
+                        activity.startActivity(ZedLaunch.intent(activity, com.melhive.zed.ui.navigation.Routes.EYE))
+                        onClose()
                     }
                     HudButton(Icons.Outlined.Keyboard, "Type") { typing = !typing }
                     HudButton(Icons.Outlined.StopCircle, "Stop", live::cancelRequest)

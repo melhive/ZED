@@ -106,6 +106,7 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         "learning", "auto learning", "automatic learning", "auto-learning" -> "auto_learning"
         "hints", "proactive hints", "suggestions", "leave now hints", "leave-now hints" -> "proactive_hints"
         "captions", "eye captions", "eye mode captions", "subtitles" -> "eye_captions"
+        "stop word", "stop words", "voice interrupt", "say stop", "stop to interrupt" -> "stop_word"
         "brain sounds", "brain sound" -> "brain_sounds"
         "think twice", "thinking twice", "double checking" -> "think_twice"
         "barge in", "barge-in", "interruptions", "interrupting" -> "barge_in"
@@ -290,6 +291,15 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         Rule(rx("(?:(?:open|start|show|enter|launch|activate|go (?:in)?to|switch to|turn on|enable)(?: me)? )?(?:the |your )?eyes? mode|(?:show me|open) your eyes|(?:let me |i want to )?see your eyes")) { tool("app.show", "screen" to "eye") },
         Rule(rx("(?:exit|close|leave|stop|end|quit|turn off|disable) (?:the |your )?eyes? mode|close your eyes|(?:(?:go|switch|back|return)(?: back)? to )?(?:the )?chat mode|(?:go|switch|return) back to (?:the )?chat")) { tool("app.show", "screen" to "chat") },
         Rule(rx("(?:(?:go|switch|back|return)(?: back)? to |open |start )?(?:the |zed )?live mode|(?:go|switch|return)(?: back)? to (?:zed )?live")) { tool("app.show", "screen" to "live") },
+
+        Rule(rx("(?:make|turn|change|set|switch) (?:your |the )?eyes?(?: colou?r)? (?:to |into )?(\\w+)|(?:change|set) (?:your |the )?eye colou?r to (\\w+)|(\\w+) eyes(?: please)?")) { m ->
+            val c = com.melhive.zed.core.eyes.EyeColors.parse(m.groupValues.drop(1).first { it.isNotEmpty() }) ?: return@Rule null
+            tool("settings.set", "key" to "eye_color", "value" to c)
+        },
+        Rule(rx("(?:listen|keep listening|wait)(?: for me)? (longer|shorter|less)|(?:set|make|change) (?:the |your )?listening(?: time)? (?:to )?(short|shorter|normal|long|longer)|keep listening(?: to me)?")) { m ->
+            val v = m.groupValues[1].ifEmpty { m.groupValues[2] }.lowercase()
+            tool("settings.set", "key" to "listening_time", "value" to when (v) { "shorter", "less", "short" -> "short"; "normal" -> "normal"; else -> "long" })
+        },
 
         // The Live Brain, by voice: "show me everything about Ana".
         Rule(rx("(?:show|open|display)(?: me)? (?:everything|all|what you know|what do you know|all you know) (?:about|on) (.+?)(?: in (?:my|the|your) brain)?|show (.+?) in (?:my|the|your) (?:live )?brain|(?:open|show)(?: me)? (?:my |the |your )?(?:live )?brain")) { m ->

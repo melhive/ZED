@@ -31,6 +31,17 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.40", "2026-11-14", "Calls you can read back, and livelier eyes", listOf(
+            "LIVE has captions: the last thing you said and the sentence ZED is saying, under the orb. Tap them or swipe up to read the whole conversation as chat bubbles; Eye mode has the same panel behind its history button.",
+            "Calls are easy to find in your conversation history: each one is named after the first thing you said and marked with a microphone, and opening LIVE without saying anything no longer leaves an empty entry. Older calls were renamed the same way.",
+            "Open LIVE or Eye mode from a chat and the call carries on that same conversation.",
+            "Say “stop”, “wait” or “enough” to cut ZED off on the loudspeaker (needs on-device speech recognition; switch in Settings → Voice). With headphones, just start talking as before.",
+            "ZED keeps listening a little longer after it answers, and you choose how long: Settings → Voice → Keep listening, or say “listen longer”.",
+            "One Orb · Eyes · Chat switch moves between LIVE, Eye mode and the chat without ending the conversation. The floating orb (shortcut or “Hey Zed”) has an Eye mode button too.",
+            "Eye mode: the eyes come back to you when you start talking, narrow at loud sounds, and close slowly when you say thanks or good night. After a long quiet time they fall asleep and the screen dims; they wake when you come into view or touch the screen.",
+            "Eye contact is corrected for the camera sitting at one end of the phone, the glow turns down in a dark room, and you can pick the iris colour — cyan, amber, green or violet — from the controls or by saying “make your eyes green”.",
+            "Live Brain: tap a conversation to read its messages, or a document to read its text, right in the brain.",
+        )),
         Release("0.1.39", "2026-11-13", "Eye mode", listOf(
             "Eye mode: ZED's two eyes fill the screen in landscape — robotic owl eyes with a feathered brow and a reactor iris, on pure black. Open it with the eye button in LIVE or Chat, or say “eye mode”. Say “chat mode” or “exit eye mode” to leave, or tap the screen for the controls.",
             "The eyes are alive: they jump between things like real eyes, blink (sometimes twice, sometimes with the sideways inner lid), look away while thinking, pulse with ZED's voice and get drowsy when nothing happens.",

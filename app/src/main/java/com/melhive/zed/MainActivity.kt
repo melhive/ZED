@@ -7,6 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import com.melhive.zed.ui.navigation.ZedRoot
 import com.melhive.zed.ui.theme.ZedTheme
@@ -44,6 +45,18 @@ class MainActivity : ComponentActivity() {
             if (!migrations.getBoolean("wake_maximum", false)) {
                 if (s.wakeSensitivity == 2) { c.settings.setWakeSensitivity(3); restartWake = true }
                 migrations.edit().putBoolean("wake_maximum", true).apply()
+            }
+            // v0.1.40: calls are named after what was said. Older ones were all called "ZED LIVE session".
+            if (!migrations.getBoolean("call_titles", false)) {
+                runCatching {
+                    c.db.conversations().observeAll().first().filter { it.title == "ZED LIVE session" }.forEach { conv ->
+                        val first = c.conversations.allMessages(conv.id).firstOrNull { it.role == "user" && it.content.isNotBlank() }?.content
+                        // A call in which nothing was said left an empty entry behind.
+                        if (first == null) { if (c.conversations.allMessages(conv.id).isEmpty() && conv.id != c.live.conversation) c.conversations.delete(conv.id) }
+                        else c.conversations.rename(conv.id, "🎙 " + first.lineSequence().first().take(46))
+                    }
+                }
+                migrations.edit().putBoolean("call_titles", true).apply()
             }
             if (s.wakeWordEnabled && c.voicePacks.isInstalled(com.melhive.zed.core.voice.VoiceCatalog.WAKE_WORD) &&
                 com.melhive.zed.android.PermissionCatalog.isGranted(this@MainActivity, com.melhive.zed.android.PermissionCatalog.MICROPHONE)) {
