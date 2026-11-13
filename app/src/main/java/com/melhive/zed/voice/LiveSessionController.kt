@@ -76,6 +76,10 @@ class LiveSessionController(
     private val sttFactory: () -> SpeechToText,
     private val ttsFactory: () -> TextToSpeechEngine,
 ) {
+    /** The user's name, for greetings (set by the container). */
+    var userName: (suspend () -> String?)? = null
+    private var lastGreeting: String? = null
+
     private val _state = MutableStateFlow(LiveUiState())
     val state: StateFlow<LiveUiState> = _state.asStateFlow()
 
@@ -100,7 +104,8 @@ class LiveSessionController(
     private var soundStyle = com.melhive.zed.core.voice.SoundSynth.Style.CORE
     private var hideBeep = true
 
-    fun start() {
+    /** Starts LIVE. [greet]: ZED was called ("Hey Zed" or the shortcut) and answers with a greeting first. */
+    fun start(greet: Boolean = false) {
         if (_state.value.active) return
         if (!PermissionCatalog.isGranted(context, PermissionCatalog.MICROPHONE)) {
             _state.value = LiveUiState(orb = OrbState.ERROR, error = "Microphone permission is required for ZED LIVE.")
@@ -129,6 +134,15 @@ class LiveSessionController(
             if (!recognitionAvailable()) {
                 setOrb(OrbState.ERROR, "No speech recognition service on this phone. Use the keyboard or system voice input below, or install Google's speech services.")
                 com.melhive.zed.android.CrashReporter.recordNonFatal("live", IllegalStateException("No speech recognition service available"))
+            } else if (greet && cfg.greetOnCall && _state.value.speakerOn) {
+                // Answer like an assistant at the ready; listening starts when the greeting ends (or on a tap).
+                val name = runCatching { userName?.invoke() }.getOrNull()
+                val hello = com.melhive.zed.core.voice.Greetings.pick(java.time.LocalTime.now().hour, cfg.userTitle, name, lastGreeting)
+                lastGreeting = hello
+                _state.update { it.copy(transcript = it.transcript + LiveTurn(false, hello)) }
+                replyFinished = true
+                speakChunk(hello)
+                if (pendingUtterances.isEmpty()) listen()
             } else listen()
         }
         s.launch { stt!!.events.collect { onStt(it) } }

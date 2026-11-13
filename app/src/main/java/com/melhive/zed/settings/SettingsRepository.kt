@@ -46,7 +46,7 @@ data class AppSettings(
     /** Last version whose "What's new" the user has seen. */
     val lastSeenVersion: String? = null,
     /** LIVE start/stop sound: arc, pulse, chime or off. */
-    val liveSound: String = "core",
+    val liveSound: String = "holo",
     /** Mute the speech recognizer's own start beep while LIVE listens. */
     val hideRecognizerBeep: Boolean = true,
     /** Home Assistant base URL, e.g. http://homeassistant.local:8123 */
@@ -64,6 +64,8 @@ data class AppSettings(
     val autoIndex: Boolean = false,
     val enabledSkills: Set<String> = SkillRegistry.DEFAULT.skills.map { it.id }.toSet(),
     val bargeIn: Boolean = true,
+    /** ZED speaks a greeting the moment it is called ("Hey Zed" or the assistant shortcut). */
+    val greetOnCall: Boolean = true,
     val glow: Boolean = true,
     val onboardingDone: Boolean = false,
     val checkUpdates: Boolean = true,
@@ -119,6 +121,7 @@ class SettingsRepository(private val context: Context) {
         val skills = stringSetPreferencesKey("enabled_skills")
         val knownSkills = stringSetPreferencesKey("known_skills")
         val bargeIn = booleanPreferencesKey("barge_in")
+        val greetOnCall = booleanPreferencesKey("greet_on_call")
         val glow = booleanPreferencesKey("glow")
         val onboarding = booleanPreferencesKey("onboarding_done")
         val checkUpdates = booleanPreferencesKey("check_updates")
@@ -164,6 +167,7 @@ class SettingsRepository(private val context: Context) {
             // Skills added in later versions start enabled; skills the user turned off stay off.
             enabledSkills = (p[K.skills] ?: defaults.enabledSkills) + (defaults.enabledSkills - (p[K.knownSkills] ?: LEGACY_SKILLS)),
             bargeIn = p[K.bargeIn] ?: defaults.bargeIn,
+            greetOnCall = p[K.greetOnCall] ?: defaults.greetOnCall,
             glow = p[K.glow] ?: defaults.glow,
             onboardingDone = p[K.onboarding] ?: false,
             checkUpdates = p[K.checkUpdates] ?: defaults.checkUpdates,
@@ -205,6 +209,7 @@ class SettingsRepository(private val context: Context) {
     suspend fun setUseKnowledge(v: Boolean) = context.dataStore.edit { it[K.useKnowledge] = v }
     suspend fun setAutoIndex(v: Boolean) = context.dataStore.edit { it[K.autoIndex] = v }
     suspend fun setBargeIn(v: Boolean) = context.dataStore.edit { it[K.bargeIn] = v }
+    suspend fun setGreetOnCall(v: Boolean) = context.dataStore.edit { it[K.greetOnCall] = v }
     suspend fun setGlow(v: Boolean) = context.dataStore.edit { it[K.glow] = v }
     suspend fun setLocalContextTokens(v: Int) = context.dataStore.edit { it[K.contextTokens] = v }
     suspend fun setCheckUpdates(v: Boolean) = context.dataStore.edit { it[K.checkUpdates] = v }

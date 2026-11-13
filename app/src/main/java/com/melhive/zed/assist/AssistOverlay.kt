@@ -111,7 +111,8 @@ class AssistOverlayActivity : ComponentActivity() {
             // The full app asks for the microphone permission.
             startActivity(ZedLaunch.intent(this, ZedLaunch.ROUTE_LIVE)); finish(); return
         }
-        live.start()
+        // Called by "Hey Zed" or the assistant shortcut: ZED greets first.
+        live.start(greet = true)
         // Have the on-device model ready by the time the question is asked.
         (application as com.melhive.zed.ZedApp).container.warmUpModel()
         setContent { ZedTheme { AssistOverlay(onClose = ::close, onOpenApp = ::openApp) } }

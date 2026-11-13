@@ -183,6 +183,13 @@ fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
                 Text(com.melhive.zed.core.voice.SoundSynth.Style.parse(settings.liveSound).description, style = MaterialTheme.typography.labelSmall, color = ZedColors.Cyan)
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
                     Column(Modifier.weight(1f)) {
+                        Text("Greet me when I call", style = MaterialTheme.typography.titleSmall)
+                        Text("After “Hey Zed” or the assistant shortcut, ZED answers right away — “Hello sir, how can I help you today?”, “At your service.”, “Good evening. What do you need?” — then listens. Say “call me sir” to choose how it addresses you.", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
+                    }
+                    androidx.compose.material3.Switch(checked = settings.greetOnCall, onCheckedChange = { on -> safely { c.settings.setGreetOnCall(on) } })
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
+                    Column(Modifier.weight(1f)) {
                         Text("Hide the recognizer beep", style = MaterialTheme.typography.titleSmall)
                         Text("Silences the speech service's own “listening” sound (the Google beep) each time LIVE starts listening.", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
                     }

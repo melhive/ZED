@@ -31,6 +31,10 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.32", "2026-11-13", "Eight new sounds, and ZED greets you", listOf(
+            "Eight new LIVE sounds in the style of a film AI assistant, each with a sense of space: Hologram (a display shimmers up and glass tones lock in), Reactor (an energy core hums to life with electric crackle), Neural (synapses fire into a warm chord), Scanner (a scan sweeps and locks on), Armor (servos drive and plates clamp shut), Sonar (a deep ping echoing), Core and Command. Pick one in More → Voice → LIVE sounds.",
+            "ZED answers the moment you call it: after “Hey Zed” or the assistant shortcut it says “Hello sir, how can I help you today?”, “At your service.”, “Good evening. What do you need?” or one of about forty other greetings, then listens. Say “call me sir” (or boss, or anything) to choose how it addresses you; otherwise it uses your name. Turn it off in More → Voice or say “turn off the greeting”.",
+        )),
         Release("0.1.31", "2026-11-13", "Deeper sounds, focused conversations", listOf(
             "New LIVE sounds, deep and mechanical: Core (a reactor engine spins up and a heavy lock engages), Turbine, Mech (hydraulics and a bolt slamming home) and Command (low starship-console chords). The bright beeps, chirps and 8-bit sounds are gone. The “got it” sound when ZED hears you is now a low thunk. Pick one in More → Voice → LIVE sounds.",
             "ZED stays on the conversation you're having. It only brings up something from an earlier conversation, a memory, an event or a reminder when you talk about it. After a pause of a few hours, a chat starts fresh, so yesterday's topic doesn't slip into today's answers.",

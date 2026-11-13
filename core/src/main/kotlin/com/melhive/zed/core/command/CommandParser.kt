@@ -111,6 +111,7 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         "document context", "knowledge context" -> "use_knowledge"
         "briefing", "daily briefing", "morning briefing" -> "briefing"
         "update checks", "updates", "update check" -> "check_updates"
+        "greeting", "greetings", "hello", "the greeting", "wake greeting" -> "greeting"
         "voice responses", "voice replies", "spoken responses", "spoken replies", "voice" -> "voice_responses"
         else -> null
     }

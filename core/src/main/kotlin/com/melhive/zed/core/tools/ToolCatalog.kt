@@ -40,7 +40,7 @@ class ToolCatalog(specs: List<ToolSpec>) {
         val SETTING_KEYS = listOf(
             "voice_responses", "speech_rate", "speech_pitch", "voice", "wake_word", "wake_sensitivity", "barge_in", "auto_index", "use_knowledge",
             "theme_glow", "animation", "auto_learning", "web_research", "think_twice", "proactive_hints", "brain_sounds", "ask_before",
-            "user_title", "weather_city", "briefing", "briefing_time", "check_updates", "persona",
+            "user_title", "weather_city", "briefing", "briefing_time", "check_updates", "persona", "greeting",
         )
 
         /** Screens of the ZED app that [app.show] can open. */

@@ -13,7 +13,7 @@ Native Android personal AI assistant (Kotlin, Jetpack Compose). Three intelligen
 | Default branch | `main` (stable merges) |
 | Latest commit | see `git log -1` (this file is updated with each milestone) |
 | Build status | ✅ GitHub Actions **Android Build** green: core tests, Android unit tests, debug APK |
-| Releases | ✅ Signed release **v0.1.31** published (latest). Install/share link: https://github.com/melhive/ZED/releases/latest/download/zed.apk. Every push to `main` publishes the version in `VERSION` (bump it for a new release; re-pushing the same version replaces that release). App id `com.melhive.zed`, signed with the key in `/root/zed-signing` (back it up — updates need the same key). |
+| Releases | ✅ Signed release **v0.1.32** published (latest). Install/share link: https://github.com/melhive/ZED/releases/latest/download/zed.apk. Every push to `main` publishes the version in `VERSION` (bump it for a new release; re-pushing the same version replaces that release). App id `com.melhive.zed`, signed with the key in `/root/zed-signing` (back it up — updates need the same key). |
 
 ## Milestones
 
@@ -59,6 +59,11 @@ Failed tests: none.
 | Model download (2–3 GB) with resume + SHA-256 | | ✅ | ✅ | |
 | Keystore secret storage | | ✅ | ✅ | |
 | STT / TTS / sentence streaming / barge-in / audio focus | VAD only | ✅ | ✅ | |
+
+## Eight AI-assistant sounds and a spoken greeting (v0.1.32)
+
+- **Sounds** (`SoundSynth`): Hologram (default), Reactor, Neural, Scanner, Armor, Sonar, Core, Command, using FM "glass" tones, resonant sweeps, electric crackle, saturated low impacts and a Freeverb-style reverb; tails fade over the last 12%. Retired ids fall back to Hologram.
+- **Greeting** (`core/voice/Greetings.kt`, `GreetingsTest`): ~40 variations, time-of-day aware, never twice in a row, addressing the user by title (“call me sir”) or name. Spoken by `LiveSessionController.start(greet = true)` from the overlay (wake word / assistant shortcut) and by the hands-free wake path; setting `greetOnCall` (More → Voice, or “turn off the greeting”).
 
 ## Deeper sounds, focused conversations (v0.1.31)
 

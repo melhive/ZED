@@ -177,6 +177,7 @@ fun registerAppControl(tm: ToolManager, c: AppContainer, context: Context) {
             "think_twice" -> toggle("Think twice", { c.settings.setThinkTwice(it) })
             "brain_sounds" -> toggle("Brain sounds", { c.settings.setBrainSounds(it) })
             "check_updates" -> toggle("Update checks", { c.settings.setCheckUpdates(it) })
+            "greeting" -> toggle("Greeting when you call me", { c.settings.setGreetOnCall(it) })
             "auto_learning" -> toggle("Learning from conversations", { c.settings.setAutoLearning(it) }) { com.melhive.zed.learning.Learner.schedule(context.applicationContext, it) }
             "proactive_hints" -> toggle("Hints", { c.settings.setProactiveHints(it) }) { com.melhive.zed.learning.Dreamer.scheduleHints(context.applicationContext, it) }
             "briefing" -> toggle("The daily briefing", { c.settings.setBriefing(it, s.briefingTime); c.routines.scheduleAll() })

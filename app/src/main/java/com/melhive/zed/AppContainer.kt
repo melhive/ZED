@@ -112,6 +112,7 @@ class AppContainer(private val context: Context) {
 
     val live by lazy {
         LiveSessionController(context, orchestrator, conversations, settings, { AndroidSpeechToText(context) }, { voice.sessionHandle() })
+            .also { it.userName = { memory.userName() } }
     }
 
     val updates = com.melhive.zed.android.UpdateChecker()

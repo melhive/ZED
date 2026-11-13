@@ -34,7 +34,7 @@ class SoundSynthTest {
             val pcm = SoundSynth.render(style, start)
             val name = "${style.id}/${if (start) "start" else "stop"}"
             val seconds = pcm.size.toDouble() / SoundSynth.RATE
-            assertTrue(seconds in 0.3..0.9, "$name lasts $seconds s")
+            assertTrue(seconds in 0.3..1.2, "$name lasts $seconds s")
             val peak = pcm.maxOf { abs(it.toInt()) }
             assertTrue(peak in 17_000..20_000, "$name peak $peak")
             assertEquals(0, pcm.first().toInt(), "$name starts at silence")
@@ -78,8 +78,8 @@ class SoundSynthTest {
         assertTrue(ack.maxOf { abs(it.toInt()) } in 10_000..13_000)
     }
 
-    @Test fun retiredSoundsFallBackToCore() {
-        listOf("arc", "droid", "retro", "chime", null).forEach { assertEquals(SoundSynth.Style.CORE, SoundSynth.Style.parse(it)) }
+    @Test fun retiredSoundsFallBackToHologram() {
+        listOf("arc", "droid", "retro", "turbine", "mech", null).forEach { assertEquals(SoundSynth.Style.HOLO, SoundSynth.Style.parse(it)) }
     }
 
     @Test fun startAndStopDifferAndRenderingIsDeterministic() {
@@ -100,7 +100,7 @@ class SoundSynthTest {
 
     @Test fun offIsSilentAndIdsAreUnique() {
         assertEquals(0, SoundSynth.render(SoundSynth.Style.OFF, true).size)
-        assertEquals(SoundSynth.Style.TURBINE, SoundSynth.Style.parse("turbine"))
+        assertEquals(SoundSynth.Style.SONAR, SoundSynth.Style.parse("sonar"))
         assertEquals(SoundSynth.Style.entries.size, SoundSynth.Style.entries.map { it.id }.toSet().size)
     }
 }

@@ -171,8 +171,15 @@ class WakeWordService : Service() {
                 return
             }
         }
-        ZedSounds.play(this, style, start = true)
-        delay(450)
+        val soundMs = ZedSounds.play(this, style, start = true)
+        delay(maxOf(450L, soundMs))
+        val cfg = c.settings.current()
+        if (cfg.greetOnCall && cfg.voiceResponses && c.voice.awaitReady()) {
+            val hello = com.melhive.zed.core.voice.Greetings.pick(java.time.LocalTime.now().hour, cfg.userTitle, runCatching { c.memory.userName() }.getOrNull())
+            c.voice.speak(hello, flush = true)
+            delay(300)
+            withTimeoutOrNull(8_000) { while (c.voice.isSpeaking()) delay(100) }
+        }
         val heard = withContext(Dispatchers.Main) { listenOnce() }
         if (heard.isNullOrBlank()) { ZedSounds.play(this, style, start = false); return }
         Notifications.post(this, Notifications.CHANNEL_TASKS, NOTIFICATION_ID + 1, "You: $heard", "Thinking…", "live")
