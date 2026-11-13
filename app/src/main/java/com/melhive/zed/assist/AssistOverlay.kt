@@ -32,6 +32,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -231,7 +233,7 @@ private fun AssistOverlay(onClose: () -> Unit, onOpenApp: () -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 // While the keyboard is up, the orb steps aside so the typing box sits right on top of the keyboard.
-                val keyboardUp = androidx.compose.foundation.layout.WindowInsets.isImeVisible
+                val keyboardUp = WindowInsets.isImeVisible
                 val compact = keyboardUp || typing
                 Text("ZED", style = MaterialTheme.typography.titleMedium, color = ZedColors.Cyan, letterSpacing = 8.sp, modifier = Modifier.padding(top = 8.dp))
                 if (!compact) com.melhive.zed.ui.screens.MiniBrain(Modifier.padding(top = 6.dp).size(64.dp))

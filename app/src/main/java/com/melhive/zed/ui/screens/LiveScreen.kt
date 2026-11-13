@@ -40,6 +40,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -127,7 +129,7 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit) {
         Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF070B16), ZedColors.Background, Color(0xFF02030A))))
     ) {
         // The whole panel sits above the keyboard; the orb shrinks while typing so the box stays visible.
-        val compact = typing || androidx.compose.foundation.layout.WindowInsets.isImeVisible
+        val compact = typing || WindowInsets.isImeVisible
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("ZED LIVE", style = MaterialTheme.typography.titleMedium, color = ZedColors.Muted, modifier = Modifier.weight(1f))
