@@ -198,11 +198,47 @@ footer .wrap { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
 footer nav { display: flex; gap: 18px; margin-left: auto; }
 footer a:hover { color: var(--text); }
 
+/* Accessibility */
+.skip { position: absolute; left: -9999px; top: 8px; z-index: 50; background: var(--text); color: #000; padding: 8px 14px; border-radius: 8px; }
+.skip:focus { left: 16px; }
+a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 8px; }
+.bar nav a.active { color: var(--text); }
+
+/* Mobile menu */
+.menu { display: none; position: relative; }
+.menu summary { list-style: none; cursor: pointer; width: 40px; height: 40px; border: 1px solid var(--line-2); border-radius: 10px; display: grid; place-items: center; background: var(--panel); }
+.menu summary::-webkit-details-marker { display: none; }
+.menu summary span, .menu summary span::before, .menu summary span::after { display: block; width: 16px; height: 1.6px; background: var(--text); position: relative; content: ""; }
+.menu summary span::before { position: absolute; top: -5px; } .menu summary span::after { position: absolute; top: 5px; }
+.menu[open] .sheet { display: grid; }
+.menu .sheet { display: none; position: absolute; right: 0; top: 50px; width: 220px; padding: 8px; gap: 2px; background: var(--panel); border: 1px solid var(--line-2); border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,.6); }
+.menu .sheet a { padding: 10px 12px; border-radius: 8px; color: var(--muted); font-size: 14.5px; }
+.menu .sheet a:hover { background: var(--panel-2); color: var(--text); }
+
+/* FAQ */
+.faq { display: grid; gap: 10px; max-width: 860px; }
+.faq details { border: 1px solid var(--line); border-radius: 12px; background: var(--bg-2); padding: 0 20px; transition: border-color .15s; }
+.faq details[open] { border-color: var(--line-2); background: var(--panel); }
+.faq summary { cursor: pointer; list-style: none; padding: 18px 0; font-weight: 600; font-size: 15.5px; display: flex; justify-content: space-between; gap: 16px; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; font-family: var(--mono); color: var(--accent); font-weight: 400; transition: transform .2s; }
+.faq details[open] summary::after { transform: rotate(45deg); }
+.faq details p { margin: 0 0 18px; color: var(--muted); font-size: 15px; }
+.faq a { color: var(--accent); }
+
+/* Release + legal */
+.release { margin-top: 14px; font-family: var(--mono); font-size: 12.5px; color: var(--dim); display: flex; gap: 14px; flex-wrap: wrap; }
+.release b { color: var(--ok); font-weight: 500; }
+.release a { color: var(--accent); }
+.legal-note { margin-top: 16px; font-size: 14px; color: var(--muted); }
+.legal-note a { color: var(--accent); }
+
 @media (max-width: 980px) {
   .hero .wrap, .arch { grid-template-columns: 1fr; gap: 40px; }
   .cards { grid-template-columns: repeat(2, 1fr); }
   .steps { grid-template-columns: repeat(2, 1fr); }
   .bar nav { display: none; }
+  .menu { display: block; }
 }
 @media (max-width: 640px) {
   .hero { padding: 56px 0 48px; }
@@ -225,6 +261,7 @@ footer a:hover { color: var(--text); }
 </style>
 </head>
 <body>
+<a class="skip" href="#top">Skip to content</a>
 <div class="grid-bg" aria-hidden="true"></div>
 <div class="glow" aria-hidden="true"></div>
 
@@ -236,6 +273,7 @@ footer a:hover { color: var(--text); }
       <a href="#architecture">Architecture</a>
       <a href="#privacy">Privacy</a>
       <a href="#specs">Specs</a>
+      <a href="#faq">FAQ</a>
     </nav>
     <div class="spacer"></div>
     <a class="btn ghost" href="https://github.com/melhive/ZED">
@@ -243,6 +281,13 @@ footer a:hover { color: var(--text); }
       GitHub
     </a>
     <a class="btn primary" href="https://github.com/melhive/ZED/releases/latest/download/zed.apk">Download APK</a>
+    <details class="menu">
+      <summary aria-label="Menu"><span></span></summary>
+      <div class="sheet">
+        <a href="#features">Features</a><a href="#architecture">Architecture</a><a href="#privacy">Privacy</a><a href="#specs">Specs</a><a href="#faq">FAQ</a>
+        <a href="https://github.com/melhive/ZED">GitHub</a>
+      </div>
+    </details>
   </div>
 </header>
 
@@ -414,6 +459,7 @@ footer a:hover { color: var(--text); }
           </ul>
         </div>
       </div>
+      <p class="legal-note">No analytics, no advertising IDs, no accounts. Read the full <a href="privacy.html">Privacy Policy</a> and <a href="terms.html">Terms of Use</a>.</p>
     </div>
   </section>
 
@@ -452,6 +498,25 @@ footer a:hover { color: var(--text); }
         <code id="apk">https://github.com/melhive/ZED/releases/latest/download/zed.apk</code>
         <button class="btn" type="button" id="copy">Copy link</button>
       </div>
+      <div class="release" id="release"><span>Latest: <b class="zed-version">v0.1.32</b></span><span id="rel-date"></span><a href="https://github.com/melhive/ZED/releases">Release notes →</a></div>
+    </div>
+  </section>
+
+  <section id="faq" style="padding-top: 24px;">
+    <div class="wrap">
+      <div class="head">
+        <div class="kicker">FAQ</div>
+        <h2>Questions, answered.</h2>
+      </div>
+      <div class="faq">
+        <details><summary>Is ZED really free?</summary><p>Yes. There's no subscription, no in-app purchase and no account. The models and voices it downloads are free and come with their own open licenses.</p></details>
+        <details><summary>Does it work without internet?</summary><p>Yes. Once a model and a voice are downloaded, answers, actions, the wake word and speech run on your phone. Only weather, web research and smart home need a connection. Speech recognition depends on your phone; install your language's offline speech pack to use it offline.</p></details>
+        <details><summary>Will it run on my phone?</summary><p>You need Android 8.0 or newer on a 64-bit ARM phone. Gemma 4 E2B needs about 4 GB of RAM; Model Manager also offers smaller models for older phones and recommends one that fits yours.</p></details>
+        <details><summary>Is anything I say sent to a server?</summary><p>No. There is no ZED server. Your conversations, memories and documents are processed and stored on the phone. The few features that go online send only what they need, such as a search query or your city for the weather. See the <a href="privacy.html">Privacy Policy</a>.</p></details>
+        <details><summary>Why isn't it on the Play Store?</summary><p>ZED is distributed as a signed APK from GitHub. Every release is signed with the same key, so updates install over the old version and keep your data. ZED tells you when a new version is ready.</p></details>
+        <details><summary>Can it act without asking me first?</summary><p>Yes, by default it runs what you ask straight away. If you prefer, Settings → Ask before actions makes it confirm risky actions or every change.</p></details>
+        <details><summary>Where is the source code?</summary><p>On <a href="https://github.com/melhive/ZED">GitHub</a>. Every release is built and signed by GitHub Actions, and the build status and tests are public.</p></details>
+      </div>
     </div>
   </section>
 
@@ -482,6 +547,8 @@ footer a:hover { color: var(--text); }
       <a href="https://github.com/melhive/ZED">GitHub</a>
       <a href="https://github.com/melhive/ZED/releases">Releases</a>
       <a href="https://github.com/melhive/ZED/issues">Issues</a>
+      <a href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
     </nav>
   </div>
 </footer>
@@ -490,12 +557,27 @@ footer a:hover { color: var(--text); }
   // Always show the newest release's version (the download buttons already fetch the newest APK).
   fetch("https://api.github.com/repos/melhive/ZED/releases/latest").then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
     if (d && d.tag_name) document.querySelectorAll(".zed-version").forEach(function (el) { el.textContent = d.tag_name; });
+    if (d && d.published_at) document.getElementById("rel-date").textContent = "released " + new Date(d.published_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
   }).catch(function () {});
   document.getElementById("copy").addEventListener("click", function () {
     var b = this, t = document.getElementById("apk").textContent;
     (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { b.textContent = "Copied"; }, function () { b.textContent = "Select & copy"; });
     setTimeout(function () { b.textContent = "Copy link"; }, 1600);
   });
+  // Close the mobile menu after choosing a section.
+  document.querySelectorAll(".menu .sheet a").forEach(function (a) { a.addEventListener("click", function () { a.closest("details").open = false; }); });
+  // Highlight the section in view.
+  if ("IntersectionObserver" in window) {
+    var links = {};
+    document.querySelectorAll(".bar nav a").forEach(function (a) { links[a.getAttribute("href").slice(1)] = a; });
+    var spy = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        Object.keys(links).forEach(function (id) { links[id].classList.toggle("active", id === e.target.id); });
+      });
+    }, { rootMargin: "-45% 0px -50% 0px" });
+    Object.keys(links).forEach(function (id) { var el = document.getElementById(id); if (el) spy.observe(el); });
+  }
 </script>
 </body>
 </html>

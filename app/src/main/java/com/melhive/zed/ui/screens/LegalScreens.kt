@@ -17,7 +17,7 @@ private const val PROJECT_URL = "https://github.com/melhive/ZED"
 
 private val TERMS = LegalDoc(
     title = "Terms of Use",
-    updated = "November 11, 2026",
+    updated = "November 13, 2026",
     intro = "These terms apply to the ZED app, a MelHive Project. By installing or using ZED you agree to them. If you don't agree, please uninstall the app.",
     sections = listOf(
         "1. What ZED is" to listOf(
@@ -53,18 +53,17 @@ private val TERMS = LegalDoc(
 
 private val PRIVACY = LegalDoc(
     title = "Privacy Policy",
-    updated = "November 11, 2026",
+    updated = "November 13, 2026",
     intro = "ZED is built to keep your information on your phone. The MelHive Project does not run servers for ZED, does not create accounts, and does not collect analytics, advertising IDs or usage data. This policy explains what stays on your phone and what is sent elsewhere — only when you use features that need it.",
     sections = listOf(
         "Stored only on your phone" to listOf(
-            "Conversations, memories, your task list, reminders, routines, settings and the document index are stored in ZED's private storage on your phone. Android app backups are turned off for ZED.",
+            "Conversations, memories, your task list, reminders, routines, settings, the document index and the lessons you teach ZED (answering rules, pronunciations and shortcuts) are stored in ZED's private storage on your phone. Android app backups are turned off for ZED; ZED's own backup feature saves a file only where you choose.",
             "Your Home Assistant token is encrypted with the Android Keystore.",
             "Problem reports (crash details) are saved on the phone and are only shared if you tap Share report yourself.",
             "Uninstalling ZED deletes all of this. You can also clear memories and conversations in the app.",
         ),
         "When something leaves your phone" to listOf(
             "No online AI: your messages, memories, documents and photos are answered by the model on your phone and are never sent to an AI service. Web research sends only the search question to the search service.",
-            "Real-time voice (Gemini Live): when enabled, your microphone audio during ZED LIVE is streamed to Google.",
             "Speech recognition: standard voice input uses your phone's speech service (often Google's), which may process audio on the device or online depending on your phone.",
             "Weather: your city name or approximate location is sent to Open-Meteo to get the forecast.",
             "Smart home: commands and device lists travel between ZED and your own Home Assistant server.",
