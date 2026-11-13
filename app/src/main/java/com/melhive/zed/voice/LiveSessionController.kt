@@ -123,7 +123,12 @@ class LiveSessionController(
             _state.value = LiveUiState(orb = OrbState.ERROR, error = "Microphone permission is required for ZED LIVE.")
             return
         }
-        val s = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        // A failure inside the session must never close the app: record it and show it on the orb.
+        val guard = kotlinx.coroutines.CoroutineExceptionHandler { _, e ->
+            com.melhive.zed.android.CrashReporter.recordNonFatal("live session", e)
+            runCatching { setOrb(OrbState.ERROR, "Something went wrong — tap the orb to try again") }
+        }
+        val s = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + guard)
         scope = s
         WakeWordService.paused.value = true // LIVE takes the microphone
         exchanges = 0

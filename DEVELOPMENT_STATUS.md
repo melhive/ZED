@@ -60,6 +60,13 @@ Failed tests: none.
 | Keystore secret storage | | ✅ | ✅ | |
 | STT / TTS / sentence streaming / barge-in / audio focus | VAD only | ✅ | ✅ | |
 
+## Stability (v0.1.36)
+
+- `LocalModelRuntime.unload` cancels and then takes `generationLock` (closing the engine under a running generation was a native use-after-free); `onTrimMemory` frees nothing while the orchestrator is busy or LIVE is open.
+- `OnDeviceSpeechToText.Engine.lock`: one utterance at a time; unload only when free.
+- `CrashReporter`: survivable errors (background threads, coroutines, main-thread callbacks outside Compose; max 5 per 30 s) are recorded and the app keeps running; `ApplicationExitInfo` (native crash, ANR, low memory) collected at start with traces; reports mirrored to Download/ZED via MediaStore. LIVE scope has a `CoroutineExceptionHandler`; reminder/boot receivers catch errors; wake settings read off the main thread.
+- `MODIFY_AUDIO_SETTINGS` added (Bluetooth earphone mic).
+
 ## Announcements, earphones, keyboard (v0.1.35)
 
 - **Announcer** (`agents/Announcer.kt`): reminders (from `ReminderReceiver`), calendar events (one exact alarm for the next event, `eventAnnounceMinutes` before; re-planned at start, boot, every 3 h and after calendar tools via `ToolManager.afterSuccess`), and a briefing after an alarm: `NEXT_ALARM_CLOCK_CHANGED` fires when an alarm starts ringing, so a check 90 s later briefs unless the next alarm is within 20 min (snoozed). Opens the overlay with `EXTRA_ANNOUNCE` (needs display-over-apps; otherwise speaks in the background). `reminder.snooze` uses the last fired reminder.

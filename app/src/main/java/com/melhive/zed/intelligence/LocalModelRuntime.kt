@@ -149,12 +149,20 @@ class LocalModelRuntime(private val cacheDir: File) {
         session = null
     }
 
-    suspend fun unload() = lock.withLock {
-        withContext(Dispatchers.IO) {
-            activeConversation?.let { runCatching { it.cancelProcess() } }
-            closeSession()
-            engine?.close(); engine = null; loadedKey = null
-            _state.value = State.Unloaded
+    /**
+     * Frees the model. A generation in progress is cancelled first and allowed to finish before the
+     * engine is closed — closing it underneath a running generation crashed the app (native).
+     */
+    suspend fun unload() {
+        activeConversation?.let { runCatching { it.cancelProcess() } }
+        generationLock.withLock {
+            lock.withLock {
+                withContext(Dispatchers.IO) {
+                    closeSession()
+                    engine?.close(); engine = null; loadedKey = null
+                    _state.value = State.Unloaded
+                }
+            }
         }
     }
 

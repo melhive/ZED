@@ -31,6 +31,13 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.36", "2026-11-13", "Stability", listOf(
+            "Fixed a crash while talking to ZED: when the phone ran low on memory, ZED could free Gemma while it was still answering. It now waits for the answer to finish, and never frees models while you're talking to it or the floating orb is open.",
+            "On-device speech recognition can no longer be used by two listeners at once or freed while it's listening (another possible crash).",
+            "If something unexpected goes wrong in a button or a background task, ZED records it and keeps running instead of closing.",
+            "Crashes that used to leave no trace (inside the AI model, the voice or speech engines, freezes, low memory) are now recorded on the next start, with a copy in Download/ZED so they can be looked into.",
+            "Earphone-mic mode now works with Bluetooth earbuds (it was missing a permission).",
+        )),
         Release("0.1.35", "2026-11-13", "Announcements, earphones and a keyboard fix", listOf(
             "ZED comes to you: when a reminder is due, ZED appears on your screen (even the lock screen), says it and listens — say “snooze ten minutes”. Calendar events are announced 10 minutes before they start (change it in More → Voice → Announcements).",
             "After your alarm: when you turn off an alarm — any alarm, not only ones ZED set — ZED says good morning with the weather, your schedule and reminders. Snoozed alarms are skipped until you really get up.",

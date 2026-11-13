@@ -63,9 +63,12 @@ class OnDeviceSpeechToText(private val dir: File, private val context: android.c
 
     private fun emit(e: SttEvent) { main.post { _events.tryEmit(e) } }
 
+    /** One utterance at a time: the recognizer is never used by two threads, nor freed while in use. */
+    private fun listen() = Engine.lock.withLockInterruptibly { listenLocked() }
+
     @SuppressLint("MissingPermission")
-    private fun listen() {
-        val recognizer = try { Engine.get(dir) } catch (e: Throwable) {
+    private fun listenLocked() {
+        val recognizer = try { Engine.get(dir) } catch (e: InterruptedException) { return } catch (e: Throwable) {
             com.melhive.zed.android.CrashReporter.recordNonFatal("on-device asr load", e)
             emit(SttEvent.Error(-2, "On-device speech recognition couldn't start", false)); return
         }
@@ -127,9 +130,12 @@ class OnDeviceSpeechToText(private val dir: File, private val context: android.c
     /** One shared recognizer: loading takes about two seconds, so it stays in memory until [unload]. */
     object Engine {
         @Volatile private var loaded: Pair<String, OnlineRecognizer>? = null
+        /** Held for the whole of each utterance and while loading or freeing the model. */
+        val lock = java.util.concurrent.locks.ReentrantLock()
 
-        @Synchronized
-        fun get(dir: File): OnlineRecognizer {
+        fun get(dir: File): OnlineRecognizer = lock.withLockInterruptibly { getLocked(dir) }
+
+        private fun getLocked(dir: File): OnlineRecognizer {
             loaded?.let { (path, r) -> if (path == dir.path) return r; r.release() }
             val r = OnlineRecognizer(null, OnlineRecognizerConfig(
                 featConfig = FeatureConfig(sampleRate = RATE, featureDim = 80),
@@ -148,8 +154,11 @@ class OnDeviceSpeechToText(private val dir: File, private val context: android.c
         /** Loads ahead of time (LIVE opening) so the first sentence isn't delayed. */
         fun warm(dir: File) { runCatching { get(dir) } }
 
-        @Synchronized
-        fun unload() { loaded?.second?.release(); loaded = null }
+        /** Frees the model unless it is in use right now. */
+        fun unload() {
+            if (!lock.tryLock()) return
+            try { loaded?.second?.release(); loaded = null } finally { lock.unlock() }
+        }
     }
 
     private companion object {
@@ -159,4 +168,9 @@ class OnDeviceSpeechToText(private val dir: File, private val context: android.c
         const val NO_SPEECH_MS = 7000L
         const val MAX_MS = 20_000L
     }
+}
+
+private inline fun <T> java.util.concurrent.locks.ReentrantLock.withLockInterruptibly(block: () -> T): T {
+    lockInterruptibly()
+    try { return block() } finally { unlock() }
 }

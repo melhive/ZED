@@ -20,6 +20,8 @@ class ZedApp : Application() {
         CrashReporter.install(this)
         container = AppContainer(this)
         com.melhive.zed.diagnostics.SpeedLog.init(this)
+        // Why did ZED last stop? (native crashes and freezes don't reach the crash handler)
+        if (!currentProcessName().endsWith(":voice")) Thread { CrashReporter.collectExitReasons(this) }.start()
         isVoiceProcess = currentProcessName().endsWith(":voice")
         if (isVoiceProcess) return
         // A verified restore waiting from Backup & restore is swapped in now, before the database or settings are opened.
@@ -84,6 +86,9 @@ class ZedApp : Application() {
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         if (isVoiceProcess) return
+        // Never free models while ZED is answering or a voice session is open (that's when memory peaks).
+        val busy = runCatching { container.orchestrator.activity.value.busy || container.live.state.value.active }.getOrDefault(true)
+        if (busy) return
         if (level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND || level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) {
             container.appScope.launch { runCatching { container.localRuntime.unload() } }
             // Neural voices hold 100–300 MB; release them only while ZED is in the background.

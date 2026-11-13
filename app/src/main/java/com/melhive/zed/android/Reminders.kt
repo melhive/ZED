@@ -89,8 +89,10 @@ class ReminderReceiver : BroadcastReceiver() {
                     // So "snooze ten minutes" knows which reminder.
                     context.getSharedPreferences("zed_reminders", Context.MODE_PRIVATE).edit().putLong("last_fired", id).apply()
                     // ZED comes onto the screen and says it.
-                    com.melhive.zed.agents.Announcer.onReminder(context, r.text)
+                    runCatching { com.melhive.zed.agents.Announcer.onReminder(context, r.text) }
                 }
+            } catch (e: Exception) {
+                CrashReporter.recordNonFatal("reminder", e)
             } finally {
                 pending.finish()
             }
@@ -107,7 +109,7 @@ class BootReceiver : BroadcastReceiver() {
         val container = (context.applicationContext as ZedApp).container
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
-                container.reminderScheduler.rescheduleAll()
+                runCatching { container.reminderScheduler.rescheduleAll() }.onFailure { CrashReporter.recordNonFatal("boot reschedule", it) }
                 runCatching { com.melhive.zed.agents.Announcer.planEvents(context) }
                 runCatching { com.melhive.zed.agents.Announcer.rememberNextAlarm(context) }
             } finally { pending.finish() }

@@ -91,8 +91,11 @@ class WakeWordService : Service() {
         val dir = File(File(filesDir, "voices"), VoiceCatalog.WAKE_WORD.id)
         if (!File(dir, ".installed").exists() || ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) { stopSelf(); return }
         running = true
-        val sensitivity = runCatching { kotlinx.coroutines.runBlocking { (application as ZedApp).container.settings.current().wakeSensitivity } }.getOrDefault(1)
-        thread = Thread({ listenLoop(dir, sensitivity) }, "zed-wake").also { it.start() }
+        // Settings are read on the listening thread, never blocking the main thread.
+        thread = Thread({
+            val sensitivity = runCatching { kotlinx.coroutines.runBlocking { (application as ZedApp).container.settings.current().wakeSensitivity } }.getOrDefault(1)
+            runCatching { listenLoop(dir, sensitivity) }.onFailure { com.melhive.zed.android.CrashReporter.recordNonFatal("wake loop", it) }
+        }, "zed-wake").also { it.start() }
     }
 
     @SuppressLint("MissingPermission")

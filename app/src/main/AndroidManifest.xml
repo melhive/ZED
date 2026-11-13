@@ -7,6 +7,8 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- ZED LIVE and voice input. Requested only when the user starts voice. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Earphone-mic mode: switch Bluetooth earbuds to their microphone during LIVE -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <!-- Task, reminder and assistant notifications (Android 13+ runtime permission). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Normal permission required by the AlarmClock intents. -->
