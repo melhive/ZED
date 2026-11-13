@@ -77,6 +77,8 @@ class AppContainer(val context: Context) {
         return com.melhive.zed.android.HomeAssistant(url, token)
     }
 
+    /** How many voice screens (LIVE, Eye mode) are showing: the session ends when the last one closes, not when switching between them. */
+    val voiceScreens = java.util.concurrent.atomic.AtomicInteger(0)
     /** A request LIVE should send as soon as it opens (from a notification or shortcut). */
     val livePrompt = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
 

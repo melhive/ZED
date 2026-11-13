@@ -48,7 +48,11 @@ object PermissionCatalog {
         Manifest.permission.ACCESS_COARSE_LOCATION, "Approximate location",
         "Optional. Used only for the weather in your briefing (city-level). You can type a city in Settings instead.",
     )
-    val ALL = listOf(MICROPHONE, NOTIFICATIONS, CONTACTS, CALL_PHONE, CALENDAR, CALENDAR_WRITE, SMS, LOCATION)
+    val CAMERA = PermissionInfo(
+        Manifest.permission.CAMERA, "Camera",
+        "Used only while Eye mode is open: ZED's eyes follow you and look at what you show them. Nothing is saved.",
+    )
+    val ALL = listOf(MICROPHONE, CAMERA, NOTIFICATIONS, CONTACTS, CALL_PHONE, CALENDAR, CALENDAR_WRITE, SMS, LOCATION)
 
     /** Everything not yet granted, for the one-tap "Allow everything" request. */
     fun missing(context: Context): Array<String> = ALL.filter { applicable(it) && !isGranted(context, it) }.map { it.permission }.toTypedArray()

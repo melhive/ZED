@@ -7,6 +7,8 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- ZED LIVE and voice input. Requested only when the user starts voice. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Eye mode: the eyes follow the user and look at what is shown. Used only while Eye mode is on screen. -->
+    <uses-permission android:name="android.permission.CAMERA" />
     <!-- Earphone-mic mode: switch Bluetooth earbuds to their microphone during LIVE -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <!-- Task, reminder and assistant notifications (Android 13+ runtime permission). -->
@@ -34,6 +36,7 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.front" android:required="false" />
 
     <queries>
         <intent><action android:name="android.speech.RecognitionService" /></intent>

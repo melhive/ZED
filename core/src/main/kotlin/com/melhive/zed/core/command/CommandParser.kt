@@ -93,6 +93,8 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         "lessons", "what you learned", "what you've learned", "taught", "teachings" -> "taught"
         "home", "home screen", "dashboard" -> "home"
         "chat" -> "chat"
+        "eyes", "eye", "eye mode", "eyes mode" -> "eye"
+        "live", "zed live" -> "live"
         "background tasks", "tasks screen" -> "tasks"
         else -> null
     }
@@ -103,6 +105,7 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         "web research", "web search", "internet research", "online research" -> "web_research"
         "learning", "auto learning", "automatic learning", "auto-learning" -> "auto_learning"
         "hints", "proactive hints", "suggestions", "leave now hints", "leave-now hints" -> "proactive_hints"
+        "captions", "eye captions", "eye mode captions", "subtitles" -> "eye_captions"
         "brain sounds", "brain sound" -> "brain_sounds"
         "think twice", "thinking twice", "double checking" -> "think_twice"
         "barge in", "barge-in", "interruptions", "interrupting" -> "barge_in"
@@ -282,6 +285,11 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
             tool("memory.remember", "fact" to m.groupValues[1])
         },
         Rule(rx("forget (?:that |about )?(.+)")) { m -> tool("memory.forget", "query" to m.groupValues[1]) },
+
+        // Eye mode: ZED's eyes on the whole screen; "chat mode" and "live mode" lead back.
+        Rule(rx("(?:(?:open|start|show|enter|launch|activate|go (?:in)?to|switch to|turn on|enable)(?: me)? )?(?:the |your )?eyes? mode|(?:show me|open) your eyes|(?:let me |i want to )?see your eyes")) { tool("app.show", "screen" to "eye") },
+        Rule(rx("(?:exit|close|leave|stop|end|quit|turn off|disable) (?:the |your )?eyes? mode|close your eyes|(?:(?:go|switch|back|return)(?: back)? to )?(?:the )?chat mode|(?:go|switch|return) back to (?:the )?chat")) { tool("app.show", "screen" to "chat") },
+        Rule(rx("(?:(?:go|switch|back|return)(?: back)? to |open |start )?(?:the |zed )?live mode|(?:go|switch|return)(?: back)? to (?:zed )?live")) { tool("app.show", "screen" to "live") },
 
         // The Live Brain, by voice: "show me everything about Ana".
         Rule(rx("(?:show|open|display)(?: me)? (?:everything|all|what you know|what do you know|all you know) (?:about|on) (.+?)(?: in (?:my|the|your) brain)?|show (.+?) in (?:my|the|your) (?:live )?brain|(?:open|show)(?: me)? (?:my |the |your )?(?:live )?brain")) { m ->

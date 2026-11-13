@@ -90,6 +90,8 @@ data class AppSettings(
     val autoBackupStatus: String = "",
     /** Synapse ticks and vibration when touching the Live Brain. */
     val brainSounds: Boolean = true,
+    /** Eye mode shows what is being said as a line of text under the eyes. */
+    val eyeCaptions: Boolean = false,
     /** Learn lasting facts from ordinary conversation (shown for review; always editable). */
     val autoLearning: Boolean = true,
     /** Search the web (no key needed) when a question needs fresh facts. Only the search question leaves the phone. */
@@ -149,6 +151,7 @@ class SettingsRepository(private val context: Context) {
         val autoBackupFolder = stringPreferencesKey("auto_backup_folder")
         val autoBackupStatus = stringPreferencesKey("auto_backup_status")
         val brainSounds = booleanPreferencesKey("brain_sounds")
+        val eyeCaptions = booleanPreferencesKey("eye_captions")
         val autoLearning = booleanPreferencesKey("auto_learning")
         val webResearch = booleanPreferencesKey("web_research")
         val thinkTwice = booleanPreferencesKey("think_twice")
@@ -202,6 +205,7 @@ class SettingsRepository(private val context: Context) {
             autoBackupFolder = p[K.autoBackupFolder] ?: "",
             autoBackupStatus = p[K.autoBackupStatus] ?: "",
             brainSounds = p[K.brainSounds] ?: true,
+            eyeCaptions = p[K.eyeCaptions] ?: false,
             autoLearning = p[K.autoLearning] ?: true,
             webResearch = p[K.webResearch] ?: true,
             thinkTwice = p[K.thinkTwice] ?: true,
@@ -248,6 +252,7 @@ class SettingsRepository(private val context: Context) {
     suspend fun setCheckUpdates(v: Boolean) = context.dataStore.edit { it[K.checkUpdates] = v }
     suspend fun setAutoBackupFolder(uri: String) = context.dataStore.edit { it[K.autoBackupFolder] = uri; it.remove(K.autoBackupStatus) }
     suspend fun setAutoBackupStatus(v: String) = context.dataStore.edit { it[K.autoBackupStatus] = v }
+    suspend fun setEyeCaptions(v: Boolean) = context.dataStore.edit { it[K.eyeCaptions] = v }
     suspend fun setBrainSounds(v: Boolean) = context.dataStore.edit { it[K.brainSounds] = v }
     suspend fun setAutoLearning(v: Boolean) = context.dataStore.edit { it[K.autoLearning] = v }
     suspend fun setWebResearch(v: Boolean) = context.dataStore.edit { it[K.webResearch] = v }

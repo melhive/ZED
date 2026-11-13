@@ -201,8 +201,9 @@ fun registerAppControl(tm: ToolManager, c: AppContainer, context: Context) {
         val screen = a.string("screen")
         val (route, label) = when (screen) {
             "home" -> Routes.HOME to "Home"
-            "chat" -> Routes.CHAT to "Chat"
+            "chat" -> (c.live.conversation?.let { Routes.chat(it) } ?: Routes.CHAT) to "Chat"
             "live" -> Routes.LIVE to "LIVE"
+            "eye" -> Routes.EYE to "Eye mode"
             "tasks" -> Routes.TASKS to "background tasks"
             "more" -> Routes.MORE to "More"
             "facts" -> Routes.memoryTab(0) to "your facts"
@@ -258,6 +259,7 @@ fun registerAppControl(tm: ToolManager, c: AppContainer, context: Context) {
                 if (style != com.melhive.zed.core.voice.SoundSynth.Style.OFF) com.melhive.zed.voice.ZedSounds.play(context, style, start = true)
                 ok(if (style == com.melhive.zed.core.voice.SoundSynth.Style.OFF) "LIVE sounds off." else "LIVE sound set to ${style.label}.")
             }
+            "eye_captions" -> toggle("Eye mode captions", { c.settings.setEyeCaptions(it) })
             "hide_beep" -> toggle("Hiding the recognizer beep", { c.settings.setHideRecognizerBeep(it) })
             "speech_recognition" -> {
                 val phone = value.contains("phone") || value.contains("google") || value.contains("android") || value == "off"

@@ -28,6 +28,7 @@ import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.MicOff
 import androidx.compose.material.icons.outlined.StopCircle
 import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.automirrored.outlined.VolumeOff
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
@@ -71,7 +72,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit) {
+fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit, onOpenEye: () -> Unit = {}) {
     val c = rememberContainer()
     val context = LocalContext.current
     val live = c.live
@@ -120,7 +121,8 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit) {
         }
     }
     // Leaving the screen ends the voice session (the mic is never used in the background). Tasks continue.
-    DisposableEffect(Unit) { onDispose { live.end() } }
+    // Switching to Eye mode keeps the same session going.
+    DisposableEffect(Unit) { c.voiceScreens.incrementAndGet(); onDispose { if (c.voiceScreens.decrementAndGet() <= 0) live.end() } }
 
     val listState = rememberLazyListState()
     LaunchedEffect(state.transcript.size) { if (state.transcript.isNotEmpty()) listState.animateScrollToItem(state.transcript.size - 1) }
@@ -133,6 +135,7 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("ZED LIVE", style = MaterialTheme.typography.titleMedium, color = ZedColors.Muted, modifier = Modifier.weight(1f))
+                IconButton(onClick = onOpenEye) { Icon(Icons.Outlined.Visibility, "Eye mode", tint = ZedColors.Cyan) }
                 TaskIndicator(activeTasks, onOpenTasks)
                 // ZED's memory at work: a memory flashes when it is used to answer.
                 MiniBrain(Modifier.padding(start = 8.dp).size(52.dp), glow = settings?.glow ?: true)

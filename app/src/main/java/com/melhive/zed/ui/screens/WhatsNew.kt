@@ -31,6 +31,14 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.39", "2026-11-13", "Eye mode", listOf(
+            "Eye mode: ZED's two eyes fill the screen in landscape — robotic owl eyes with a feathered brow and a reactor iris, on pure black. Open it with the eye button in LIVE or Chat, or say “eye mode”. Say “chat mode” or “exit eye mode” to leave, or tap the screen for the controls.",
+            "The eyes are alive: they jump between things like real eyes, blink (sometimes twice, sometimes with the sideways inner lid), look away while thinking, pulse with ZED's voice and get drowsy when nothing happens.",
+            "They show feeling: happy, curious, concerned, surprised, amused or focused, read from what ZED is saying, sentence by sentence.",
+            "They see you: with the camera allowed, the eyes follow your face, search for you when you leave and wander when they can't see you. Hold something up and they look at it.",
+            "Ask “what is this?” (or “can you see me?”, “read this”, “what colour is this?”) and ZED answers from what the camera sees at that moment. The camera runs only while Eye mode is open and nothing is saved.",
+            "Captions: an optional line under the eyes with what is heard and said — switch it in the controls or say “turn on captions”. Everything said in Eye mode is in Chat afterwards, like LIVE.",
+        )),
         Release("0.1.38", "2026-11-13", "Web search that just works, and a crash fix", listOf(
             "ZED searches the web by itself when a question needs it — “tell me about the Philippine Eagle”, “who won the NBA finals”, “latest news in Cebu”, “search the internet for cheap flights” — and answers from what it found, with sources. Offline, it tells you it couldn't check online and answers from what it knows (or says it doesn't know).",
             "Asking “can you search the internet?” now gets the right answer: yes.",

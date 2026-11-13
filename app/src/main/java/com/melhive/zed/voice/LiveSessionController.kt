@@ -53,6 +53,10 @@ data class LiveUiState(
     val followUp: Boolean = false,
     /** The conversation went quiet: the floating orb closes itself. */
     val finished: Boolean = false,
+    /** The sentence ZED is saying right now (Eye mode reads its feeling and shows it as a caption). */
+    val spoken: String = "",
+    /** ZED is looking through the camera to answer ("what is this?" in Eye mode). */
+    val looking: Boolean = false,
 )
 
 /**
@@ -98,6 +102,11 @@ class LiveSessionController(
     private var monitor: BargeInMonitor? = null
     private var focus: AudioFocus? = null
     private var conversationId: Long? = null
+    /** The conversation this session writes to, so "chat mode" can open it. */
+    val conversation: Long? get() = conversationId
+    /** Eye mode's camera: when set, questions like "what is this?" are answered from what it sees. */
+    @Volatile var frameSource: (suspend () -> com.melhive.zed.intelligence.ImageInput?)? = null
+    private val utteranceText = HashMap<String, String>()
     private var requestJob: Job? = null
 
     // Sentence streaming bookkeeping.
@@ -188,6 +197,7 @@ class LiveSessionController(
         scope?.cancel()
         stt = null; tts = null; monitor = null; focus = null; scope = null
         pendingUtterances.clear()
+        utteranceText.clear()
         _state.value = LiveUiState()
     }
 
@@ -251,6 +261,7 @@ class LiveSessionController(
         orchestrator.cancelCurrent()
         tts?.stop(); pendingUtterances.clear(); replyFinished = true
         monitor?.stop()
+        _state.update { it.copy(looking = false) }
         setOrb(OrbState.IDLE, "Request cancelled")
     }
 
@@ -268,7 +279,7 @@ class LiveSessionController(
 
     private fun listen() {
         if (!_state.value.active || _state.value.micMuted) return
-        _state.update { it.copy(partial = "", micLevel = 0f, followUp = exchanges > 0, finished = false) }
+        _state.update { it.copy(partial = "", micLevel = 0f, followUp = exchanges > 0, finished = false, looking = false, spoken = "") }
         setOrb(OrbState.LISTENING)
         listenJob?.cancel()
         listenJob = scope?.launch {
@@ -343,8 +354,12 @@ class LiveSessionController(
         // Instant acknowledgement: a low thunk the moment ZED has the request, before any answer exists.
         if (soundStyle != com.melhive.zed.core.voice.SoundSynth.Style.OFF) ZedSounds.ack(context)
         streamText = ""; spokenChars = 0; replyFinished = false
+        // Eye mode: "what is this?" is answered from what the camera sees right now.
+        val camera = frameSource?.takeIf { image == null && com.melhive.zed.core.eyes.VisualAsk.matches(text) }
+        if (camera != null) _state.update { it.copy(looking = true) }
         requestJob = scope?.launch {
-            val reply = try { orchestrator.respond(conv, text.removePrefix("📷 "), voice = true, image = image) } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            val seen = image ?: camera?.let { runCatching { it() }.getOrNull() }
+            val reply = try { orchestrator.respond(conv, text.removePrefix("📷 "), voice = true, image = seen) } catch (e: kotlinx.coroutines.CancellationException) { throw e }
             onReply(reply)
         }
     }
@@ -378,7 +393,8 @@ class LiveSessionController(
     private fun speakChunk(text: String) {
         val id = tts?.speak(text, flush = false) ?: return
         pendingUtterances += id
-        if (pendingUtterances.size == 1) queuedAt[id] = System.currentTimeMillis()
+        utteranceText[id] = text
+        if (pendingUtterances.size == 1) { queuedAt[id] = System.currentTimeMillis(); _state.update { it.copy(spoken = text) } }
         if (_state.value.orb != OrbState.SPEAKING) {
             focus?.acquire()
             setOrb(OrbState.SPEAKING)
@@ -413,6 +429,7 @@ class LiveSessionController(
             is TtsEvent.Done, is TtsEvent.Stopped, is TtsEvent.Error -> {
                 val id = when (e) { is TtsEvent.Done -> e.utteranceId; is TtsEvent.Stopped -> e.utteranceId; is TtsEvent.Error -> e.utteranceId; else -> null }
                 pendingUtterances.remove(id)
+                utteranceText.remove(id)
                 if (pendingUtterances.isEmpty()) focus?.release()
                 if (pendingUtterances.isEmpty() && replyFinished && _state.value.orb == OrbState.SPEAKING) {
                     monitor?.stop()
@@ -420,7 +437,10 @@ class LiveSessionController(
                     scope?.launch { delay(400); if (pendingUtterances.isEmpty() && replyFinished) listen() }
                 }
             }
-            is TtsEvent.Started -> queuedAt.remove(e.utteranceId)?.let { com.melhive.zed.diagnostics.SpeedLog.record(com.melhive.zed.diagnostics.SpeedLog.Stage.VOICE, System.currentTimeMillis() - it) }
+            is TtsEvent.Started -> {
+                utteranceText[e.utteranceId]?.let { said -> _state.update { it.copy(spoken = said) } }
+                queuedAt.remove(e.utteranceId)?.let { com.melhive.zed.diagnostics.SpeedLog.record(com.melhive.zed.diagnostics.SpeedLog.Stage.VOICE, System.currentTimeMillis() - it) }
+            }
         }
     }
 

@@ -30,6 +30,7 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.GraphicEq
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Stop
@@ -74,7 +75,7 @@ import com.melhive.zed.ui.theme.ZedColors
 
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-fun ChatScreen(initialConversationId: Long?, onOpenLive: () -> Unit, onOpenModels: () -> Unit) {
+fun ChatScreen(initialConversationId: Long?, onOpenLive: () -> Unit, onOpenModels: () -> Unit, onOpenEye: () -> Unit = {}) {
     val vm: ChatViewModel = viewModel()
     LaunchedEffect(initialConversationId) { vm.open(initialConversationId) }
     val context = LocalContext.current
@@ -127,6 +128,7 @@ fun ChatScreen(initialConversationId: Long?, onOpenLive: () -> Unit, onOpenModel
             IconButton(onClick = { showHistory = true }) { Icon(Icons.Outlined.History, "Conversations") }
             IconButton(onClick = vm::newConversation) { Icon(Icons.Outlined.Add, "New conversation") }
             IconButton(onClick = onOpenLive) { Icon(Icons.Outlined.GraphicEq, "ZED LIVE") }
+            IconButton(onClick = onOpenEye) { Icon(Icons.Outlined.Visibility, "Eye mode") }
         }
 
         Box(Modifier.weight(1f).fillMaxWidth()) {

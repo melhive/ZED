@@ -65,6 +65,7 @@ object Routes {
     const val HOME = "home"
     const val CHAT = "chat"
     const val LIVE = "live"
+    const val EYE = "eye"
     const val TASKS = "tasks"
     const val TASK = "task/{id}"
     const val MORE = "more"
@@ -119,13 +120,17 @@ fun ZedRoot(requestedRoute: String?, onRouteConsumed: () -> Unit) {
     val imeVisible = WindowInsets.isImeVisible
 
     LaunchedEffect(requestedRoute) {
-        if (requestedRoute != null) { nav.navigateTab(requestedRoute); onRouteConsumed() }
+        if (requestedRoute != null) {
+            // A particular conversation ("chat mode" from Eye mode) is opened as itself, not as the last chat tab.
+            if (requestedRoute.startsWith(Routes.CHAT + "?")) nav.navigate(requestedRoute) { launchSingleTop = true } else nav.navigateTab(requestedRoute)
+            onRouteConsumed()
+        }
     }
 
     Scaffold(
         containerColor = ZedColors.Background,
         bottomBar = {
-            if (route != Routes.LIVE && !imeVisible) {
+            if (route != Routes.LIVE && route != Routes.EYE && !imeVisible) {
                 val tabView = androidx.compose.ui.platform.LocalView.current
                 NavigationBar(
                     containerColor = ZedColors.Surface.copy(alpha = 0.97f),
@@ -147,7 +152,7 @@ fun ZedRoot(requestedRoute: String?, onRouteConsumed: () -> Unit) {
             }
         },
     ) { padding ->
-        val contentPadding = if (route == Routes.LIVE) androidx.compose.foundation.layout.PaddingValues() else padding
+        val contentPadding = if (route == Routes.LIVE || route == Routes.EYE) androidx.compose.foundation.layout.PaddingValues() else padding
         // consumeWindowInsets prevents screens' imePadding() from adding the navigation-bar space twice.
         Box(Modifier.fillMaxSize().padding(contentPadding).consumeWindowInsets(contentPadding)) {
             NavHost(
@@ -163,9 +168,17 @@ fun ZedRoot(requestedRoute: String?, onRouteConsumed: () -> Unit) {
                     arguments = listOf(navArgument("id") { type = NavType.LongType; defaultValue = -1L }),
                 ) { entry ->
                     val id = entry.arguments?.getLong("id")?.takeIf { it > 0 }
-                    ChatScreen(initialConversationId = id, onOpenLive = { nav.navigateTab(Routes.LIVE) }, onOpenModels = { nav.navigate(Routes.MODELS) })
+                    ChatScreen(initialConversationId = id, onOpenLive = { nav.navigateTab(Routes.LIVE) }, onOpenModels = { nav.navigate(Routes.MODELS) }, onOpenEye = { nav.navigate(Routes.EYE) { launchSingleTop = true } })
                 }
-                screen(Routes.LIVE) { LiveScreen(onClose = { if (!nav.popBackStack()) nav.navigateTab(Routes.HOME) }, onOpenTasks = { nav.navigateTab(Routes.TASKS) }) }
+                screen(Routes.LIVE) { LiveScreen(onClose = { if (!nav.popBackStack()) nav.navigateTab(Routes.HOME) }, onOpenTasks = { nav.navigateTab(Routes.TASKS) }, onOpenEye = { nav.navigate(Routes.EYE) { launchSingleTop = true } }) }
+                // Eye mode: ZED's eyes on the whole screen, in landscape.
+                screen(Routes.EYE) {
+                    com.melhive.zed.ui.screens.EyeScreen(
+                        onClose = { if (!nav.popBackStack()) nav.navigateTab(Routes.HOME) },
+                        onOpenChat = { id -> nav.navigate(Routes.chat(id)) { popUpTo(Routes.EYE) { inclusive = true }; launchSingleTop = true } },
+                        onOpenLive = { nav.navigateTab(Routes.LIVE) },
+                    )
+                }
                 screen(Routes.TASKS) { TasksScreen(onOpen = { nav.navigate(Routes.task(it)) }) }
                 screen(Routes.TASK, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
                     TaskDetailScreen(taskId = entry.arguments?.getLong("id") ?: 0L, onBack = { nav.popBackStack() })
@@ -243,7 +256,7 @@ private object NavMotion {
     private fun specOffset() = androidx.compose.animation.core.tween<androidx.compose.ui.unit.IntOffset>(durationMillis = 420, easing = emphasized)
     private val tabOrder = listOf(Routes.HOME, Routes.CHAT, Routes.LIVE, Routes.TASKS, Routes.MORE)
     private fun tab(route: String?) = tabOrder.indexOf(route?.substringBefore('?'))
-    private fun isLive(route: String?) = route == Routes.LIVE
+    private fun isLive(route: String?) = route == Routes.LIVE || route == Routes.EYE
 
     fun enter(from: String?, to: String?): androidx.compose.animation.EnterTransition = when {
         isLive(to) -> androidx.compose.animation.slideInVertically(specOffset()) { it }
