@@ -86,6 +86,7 @@ class AppContainer(private val context: Context) {
     val orchestrator by lazy {
         AssistantOrchestrator(appScope, conversations, memory, knowledge, providers, toolManager, skills, settings).also { o ->
             o.routineMatcher = { text -> routines.matchPhrase(text)?.name }
+            o.aliases = { teaching.aliases }
             o.awareness = { com.melhive.zed.agents.AwarenessCollector(context, this).collect() }
         }
     }
@@ -122,7 +123,9 @@ class AppContainer(private val context: Context) {
     val voicePacks by lazy { com.melhive.zed.voice.VoicePackRepository(context) }
 
     /** The voice ZED speaks with everywhere (system or neural, per Settings → Voice). */
-    val voice by lazy { com.melhive.zed.voice.VoiceManager(context, settings, voicePacks, appScope) }
+    /** Pronunciations and shortcuts the user taught (loaded before the voice so taught words are said right). */
+    val teaching by lazy { com.melhive.zed.learning.TeachingStore(context) }
+    val voice by lazy { teaching; com.melhive.zed.voice.VoiceManager(context, settings, voicePacks, appScope) }
 
     /** Backup to a file and restore from one (More → Backup & restore). */
     val backup by lazy {

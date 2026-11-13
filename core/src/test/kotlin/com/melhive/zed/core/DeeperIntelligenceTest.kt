@@ -10,6 +10,7 @@ import com.melhive.zed.core.learning.DreamLogic
 import com.melhive.zed.core.learning.Hints
 import com.melhive.zed.core.learning.Insight
 import com.melhive.zed.core.learning.Insights
+import com.melhive.zed.core.learning.Topics
 import com.melhive.zed.core.learning.Relation
 import com.melhive.zed.core.learning.RelationPatterns
 import java.time.LocalDateTime
@@ -84,6 +85,35 @@ class DeeperIntelligenceTest {
         assertTrue(Insights.topics(msgs, at(10, 12), covered = emptyList(), seen = setOf("topic:dentist"), zone = zone).isEmpty(), "offered once only")
         val sameDay = listOf("dentist" to at(9, 8), "dentist again" to at(9, 9), "dentist!" to at(9, 10))
         assertTrue(Insights.topics(sameDay, at(10, 12), emptyList(), emptySet(), zone).isEmpty(), "needs more than one day")
+    }
+
+    @Test fun aRepeatedWordIsNotATopic() {
+        // "coffee" said every day, with nothing that makes it matter.
+        val chatter = listOf("I love the coffee here" to at(2, 9), "the coffee was great" to at(4, 9), "had the coffee again" to at(6, 9), "my coffee is cold lol" to at(8, 9))
+        assertTrue(Insights.topics(chatter, at(10, 12), emptyList(), emptySet(), zone).isEmpty(), "just a repeated word")
+        // Requests to ZED are not topics of the user's life.
+        val commands = listOf("turn on the lights" to at(2, 20), "turn off the lights tomorrow" to at(4, 20), "set the lights to 50" to at(6, 20))
+        assertTrue(Insights.topics(commands, at(10, 12), emptyList(), emptySet(), zone).isEmpty(), "commands")
+    }
+
+    @Test fun anOngoingMatterIsATopic() {
+        val msgs = listOf(
+            "I have to finish my thesis defense slides" to at(2, 21),
+            "my thesis defense is on Friday, I'm so nervous" to at(5, 22),
+            "can you explain p-values? it's for my thesis" to at(7, 20),
+            "I love the coffee here" to at(7, 9), "the coffee was great" to at(8, 9), "had the coffee again" to at(9, 9),
+        )
+        val i = Insights.topics(msgs, at(10, 12), emptyList(), emptySet(), zone).single()
+        assertEquals("topic:thesis", i.key)
+        assertEquals("my thesis defense", i.payload)
+        assertTrue(i.text.startsWith("We've talked about your thesis defense on 3 different days") && i.text.contains("date"), i.text)
+        assertEquals(listOf("my sister's wedding"), Topics.phrases("my sister's wedding is next month").map { it.text })
+    }
+
+    @Test fun modelTopicsMustBeGrounded() {
+        val msgs = listOf("the visa forms are confusing" to at(2, 9), "I still haven't sent the visa photos" to at(6, 9), "nice weather" to at(7, 9))
+        val out = "Visa application | You're still preparing the forms and photos\nMoon landing | You love space\nNONE"
+        assertEquals(listOf("Visa application" to "You're still preparing the forms and photos"), Topics.parse(out, msgs, zone))
     }
 
     @Test fun habitsBecomeRoutineSuggestions() {

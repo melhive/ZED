@@ -49,7 +49,7 @@ class Dreamer(private val context: Context, private val c: AppContainer) {
         prefs.edit().putLong(KEY_LAST_DREAM, now).apply()
         mergeDuplicates()
         relationships(allowModel)
-        notice()
+        notice(allowModel)
     }
 
     private suspend fun mergeDuplicates() {
@@ -89,7 +89,7 @@ class Dreamer(private val context: Context, private val c: AppContainer) {
         prefs.edit().putLong(KEY_REL_CURSOR, newest).apply()
     }
 
-    private suspend fun notice() {
+    private suspend fun notice(allowModel: Boolean) {
         val now = System.currentTimeMillis()
         val seen = prefs.getStringSet(KEY_SEEN, emptySet()).orEmpty()
         val pending = _insights.value
@@ -97,7 +97,7 @@ class Dreamer(private val context: Context, private val c: AppContainer) {
         val messages = c.db.messages().userMessagesSince(now - 14 * 86_400_000L).map { it.content.substringBefore("\n\n[Attached file:") to it.createdAt }
         val covered = c.db.reminders().scheduled().map { it.text } + c.todos.list(false).map { it.title }
         val actions = c.db.audit().between(now - 21 * 86_400_000L, now).filter { it.outcome == "executed" }.map { Insights.Done(it.tool, it.argsSummary, it.timestamp) }
-        val found = (Insights.topics(messages, now, covered, seen) + Insights.habits(actions, now, seen))
+        val found = (modelTopics(allowModel, messages, covered, seen) + Insights.topics(messages, now, covered, seen) + Insights.habits(actions, now, seen))
             .filter { f -> pending.none { it.key == f.key } }.take(1)
         if (found.isEmpty()) return
         val next = pending + found
@@ -109,6 +109,32 @@ class Dreamer(private val context: Context, private val c: AppContainer) {
             Notifications.post(context, Notifications.CHANNEL_ASSISTANT, 7500, "ZED noticed something", found.first().text, Routes.HOME)
             recordHint(now)
         }
+    }
+
+    /**
+     * While charging (or when Gemma is already loaded), Gemma reads the last two weeks of what the
+     * user said and names what genuinely matters — plans, deadlines, worries — rather than words
+     * that recur. Only topics grounded in messages on two or more days are kept.
+     */
+    private suspend fun modelTopics(allowModel: Boolean, messages: List<Pair<String, Long>>, covered: List<String>, seen: Set<String>): List<Insight> {
+        if (!allowModel || messages.size < 4) return emptyList()
+        val provider = c.providers.active() as? LocalLiteRtProvider ?: return emptyList()
+        val day = java.time.format.DateTimeFormatter.ofPattern("EEE d MMM", java.util.Locale.ENGLISH)
+        val lines = messages.filterNot { com.melhive.zed.core.learning.Topics.isCommand(it.first) }
+            .map { java.time.Instant.ofEpochMilli(it.second).atZone(java.time.ZoneId.systemDefault()).format(day) to it.first }
+        if (lines.size < 4) return emptyList()
+        val out = StringBuilder()
+        runCatching {
+            provider.generate(GenerationRequest(system = com.melhive.zed.core.learning.Topics.PROMPT_SYSTEM,
+                turns = listOf(ChatTurn(Role.USER, com.melhive.zed.core.learning.Topics.prompt(lines))), maxOutputTokens = 120, sessionKey = "dreaming"))
+                .collect { e -> if (e is GenerationEvent.Delta) out.append(e.text) }
+        }
+        val coveredText = covered.joinToString(" ").lowercase()
+        return com.melhive.zed.core.learning.Topics.parse(out.toString(), messages).mapNotNull { (topic, reason) ->
+            val key = "topic:" + topic.lowercase().split(' ').filter { it.length >= 3 }.joinToString(" ")
+            if (key in seen || topic.lowercase().split(' ').any { it.length >= 4 && coveredText.contains(it) }) null
+            else Insight(key, "${topic.replaceFirstChar { it.uppercase() }}: ${reason.replaceFirstChar { it.lowercase() }}. Want me to remind you about it?", Insight.Action.REMIND, topic)
+        }.take(1)
     }
 
     fun dismiss(key: String) { _insights.value = _insights.value.filter { it.key != key }; saveInsights(_insights.value) }

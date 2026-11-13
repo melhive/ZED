@@ -9,6 +9,7 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CheckBox
 import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -46,13 +47,27 @@ fun MemoryScreen(onBack: () -> Unit, initialTab: Int = 0, onOpenBrain: (() -> Un
     val context = androidx.compose.ui.platform.LocalContext.current
     var scheduleRefresh by remember { mutableIntStateOf(0) }
     val calendarPermission = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()) { scheduleRefresh++ }
-    val upcoming by androidx.compose.runtime.produceState<List<Pair<java.time.LocalDate, List<String>>>?>(null, tab, scheduleRefresh) {
+    val upcoming by androidx.compose.runtime.produceState<List<Pair<java.time.LocalDate, List<com.melhive.zed.agents.CalendarReader.Item>>>?>(null, tab, scheduleRefresh) {
         value = if (tab != 4) null else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val cal = com.melhive.zed.agents.CalendarReader(context)
-            if (!cal.granted()) emptyList() else (0L until 14L).map { java.time.LocalDate.now().plusDays(it) }.map { d -> d to runCatching { cal.events(d) }.getOrDefault(emptyList()) }.filter { it.second.isNotEmpty() }
+            if (!cal.granted()) emptyList() else (0L until 14L).map { java.time.LocalDate.now().plusDays(it) }.map { d -> d to runCatching { cal.items(d) }.getOrDefault(emptyList()) }.filter { it.second.isNotEmpty() }
         }
     }
-    val facts by c.memory.facts.collectAsStateWithLifecycle(initialValue = emptyList())
+    // Deletes one calendar occurrence at once (asks for calendar write access the first time).
+    val deleteEvent: (com.melhive.zed.agents.CalendarReader.Item) -> Unit = { item ->
+        val writer = com.melhive.zed.agents.CalendarWriter(context)
+        if (!writer.granted()) calendarPermission.launch(arrayOf(android.Manifest.permission.READ_CALENDAR, android.Manifest.permission.WRITE_CALENDAR))
+        else scope.launch {
+            val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { writer.delete(item) }
+            if (!ok) android.widget.Toast.makeText(context, "Your calendar didn't allow deleting that event.", android.widget.Toast.LENGTH_SHORT).show()
+            scheduleRefresh++
+        }
+    }
+    val allFacts by c.memory.facts.collectAsStateWithLifecycle(initialValue = emptyList())
+    // Answering rules the user gave live in Lessons, not among the facts.
+    val facts = allFacts.filter { it.source != "preference" }
+    val rules = allFacts.filter { it.source == "preference" }
+    val taught by c.teaching.state.collectAsStateWithLifecycle()
     val todos by c.todos.todos.collectAsStateWithLifecycle(initialValue = emptyList())
     val reminders by c.db.reminders().observeAll().collectAsStateWithLifecycle(initialValue = emptyList())
     val docs by c.knowledge.documents.collectAsStateWithLifecycle(initialValue = emptyList())
@@ -75,12 +90,53 @@ fun MemoryScreen(onBack: () -> Unit, initialTab: Int = 0, onOpenBrain: (() -> Un
         }
         item {
             SecondaryScrollableTabRow(selectedTabIndex = tab, containerColor = ZedColors.Background, edgePadding = 0.dp) {
-                listOf("Facts", "Task list", "Reminders", "Knowledge", "Schedule").forEachIndexed { i, label ->
+                listOf("Facts", "Task list", "Reminders", "Knowledge", "Schedule", "Lessons").forEachIndexed { i, label ->
                     Tab(selected = tab == i, onClick = { tab = i }, text = { Text(label) })
                 }
             }
         }
         when (tab) {
+            5 -> {
+                item { Text("What you taught ZED. Say “from now on keep answers short”, “pronounce Cebu as seh-boo”, or “when I say lights out, I mean turn off the lights”. Tell it “that's wrong” and it learns the right answer too.", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted) }
+                if (rules.isEmpty() && taught.pronunciations.isEmpty() && taught.aliases.isEmpty()) item { EmptyState("Nothing taught yet", "Correct ZED or tell it how you like answers — it remembers.") }
+                if (rules.isNotEmpty()) {
+                    item { Text("How you like answers", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 6.dp)) }
+                    items(rules, key = { "rule-" + it.id }) { f ->
+                        ZedCard {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(f.text, modifier = Modifier.weight(1f))
+                                IconButton(onClick = { scope.launch { c.memory.delete(listOf(f.id)) } }) { Icon(Icons.Outlined.Delete, "Delete rule", tint = ZedColors.Muted) }
+                            }
+                        }
+                    }
+                }
+                if (taught.pronunciations.isNotEmpty()) {
+                    item { Text("Pronunciations", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 6.dp)) }
+                    items(taught.pronunciations.entries.toList(), key = { "say-" + it.key }) { (word, say) ->
+                        ZedCard {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("$word → $say", modifier = Modifier.weight(1f))
+                                IconButton(onClick = { scope.launch { c.voice.preview("$word.") } }) { Icon(Icons.Outlined.PlayArrow, "Hear it", tint = ZedColors.Cyan) }
+                                IconButton(onClick = { c.teaching.forgetPronunciation(word) }) { Icon(Icons.Outlined.Delete, "Delete pronunciation", tint = ZedColors.Muted) }
+                            }
+                        }
+                    }
+                }
+                if (taught.aliases.isNotEmpty()) {
+                    item { Text("Your shortcuts", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 6.dp)) }
+                    items(taught.aliases.entries.toList(), key = { "alias-" + it.key }) { (phrase, meaning) ->
+                        ZedCard {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+                                    Text("“$phrase”")
+                                    Text(meaning, style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
+                                }
+                                IconButton(onClick = { c.teaching.forgetAlias(phrase) }) { Icon(Icons.Outlined.Delete, "Delete shortcut", tint = ZedColors.Muted) }
+                            }
+                        }
+                    }
+                }
+            }
             4 -> {
                 item { Text("Your calendar for the next 14 days, plus ZED reminders. Say “schedule lunch with Ana tomorrow at noon” to add one.", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted) }
                 if (!com.melhive.zed.agents.CalendarReader(context).granted()) item {
@@ -96,14 +152,28 @@ fun MemoryScreen(onBack: () -> Unit, initialTab: Int = 0, onOpenBrain: (() -> Un
                         ZedCard {
                             Text(when (day) { java.time.LocalDate.now() -> "Today"; java.time.LocalDate.now().plusDays(1) -> "Tomorrow"; else -> day.format(java.time.format.DateTimeFormatter.ofPattern("EEEE, MMMM d")) },
                                 style = MaterialTheme.typography.titleSmall, color = ZedColors.Cyan)
-                            events.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp)) }
+                            events.forEach { e ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("• ${e.label}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                                    IconButton(onClick = { deleteEvent(e) }) { Icon(Icons.Outlined.Delete, if (e.recurring) "Delete this occurrence" else "Delete event", tint = ZedColors.Muted) }
+                                }
+                            }
                         }
                     }
                 }
                 val pending = reminders.filter { it.status == "scheduled" && it.triggerAt > System.currentTimeMillis() }
                 if (pending.isNotEmpty()) {
                     item { Text("ZED reminders", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp)) }
-                    items(pending, key = { "r-" + it.id }) { r -> ZedCard { Text(r.text); Text(formatTime(r.triggerAt), style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted) } }
+                    items(pending, key = { "r-" + it.id }) { r ->
+                        ZedCard {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+                                    Text(r.text); Text(formatTime(r.triggerAt), style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted)
+                                }
+                                IconButton(onClick = { scope.launch { c.reminderScheduler.deleteReminder(r.id) } }) { Icon(Icons.Outlined.Delete, "Delete reminder", tint = ZedColors.Muted) }
+                            }
+                        }
+                    }
                 }
             }
             0 -> {
@@ -148,7 +218,7 @@ fun MemoryScreen(onBack: () -> Unit, initialTab: Int = 0, onOpenBrain: (() -> Un
                     ZedCard {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("#${r.id} ${r.text}", modifier = Modifier.weight(1f))
-                            if (r.status == "scheduled") TextButton(onClick = { scope.launch { c.reminderScheduler.cancelReminder(r.id) } }) { Text("Cancel") }
+                            IconButton(onClick = { scope.launch { c.reminderScheduler.deleteReminder(r.id) } }) { Icon(Icons.Outlined.Delete, "Delete reminder", tint = ZedColors.Muted) }
                         }
                         Text("${formatTime(r.triggerAt)} · ${r.status}${if (r.status == "scheduled") if (r.exact) " · exact" else " · approximate" else ""}",
                             style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted)
@@ -192,7 +262,7 @@ fun MemoryScreen(onBack: () -> Unit, initialTab: Int = 0, onOpenBrain: (() -> Un
             onDismissRequest = { confirmClear = false },
             title = { Text("Forget everything?") },
             text = { Text("All ${facts.size} remembered facts will be permanently deleted.") },
-            confirmButton = { TextButton(onClick = { scope.launch { c.memory.clear() }; confirmClear = false }) { Text("Delete all", color = ZedColors.Red) } },
+            confirmButton = { TextButton(onClick = { val ids = facts.map { it.id }; scope.launch { c.memory.delete(ids) }; confirmClear = false }) { Text("Delete all", color = ZedColors.Red) } },
             dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancel") } },
         )
     }

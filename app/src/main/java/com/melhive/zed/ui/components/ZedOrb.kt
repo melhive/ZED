@@ -105,7 +105,7 @@ fun ZedOrb(
     // Speaking pulse: each word boundary kicks it, then it decays.
     val pulse = remember { Animatable(0f) }
     LaunchedEffect(speechPulse) { if (speechPulse > 0) { pulse.snapTo(1f); pulse.animateTo(0f, tween(320, easing = FastOutSlowInEasing)) } }
-    // Completion: a one-shot expanding ring and a check.
+    // Completion: a one-shot expanding ring (no check mark).
     val done = remember { Animatable(0f) }
     LaunchedEffect(state) { if (state == OrbState.COMPLETED) { done.snapTo(0f); done.animateTo(1f, tween(700, easing = FastOutSlowInEasing)) } else done.snapTo(0f) }
 
@@ -222,7 +222,6 @@ fun ZedOrb(
         )
         drawCircle(Brush.sweepGradient(listOf(primary, secondary, primary), center), r, center, style = Stroke(1.6.dp.toPx()))
 
-        if (state == OrbState.COMPLETED && done.value > 0f) drawCheck(center, r * 0.34f, done.value)
         if (state == OrbState.ERROR) drawWarning(center, r * 0.42f)
     }
 }
@@ -272,15 +271,6 @@ private fun DrawScope.drawScan(center: Offset, r: Float, scan: Float, spin: Floa
     val half = kotlin.math.sqrt((r * r - (y - center.y) * (y - center.y)).coerceAtLeast(0f))
     drawLine(c.copy(alpha = 0.9f), Offset(center.x - half, y), Offset(center.x + half, y), 2.dp.toPx())
     drawCircle(c.copy(alpha = 0.4f), rr, center, style = Stroke(1.dp.toPx()))
-}
-
-private fun DrawScope.drawCheck(center: Offset, s: Float, progress: Float) {
-    val path = Path().apply {
-        moveTo(center.x - s * 0.6f, center.y)
-        lineTo(center.x - s * 0.15f, center.y + s * 0.45f)
-        lineTo(center.x + s * 0.65f, center.y - s * 0.45f)
-    }
-    drawPath(path, Color.White.copy(alpha = progress), style = Stroke(4.dp.toPx(), cap = StrokeCap.Round))
 }
 
 private fun DrawScope.drawWarning(center: Offset, s: Float) {

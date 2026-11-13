@@ -42,7 +42,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -248,8 +247,6 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
     var startFrame by remember { mutableLongStateOf(0L) }
     var bootStart by remember { mutableLongStateOf(0L) }
     var bootProgress by remember { mutableFloatStateOf(0f) }
-    var activity by remember { mutableFloatStateOf(0f) }
-    var activityLevel by remember { mutableIntStateOf(0) }
     var lapse by remember { mutableStateOf<Lapse?>(null) }
     var lapseLabel by remember { mutableStateOf("") }
     var lapseProgress by remember { mutableFloatStateOf(0f) }
@@ -287,7 +284,6 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
         val path = g.pathFromCore(i).toIntArray()
         if (path.size > 1) pulses += Pulse(g, path, frame)
         flashes[key] = frame + ((path.size - 1) * HOP_SECONDS * 1e9f).toLong()
-        activity = (activity + 1f).coerceAtMost(6f)
     }
 
     // What ZED does elsewhere shows up here as it happens.
@@ -295,7 +291,7 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
         c.brain.events.collect { e ->
             when (e) {
                 is BrainEvent.Recalled -> { e.keys.forEach { signal(it) }; tick(1, haptic = false) }
-                is BrainEvent.Saved -> activity = (activity + 1f).coerceAtMost(6f)
+                is BrainEvent.Saved -> Unit
             }
         }
     }
@@ -322,10 +318,6 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
                     if (i < 0) cam.focusKey = null else { tx = l.x[i]; ty = l.y[i]; tz = l.z[i] }
                 }
                 cam.px += (tx - cam.px) * 0.1f; cam.py += (ty - cam.py) * 0.1f; cam.pz += (tz - cam.pz) * 0.1f
-
-                if (activity > 0f) activity = (activity - dt * 0.35f).coerceAtLeast(0f)
-                val level = kotlin.math.ceil(activity).toInt().coerceIn(0, 5)
-                if (level != activityLevel) activityLevel = level
 
                 if (playing != null) {
                     if (playing.graph !== g) lapse = null else {
@@ -651,7 +643,6 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
                 val shown = ease(bootProgress)
                 Text("NEURONS  %03d".format((graph.nodes.size * shown).toInt()), style = MonoStyle, color = ZedColors.Cyan.copy(alpha = 0.8f))
                 Text("SYNAPSES %03d".format((graph.edges.size * shown).toInt()), style = MonoStyle, color = ZedColors.Cyan.copy(alpha = 0.8f))
-                Text("ACTIVITY " + "▮".repeat(activityLevel) + "▯".repeat(5 - activityLevel), style = MonoStyle, color = if (activityLevel > 0) ZedColors.Teal else ZedColors.Muted)
                 if (recalls > 0) Text("RECALLS  %03d".format(recalls), style = MonoStyle, color = ZedColors.Muted)
                 if (bootProgress < 1f) Text(if (bootProgress < 0.25f) "IGNITING CORE" else if (bootProgress < 0.6f) "UNFOLDING AREAS" else "LINKING MEMORIES", style = MonoStyle, color = ZedColors.Amber)
             }

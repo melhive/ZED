@@ -40,7 +40,7 @@ fun InsightsCard(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
                             scope.launch {
                                 val id = c.conversations.latestOrCreate()
                                 c.chatFocus.value = id
-                                c.orchestrator.submit(id, "remind me about the ${i.payload} tomorrow at 9am")
+                                c.orchestrator.submit(id, "remind me about ${i.payload} tomorrow at 9am")
                                 onTab(Routes.CHAT)
                             }
                         }) { Text("Remind me tomorrow") }

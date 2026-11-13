@@ -35,6 +35,7 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         text = text.trimEnd('?', '!').trimEnd()
         if (text.endsWith(".") && !Regex("\\.[A-Za-z0-9]{1,5}\\.$").containsMatchIn(text) || text.endsWith("..")) text = text.dropLast(1).trimEnd()
         if (text.isEmpty()) return ParsedCommand.NotACommand
+        teach(text)?.let { return it }
         for (rule in rules) {
             val m = rule.regex.matchEntire(text) ?: continue
             val result = rule.build(m) ?: continue
@@ -62,6 +63,59 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
     }
 
     private class Rule(val regex: Regex, val build: (MatchResult) -> ParsedCommand?)
+
+    /** Lessons: pronunciations, answering rules, shortcuts and speaking speed. */
+    private fun teach(text: String): ParsedCommand? = when (val t = com.melhive.zed.core.learning.Teaching.detect(text)) {
+        is com.melhive.zed.core.learning.Teaching.Taught.Pronounce -> tool("teach.pronounce", "word" to t.word, "say" to t.say)
+        is com.melhive.zed.core.learning.Teaching.Taught.Rule -> tool("teach.rule", "rule" to t.rule)
+        is com.melhive.zed.core.learning.Teaching.Taught.Alias -> tool("teach.alias", "phrase" to t.phrase, "meaning" to t.meaning)
+        is com.melhive.zed.core.learning.Teaching.Taught.Speed -> tool("settings.set", "key" to "speech_rate", "value" to if (t.faster) "faster" else "slower")
+        null -> null
+    }
+
+    private val DAY = "today|tomorrow|tonight|\\d{4}-\\d{2}-\\d{2}|(?:next )?(?:mon|tues|wednes|thurs|fri|satur|sun)day"
+
+    /** Spoken names of ZED's own screens → [com.melhive.zed.core.tools.ToolCatalog.SCREENS]. */
+    private fun screen(name: String): String? = when (name.lowercase().replace(Regex("\\s+"), " ").trim()) {
+        "facts", "memories", "memory", "my memories" -> "facts"
+        "task list", "to-do list", "todo list", "to do list" -> "task_list"
+        "reminders" -> "reminders"
+        "knowledge", "knowledge base", "document index", "documents index", "index" -> "knowledge"
+        "schedule", "calendar screen" -> "schedule"
+        "settings", "zed settings", "app settings" -> "settings"
+        "voice settings", "voices", "voice screen" -> "voice"
+        "models", "model manager", "ai models" -> "models"
+        "routines" -> "routines"
+        "diagnostics", "permissions" -> "diagnostics"
+        "backup", "backups" -> "backup"
+        "skills" -> "skills"
+        "what's new", "whats new", "changelog" -> "whats_new"
+        "lessons", "what you learned", "what you've learned", "taught", "teachings" -> "taught"
+        "home", "home screen", "dashboard" -> "home"
+        "chat" -> "chat"
+        "background tasks", "tasks screen" -> "tasks"
+        else -> null
+    }
+
+    /** Spoken names of ZED's switches → settings keys. */
+    private fun switch(name: String): String? = when (name.lowercase().replace(Regex("\\s+"), " ").trim().removeSuffix(" mode")) {
+        "wake word", "hey zed", "wake up word", "hotword", "wake-word" -> "wake_word"
+        "web research", "web search", "internet research", "online research" -> "web_research"
+        "learning", "auto learning", "automatic learning", "auto-learning" -> "auto_learning"
+        "hints", "proactive hints", "suggestions", "leave now hints", "leave-now hints" -> "proactive_hints"
+        "brain sounds", "brain sound" -> "brain_sounds"
+        "think twice", "thinking twice", "double checking" -> "think_twice"
+        "barge in", "barge-in", "interruptions", "interrupting" -> "barge_in"
+        "glow", "glow effects" -> "theme_glow"
+        "auto index", "automatic indexing", "auto indexing" -> "auto_index"
+        "document context", "knowledge context" -> "use_knowledge"
+        "briefing", "daily briefing", "morning briefing" -> "briefing"
+        "update checks", "updates", "update check" -> "check_updates"
+        "voice responses", "voice replies", "spoken responses", "spoken replies", "voice" -> "voice_responses"
+        else -> null
+    }
+
+    private val TITLES = setOf("sir", "ma'am", "maam", "madam", "boss", "chief", "captain", "master", "my lord", "my lady", "commander", "doc", "professor")
 
     private fun tool(name: String, vararg args: Pair<String, String?>): ParsedCommand =
         ParsedCommand.Tool(ToolRequest(name, args.filter { !it.second.isNullOrBlank() }.associate { it.first to clean(it.second!!) }, ToolRequest.Origin.NATIVE))
@@ -109,6 +163,8 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         // Reminders (before generic delete/cancel).
         Rule(rx("(?:list|show)(?: me)?(?: all)? (?:my )?reminders|what are my reminders|reminders")) { tool("reminder.list") },
         Rule(rx("(?:cancel|delete|remove) reminder (?:#|number )?(\\d+)")) { m -> tool("reminder.cancel", "id" to m.groupValues[1]) },
+        Rule(rx("(?:delete|remove|clear|erase) (?:all (?:of )?)?(?:my |the )?reminders")) { tool("reminder.delete", "item" to "all") },
+        Rule(rx("(?:delete|remove|erase|cancel) (?:the |my )?reminder (?:about |to |for |that )?(.+)")) { m -> tool("reminder.delete", "item" to m.groupValues[1]) },
         Rule(rx("remind me (in .+?|at .+?|tomorrow.*?|today.*?|tonight.*?|on .+?|next .+?|(?:mon|tues|wednes|thurs|fri|satur|sun)day.*?) (?:to|about|that) (.+)")) { m ->
             val at = TimeParser.parseDateTime(m.groupValues[1], clock()) ?: return@Rule null
             tool("reminder.create", "text" to m.groupValues[2], "at" to at.toString())
@@ -148,6 +204,15 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
             tool("calendar.create", "title" to split.first, "start" to split.second.toString(), "end" to end.toString())
         },
 
+        // Deleting an event: "delete my dentist appointment", "cancel the meeting with Ana tomorrow", "remove lunch from my calendar".
+        Rule(rx("(?:delete|remove|cancel) (?:my |the )?(?:calendar )?event (?:called |named |titled )?(.+?)(?: (?:on|for) ($DAY))?")) { m ->
+            tool("calendar.delete", "query" to m.groupValues[1], "date" to m.groupValues[2])
+        },
+        Rule(rx("(?:delete|remove|cancel) (?:my |the )?((?:[\\p{L}'-]+ ){0,3}(?:meeting|appointment|lunch|dinner|class|session|interview|call with|date with|checkup|check-up)(?: (?:with|at|about) .+?)?)(?: (?:on|for) ($DAY)| ($DAY))?")) { m ->
+            tool("calendar.delete", "query" to m.groupValues[1], "date" to m.groupValues[2].ifEmpty { m.groupValues[3] })
+        },
+        Rule(rx("(?:delete|remove|erase|take) (?:the |my )?(.+?) (?:from|off) (?:my |the )?(?:calendar|schedule|agenda)")) { m -> tool("calendar.delete", "query" to m.groupValues[1]) },
+
         // Moving an event: "move my meeting with Ana to 4", "reschedule the dentist to Friday at 10".
         Rule(rx("(?:move|reschedule|push|shift|change) (?:my |the )?(.+?) (?:to|until|till|for) (.+)")) { m ->
             val what = m.groupValues[1].trim()
@@ -169,13 +234,24 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
             tool("todo.complete", "item" to m.groupValues[1].ifEmpty { m.groupValues[2] })
         },
 
-        Rule(rx("(?:delete|remove|erase) (?:the )?(?:task|todo|to-do)(?: item)? (.+)")) { m ->
-            ParsedCommand.Clarify("To finish “${clean(m.groupValues[1])}” say “complete ${clean(m.groupValues[1])}”. To delete a task-list item, open Memory → Task list.")
-        },
+        Rule(rx("(?:delete|remove|erase|clear) (?:all )?(?:the |my )?(?:completed|done|finished|checked) (?:tasks|todos|to-dos|items)")) { tool("todo.delete", "item" to "done") },
+        Rule(rx("(?:delete|remove|erase|clear|empty) (?:all (?:of )?)?(?:my |the )?(?:tasks|todos|to-dos|task list|todo list|to-do list)")) { tool("todo.delete", "item" to "all") },
+        Rule(rx("(?:delete|remove|erase) (?:the )?(?:task|todo|to-do)(?: item)? (.+)")) { m -> tool("todo.delete", "item" to m.groupValues[1]) },
+        Rule(rx("(?:delete|remove|erase|take|cross) (.+?) (?:off|from|out of) (?:my |the )?(?:task |todo |to-do |shopping )?list")) { m -> tool("todo.delete", "item" to m.groupValues[1]) },
+
+        // Lessons the user taught.
+        Rule(rx("what (?:have you|did you) learn(?:ed)?(?: from me)?|what did i teach you|(?:list|show)(?: me)? (?:the |my |your )?(?:lessons|shortcuts|pronunciations|rules)")) { tool("teach.list") },
+        Rule(rx("(?:forget|unlearn|remove|delete) (?:all )?(?:the |my |that |your )?(?:pronunciations?|shortcuts?|rules?|lessons?)(?: (?:of|for|about|called|that says))? ?(.*)")) { m -> tool("teach.forget", "what" to m.groupValues[1].ifBlank { "all" }) },
 
         // Memory.
+        Rule(rx("(?:forget|delete|erase|clear|wipe) (?:all (?:of )?)?(?:everything(?: you know)?(?: about me)?|(?:all )?(?:my |your |the )?(?:memories|facts))")) { tool("memory.forget", "query" to "everything") },
         Rule(rx("(?:delete|remove|erase) (?:the )?(?:memory|memories|fact)(?: about)? (.+)")) { m -> tool("memory.forget", "query" to m.groupValues[1]) },
         Rule(rx("what do you (?:remember|know about me)|(?:list|show)(?: me)? (?:my |your )?memor(?:y|ies)|memories")) { tool("memory.list") },
+        Rule(rx("(?:call me|address me as|refer to me as) ([\\p{L}][\\p{L} .'-]{0,30})")) { m ->
+            val v = clean(m.groupValues[1]).trimEnd('.')
+            // Only titles ("call me boss"); names come from "my name is" / "you can call me" ("call me back later" is not a name).
+            if (v.lowercase() in TITLES) tool("settings.set", "key" to "user_title", "value" to v) else null
+        },
         Rule(rx("(?:my name is|i'?m called|you can call me) ([\\p{L}][\\p{L} .'-]{0,40})")) { m -> tool("memory.remember", "fact" to "My name is ${clean(m.groupValues[1]).replaceFirstChar { it.uppercase() }}") },
         // "remember to X [time]" / "don't forget to X [time]" are reminders (or task-list items without a time).
         Rule(rx("(?:remember|don'?t forget|do not forget) to (.+)")) { m ->
@@ -195,6 +271,8 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
 
         // History and documents.
         Rule(rx("search (?:my |the )?(?:history|conversations|chats|chat history) (?:for )?(.+)")) { m -> tool("history.search", "query" to m.groupValues[1]) },
+        Rule(rx("(?:clear|empty|wipe|reset) (?:my |the |your )?(?:knowledge|index|document index|knowledge base)")) { tool("docs.remove", "query" to "all") },
+        Rule(rx("(?:remove|delete|drop) (?:the )?(?:document |file )?(.+?) from (?:my |the |your )?(?:knowledge|index|knowledge base|document index)")) { m -> tool("docs.remove", "query" to m.groupValues[1]) },
         Rule(rx("index (?:my |the )?(?:documents|docs|files)(?: in (.+))?")) { m -> tool("docs.index", "path" to normalizeFolderWords(m.groupValues[1])) },
         Rule(rx("(?:search|find|look for|look up) (?:in )?(?:my |the )?(?:documents|docs|notes) (?:for )?(.+)")) { m -> tool("docs.search", "query" to m.groupValues[1]) },
 
@@ -205,6 +283,38 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         Rule(rx("(?:turn|switch) (on|off) (?:the )?(?:voice responses|voice replies|spoken responses|voice)")) { m -> tool("settings.set", "key" to "voice_responses", "value" to m.groupValues[1].lowercase()) },
         Rule(rx("(enable|disable) (?:the )?(?:voice responses|voice replies|spoken responses|voice)")) { m -> tool("settings.set", "key" to "voice_responses", "value" to if (m.groupValues[1].equals("enable", true)) "on" else "off") },
         Rule(rx("set (?:the )?speech rate to ([0-9.]+)")) { m -> tool("settings.set", "key" to "speech_rate", "value" to m.groupValues[1]) },
+        Rule(rx("set (?:the |your )?(?:speech |voice )?pitch to ([0-9.]+)")) { m -> tool("settings.set", "key" to "speech_pitch", "value" to m.groupValues[1]) },
+        Rule(rx("(?:change|switch|set) (?:your |the |my )?voice to (?:the )?(.+?)(?: voice)?|use (?:the )?([\\p{L}]+(?: [\\p{L}]+)?) voice")) { m ->
+            tool("settings.set", "key" to "voice", "value" to m.groupValues[1].ifEmpty { m.groupValues[2] })
+        },
+        Rule(rx("(?:turn|switch) (on|off) (?:the |your |my )?(.+?)|(?:turn|switch) (?:the |your |my )?(.+?) (on|off)|(enable|disable) (?:the |your |my )?(.+?)")) { m ->
+            val g = m.groupValues
+            val (state, name) = when { g[1].isNotEmpty() -> g[1] to g[2]; g[4].isNotEmpty() -> g[4] to g[3]; else -> g[5] to g[6] }
+            val key = switch(name) ?: return@Rule null
+            tool("settings.set", "key" to key, "value" to if (state.lowercase() in setOf("on", "enable")) "on" else "off")
+        },
+        Rule(rx("set (?:the |your )?(?:wake(?: word)?|hey zed|wake-word) sensitivity (?:to )?(low|lowest|fewer false alarms|balanced|normal|medium|high|max|maximum|highest|most sensitive)")) { m ->
+            tool("settings.set", "key" to "wake_sensitivity", "value" to m.groupValues[1])
+        },
+        Rule(rx("(?:set|make|change) (?:the |your )?animations? (?:to |level to )?(full|balanced|light|less|more|minimal)")) { m ->
+            tool("settings.set", "key" to "animation", "value" to when (m.groupValues[1].lowercase()) { "less", "minimal" -> "light"; "more" -> "full"; else -> m.groupValues[1].lowercase() })
+        },
+        Rule(rx("(?:set|change) (?:my |the )?(?:weather )?(?:city|home city) to (.+)")) { m -> tool("settings.set", "key" to "weather_city", "value" to m.groupValues[1]) },
+        Rule(rx("(?:set|move|change) (?:my |the )?(?:daily |morning )?briefing(?: time)? (?:to|for|at) (.+)")) { m ->
+            val t = TimeParser.parseClock(m.groupValues[1].trim().lowercase()) ?: return@Rule ParsedCommand.Clarify("What time should the briefing be? For example: “set my briefing to 7 am”.")
+            tool("settings.set", "key" to "briefing_time", "value" to "%02d:%02d".format(t.hour, t.minute))
+        },
+        Rule(rx("(never|always|only sometimes|sometimes) ask (?:me )?(?:before|for confirmation)(?: .+)?|(?:ask before actions|confirmations?) (?:to )?(never|always|risky)")) { m ->
+            val v = m.groupValues[1].ifEmpty { m.groupValues[2] }.lowercase()
+            tool("settings.set", "key" to "ask_before", "value" to when { v.startsWith("never") -> "never"; v.startsWith("always") -> "always"; else -> "risky" })
+        },
+        Rule(rx("(?:set|change|switch) (?:your |the )?(?:personality|persona) to (.+)")) { m -> tool("settings.set", "key" to "persona", "value" to m.groupValues[1]) },
+        Rule(rx("(?:open|show|go to|take me to)(?: me)? (?:my |the |your |zed'?s? )?(.+?)(?: screen| page| tab)?")) { m ->
+            val raw = m.groupValues[1]
+            // Plain "settings" means the phone's Settings app unless it is clearly ZED's.
+            if (raw.equals("settings", true) && !Regex("\\b(?:your|zed'?s?|the app'?s)\\b", RegexOption.IGNORE_CASE).containsMatchIn(m.value)) return@Rule null
+            screen(raw)?.let { tool("app.show", "screen" to it) }
+        },
 
         // Workflows.
         Rule(rx("(?:run |start |give me |show )?(?:my |the )?(?:morning|daily) (?:briefing|brief|summary)|brief me")) { tool("workflow.run", "name" to "morning briefing") },
@@ -313,7 +423,9 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
             |• Memory — “remember that my sister's name is Ana”, “what do you remember”, “forget sister”
             |• History — “search history for budget”
             |• Workflows — “good morning” (morning briefing), “run workflow organize downloads”
-            |• Settings — “turn off voice responses”, “set speech rate to 1.2”
+            |• Settings — “turn off voice responses”, “change your voice to Atlas”, “turn off the wake word”, “open my reminders”
+            |• Deleting — “delete task buy milk”, “delete the reminder about rent”, “delete my dentist appointment”, “remove notes.txt from knowledge”
+            |• Teaching — “pronounce Cebu as seh-boo”, “from now on keep answers short”, “when I say lights out, I mean turn off the lights”
             |• Research — “research …” (searches the web; only your question leaves the phone)
         """.trimMargin()
     }

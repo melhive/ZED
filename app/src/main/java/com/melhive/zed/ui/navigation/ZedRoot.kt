@@ -82,6 +82,8 @@ object Routes {
     const val WHATS_NEW = "whats_new"
     const val BRAIN = "brain"
     const val BACKUP = "backup"
+    const val MEMORY_TAB = "memory/{tab}"
+    fun memoryTab(tab: Int) = "memory/$tab"
     fun task(id: Long) = "task/$id"
     fun chat(conversationId: Long?) = if (conversationId == null) CHAT else "$CHAT?id=$conversationId"
 }
@@ -170,6 +172,9 @@ fun ZedRoot(requestedRoute: String?, onRouteConsumed: () -> Unit) {
                 }
                 screen(Routes.MORE) { MoreScreen(onNavigate = { nav.navigate(it) }) }
                 screen(Routes.MEMORY) { MemoryScreen(onBack = { nav.popBackStack() }, onOpenBrain = { nav.navigate(Routes.BRAIN) }) }
+                screen(Routes.MEMORY_TAB, arguments = listOf(navArgument("tab") { type = NavType.IntType })) { entry ->
+                    MemoryScreen(onBack = { nav.popBackStack() }, initialTab = entry.arguments?.getInt("tab") ?: 0, onOpenBrain = { nav.navigate(Routes.BRAIN) })
+                }
                 screen(Routes.BRAIN) { com.melhive.zed.ui.screens.BrainScreen(onBack = { nav.popBackStack() }, onOpenChat = { nav.navigate(Routes.chat(it)) }) }
                 screen(Routes.BACKUP) { com.melhive.zed.ui.screens.BackupScreen(onBack = { nav.popBackStack() }) }
                 screen(Routes.MODELS) { ModelsScreen(onBack = { nav.popBackStack() }, onOpenTasks = { nav.navigateTab(Routes.TASKS) }) }

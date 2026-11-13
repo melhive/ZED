@@ -31,6 +31,17 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.30", "2026-11-13", "Full control, and ZED learns from you", listOf(
+            "ZED can change anything in ZED by voice or chat: “delete task buy milk”, “delete the reminder about rent”, “delete my dentist appointment”, “remove notes.txt from knowledge”, “forget everything”, “change your voice to Atlas”, “turn off the wake word”, “set my briefing to 7 am”, “open my reminders”. It just does it, no questions asked.",
+            "Teach ZED how you like it: “from now on keep answers short”, “stop calling me sir”, “don't use emojis”. It follows these rules in every answer. Say “that's wrong, it's …” and it learns the right answer.",
+            "Teach it how to say words: “pronounce Cebu as seh-boo” or “Siargao is pronounced shar-gow”. It's said that way from then on.",
+            "Your own shortcuts: “when I say lights out, I mean turn off the lights and turn on do not disturb”.",
+            "Memory → Lessons shows everything you taught ZED, and you can delete any of it. “What have you learned?” reads it out.",
+            "Reminders and Schedule have delete buttons. On Schedule, deleting a repeating event removes only that day's event.",
+            "Fixed: after “Hey Zed” or the assistant shortcut, ZED sometimes spoke in the phone's female voice before going back to Atlas. When Android closes the voice in the background, ZED now reloads Atlas instead of switching voices.",
+            "“ZED noticed” is smarter: it brings up things that matter (plans, deadlines, appointments, worries) that came up on several days, not a word you happen to repeat. While the phone charges, Gemma helps pick them.",
+            "Cleaner look: no check mark on the green orb, no flashing line across panels when a screen opens, and no Activity bars in the Live Brain.",
+        )),
         Release("0.1.29", "2026-11-12", "Gemma only, steadier, and a keener “Hey Zed”", listOf(
             "“Hey Zed” is much more sensitive: it wakes on “Zed” alone or in “Hey Zed”, even said quietly or from across the room. The new Maximum setting is the default (More → Voice → Sensitivity); words that sound alike, like “zero” or “Jed”, can wake it now and then — pick High for fewer false alarms.",
             "Gemma only: online AI (Gemini, OpenAI, Claude) and real-time Gemini voice are gone. Everything you say is answered by the model on your phone, and API keys saved by older versions are deleted. Web research still works — only the search question leaves the phone.",

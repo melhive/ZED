@@ -98,6 +98,34 @@ class CalendarReader(private val context: Context) {
         if (start == null) "All day: ${e.title}$loc" else "${com.melhive.zed.core.briefing.BriefingText.clock(start)}: ${e.title}$loc"
     }
 
+    /** One calendar occurrence shown in Schedule, with what's needed to delete it. */
+    data class Item(val eventId: Long, val begin: Long, val label: String, val recurring: Boolean)
+
+    /** The day's events as deletable items (same order and wording as [events]). */
+    fun items(day: LocalDate): List<Item> {
+        if (!granted()) return emptyList()
+        val zone = ZoneId.systemDefault()
+        val start = day.atStartOfDay(zone).toInstant().toEpochMilli()
+        val end = day.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        val uri = CalendarContract.Instances.CONTENT_URI.buildUpon().also { android.content.ContentUris.appendId(it, start); android.content.ContentUris.appendId(it, end) }.build()
+        val out = mutableListOf<Item>()
+        context.contentResolver.query(
+            uri, arrayOf(CalendarContract.Instances.EVENT_ID, CalendarContract.Instances.TITLE, CalendarContract.Instances.BEGIN, CalendarContract.Instances.ALL_DAY,
+                CalendarContract.Instances.EVENT_LOCATION, CalendarContract.Instances.RRULE),
+            null, null, "${CalendarContract.Instances.BEGIN} ASC",
+        )?.use { c ->
+            while (c.moveToNext()) {
+                val title = c.getString(1)?.takeIf { it.isNotBlank() } ?: "An untitled event"
+                val loc = c.getString(4)?.takeIf { it.isNotBlank() }?.let { " at $it" } ?: ""
+                val begin = c.getLong(2)
+                val label = if (c.getInt(3) == 1) "All day: $title$loc"
+                    else "${com.melhive.zed.core.briefing.BriefingText.clock(java.time.Instant.ofEpochMilli(begin).atZone(zone).toLocalTime())}: $title$loc"
+                out += Item(c.getLong(0), begin, label, recurring = !c.getString(5).isNullOrBlank())
+            }
+        }
+        return out
+    }
+
     fun dayEvents(day: LocalDate): List<com.melhive.zed.core.briefing.DayEvent> {
         if (!granted()) return emptyList()
         val zone = ZoneId.systemDefault()
@@ -227,6 +255,22 @@ class CalendarWriter(private val context: Context) {
         }
         return context.contentResolver.update(android.content.ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, event.id), values, null, null) > 0
     }
+
+    /**
+     * Deletes one calendar occurrence straight away. A repeating event loses only this
+     * occurrence (a cancelled exception), never the whole series. Returns false when refused.
+     */
+    fun delete(item: CalendarReader.Item): Boolean = runCatching {
+        if (item.recurring) {
+            val values = android.content.ContentValues().apply {
+                put(CalendarContract.Events.ORIGINAL_INSTANCE_TIME, item.begin)
+                put(CalendarContract.Events.STATUS, CalendarContract.Events.STATUS_CANCELED)
+            }
+            context.contentResolver.insert(android.content.ContentUris.withAppendedId(CalendarContract.Events.CONTENT_EXCEPTION_URI, item.eventId), values) != null
+        } else {
+            context.contentResolver.delete(android.content.ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, item.eventId), null, null) > 0
+        }
+    }.getOrDefault(false)
 
     /** Inserts the event and a 10-minute reminder; returns the new event id. */
     fun insert(title: String, start: java.time.LocalDateTime, end: java.time.LocalDateTime, location: String?, description: String?): Pair<Long, Target>? {

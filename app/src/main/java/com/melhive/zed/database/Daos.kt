@@ -158,6 +158,9 @@ interface ReminderDao {
 
     @Query("UPDATE reminders SET exact = :exact WHERE id = :id")
     suspend fun setExact(id: Long, exact: Boolean)
+
+    @Query("DELETE FROM reminders WHERE id = :id")
+    suspend fun delete(id: Long)
 }
 
 @Dao

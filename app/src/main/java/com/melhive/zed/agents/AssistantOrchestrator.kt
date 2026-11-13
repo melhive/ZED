@@ -97,6 +97,8 @@ class AssistantOrchestrator(
 
     /** Returns a routine name when the message is one of the user's routine phrases ("good night"). */
     var routineMatcher: (suspend (String) -> String?)? = null
+    /** The user's own shortcuts ("lights out" → what it means), applied before anything else. */
+    var aliases: (() -> Map<String, String>)? = null
 
     /** The phone's side of the awareness brief (time, place, battery, what's coming up). */
     var awareness: (suspend () -> com.melhive.zed.core.understanding.Awareness)? = null
@@ -201,12 +203,14 @@ class AssistantOrchestrator(
                 setPhase(AssistantPhase.COMPLETED, null, conversationId)
                 return AssistantReply(msg, false, "system")
             }
-            currentUserText = trimmed
+            // A shortcut the user taught stands for what they meant.
+            val meant = runCatching { aliases?.invoke() }.getOrNull()?.let { com.melhive.zed.core.learning.Aliases.expand(trimmed, it) } ?: trimmed
+            currentUserText = meant
             currentConversation = conversationId
             researchSources = emptyList()
             val plain = attachmentText == null && image == null
-            val reply = if (plain) understood(conversationId, trimmed, modelAvailable = provider != null) else null
-            val final = reply ?: if (provider != null) handleWithModel(conversationId, provider, voice, trimmed) else nativeConversation(conversationId, trimmed)
+            val reply = if (plain) understood(conversationId, meant, modelAvailable = provider != null) else null
+            val final = reply ?: if (provider != null) handleWithModel(conversationId, provider, voice, meant) else nativeConversation(conversationId, meant)
             // Instant (native) replies record how long the whole turn took; model replies are timed while streaming.
             runCatching { conversations.setTotalOnLastReply(conversationId, (System.nanoTime() - turnStartedAt) / 1_000_000) }
             setPhase(if (final.ok) AssistantPhase.COMPLETED else AssistantPhase.ERROR, if (final.ok) null else final.text, conversationId)
@@ -393,9 +397,12 @@ class AssistantOrchestrator(
         fun label(f: com.melhive.zed.core.understanding.MemoryFact) = when (sourceOf[f.id]) {
             "learned" -> "${f.text} (learned, not confirmed)"
             "correction" -> "${f.text} (the user corrected you — follow this)"
+            "preference" -> "${f.text} (the user's rule for how you answer — always follow it)"
             else -> f.text
         }
-        val memories = if (isLocal) ranked.map { label(it.fact) } else (ranked.map { it.fact.text } + allFacts.filter { it.pinned }.map { it.text } + allFacts.take(12).map { it.text }).distinct().take(30)
+        // How the user wants ZED to answer: always included, whatever the question.
+        val rules = allFacts.filter { it.source == "preference" }.take(8).map { "${it.text} (the user's rule for how you answer — always follow it)" }
+        val memories = rules + if (isLocal) ranked.filter { sourceOf[it.fact.id] != "preference" }.map { label(it.fact) } else (ranked.map { it.fact.text } + allFacts.filter { it.pinned }.map { it.text } + allFacts.take(12).map { it.text }).distinct().take(30)
         // The memories this question touches grow stronger and light up in the Live Brain (off the reply path).
         if (ranked.isNotEmpty()) appScope.launch { runCatching { memory.markUsed(ranked.map { it.fact.id }) } }
         val environment = runCatching { awareness?.invoke() }.getOrNull()

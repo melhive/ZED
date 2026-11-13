@@ -58,7 +58,18 @@ object ToolSelector {
         "home.status" to w("is the .+ (?:on|off|open|locked)", "temperature in", "humidity"),
         "home.secure" to w("lock", "unlock", "garage", "front door", "gate", "blinds", "curtains"),
         "workflow.run" to w("workflow", "briefing", "brief me"),
-        "settings.set" to w("speech rate", "voice responses", "talk faster", "talk slower"),
+        "settings.set" to w("speech rate", "voice responses", "talk faster", "talk slower", "wake word", "hey zed", "sensitivity", "(?:change|switch|set) (?:your |the )?voice", "animations?",
+            "web research", "learning", "briefing", "think twice", "barge", "glow", "hints", "brain sounds", "personality", "persona", "ask before", "confirm", "setting"),
+        "app.show" to w("(?:open|show|go to|take me to) (?:my |the |your |zed'?s )?(?:facts|memories|task list|reminders|knowledge|schedule|settings|voice settings|models|routines|diagnostics|backup|skills|what'?s new)"),
+        "todo.delete" to w("(?:delete|remove|clear|erase) (?:[\\w']+ ){0,4}(?:tasks?|to-?dos?|task list)", "(?:delete|remove) .{1,40} from (?:my )?(?:task |to-?do )?list"),
+        "reminder.delete" to w("(?:delete|remove|clear|erase) (?:[\\w']+ ){0,3}reminders?"),
+        "calendar.delete" to w("(?:delete|remove|cancel|clear) (?:my |the )?(?:[\\w']+ ){0,4}(?:meeting|appointment|event)", "(?:delete|remove) .{1,40} from (?:my )?(?:calendar|schedule)"),
+        "docs.remove" to w("(?:remove|delete|clear) .{0,40}(?:knowledge|index)"),
+        "teach.pronounce" to w("pronounce", "pronounced", "pronunciation", "you(?:'re| are) saying .+ wrong"),
+        "teach.rule" to w("from now on", "next time", "going forward", "stop saying", "don'?t say", "stop calling me", "don'?t call me", "be (?:more )?(?:shorter|brief|concise|formal|casual)", "keep it short", "i prefer (?:you|your|when you)", "don'?t use"),
+        "teach.alias" to w("when i say", "whenever i say"),
+        "teach.list" to w("what have you learned", "what did you learn", "what did i teach"),
+        "teach.forget" to w("forget (?:the |that |my )?(?:pronunciation|shortcut|rule|lesson)", "unlearn"),
     )
 
     /** Tools that often follow another one (look up a number before texting). */

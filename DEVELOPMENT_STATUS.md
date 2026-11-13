@@ -1,6 +1,6 @@
 # ZED — Development Status
 
-_Last updated: 2026-11-11_
+_Last updated: 2026-11-13_
 
 ## Overview
 
@@ -13,7 +13,7 @@ Native Android personal AI assistant (Kotlin, Jetpack Compose). Three intelligen
 | Default branch | `main` (stable merges) |
 | Latest commit | see `git log -1` (this file is updated with each milestone) |
 | Build status | ✅ GitHub Actions **Android Build** green: core tests, Android unit tests, debug APK |
-| Releases | ✅ Signed release **v0.1.29** published (latest). Install/share link: https://github.com/melhive/ZED/releases/latest/download/zed.apk. Every push to `main` publishes the version in `VERSION` (bump it for a new release; re-pushing the same version replaces that release). App id `com.melhive.zed`, signed with the key in `/root/zed-signing` (back it up — updates need the same key). |
+| Releases | ✅ Signed release **v0.1.30** published (latest). Install/share link: https://github.com/melhive/ZED/releases/latest/download/zed.apk. Every push to `main` publishes the version in `VERSION` (bump it for a new release; re-pushing the same version replaces that release). App id `com.melhive.zed`, signed with the key in `/root/zed-signing` (back it up — updates need the same key). |
 
 ## Milestones
 
@@ -59,6 +59,14 @@ Failed tests: none.
 | Model download (2–3 GB) with resume + SHA-256 | | ✅ | ✅ | |
 | Keystore secret storage | | ✅ | ✅ | |
 | STT / TTS / sentence streaming / barge-in / audio focus | VAD only | ✅ | ✅ | |
+
+## Full control and learning from the user (v0.1.30)
+
+- **Full control** (`tools/executors/AppControl.kt`): `todo.delete`, `reminder.delete`, `calendar.delete` (one occurrence of a repeating event via a cancelled exception), `docs.remove`, `memory.forget everything`, `app.show` (any ZED screen, `memory/{tab}` route), and `settings.set` covering every user setting (voice by name, wake word and sensitivity, speech rate/pitch incl. faster/slower, animation, ask-before, title, city, briefing, persona, all switches). Offline parser rules for each (`CommandParserTest`).
+- **Teaching** (`core/learning/Teaching.kt`, unit-tested in `TeachingTest`): pronunciations (`Pronunciations.apply` in `VoiceManager.speak`), answering rules (pinned memories with source `preference`, always in Gemma's context), shortcuts (`Aliases.expand` before understanding), speaking speed. Stored in `TeachingStore`; shown in Memory → Lessons.
+- **Voice**: a killed `:voice` process restarts the chosen neural voice (≤3 times in 5 min) instead of falling back to the female system voice; a real load failure falls back for 2 min, then retries.
+- **Insights**: `Insights.topics` needs an importance signal (to-do, date, event, worry) and ignores device commands; `Topics.prompt/parse` lets Gemma name topics while charging, kept only if grounded on ≥2 days.
+- **UI**: delete buttons on Reminders and Schedule; no orb check mark; no panel light sweep; Live Brain Activity bars removed.
 
 ## Stabilising: Gemma-only, battery, calendar moves, wake word (v0.1.29)
 

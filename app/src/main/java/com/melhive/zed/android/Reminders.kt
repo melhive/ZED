@@ -61,6 +61,12 @@ class ReminderScheduler(private val context: Context, private val dao: ReminderD
         return true
     }
 
+    /** Removes a reminder for good (any status), cancelling its alarm first. */
+    suspend fun deleteReminder(id: Long) {
+        cancel(id)
+        dao.delete(id)
+    }
+
     /** Re-registers alarms after reboot/update; overdue reminders fire immediately. */
     suspend fun rescheduleAll() {
         val now = System.currentTimeMillis()

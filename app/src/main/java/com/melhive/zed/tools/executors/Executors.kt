@@ -90,6 +90,11 @@ object DefaultConfirmationText : ConfirmationText {
         "memory.remember" -> "Remember permanently: “${args.string("fact")}”?"
         "memory.forget" -> "Forget all memories matching “${args.string("query")}”?"
         "settings.set" -> "Change setting ${args.string("key")} to “${args.string("value")}”?"
+        "todo.delete" -> "Delete “${args.string("item")}” from your task list?"
+        "reminder.delete" -> "Delete the reminder “${args.string("item")}”?"
+        "calendar.delete" -> "Delete “${args.string("query")}” from your calendar?"
+        "docs.remove" -> "Remove “${args.string("query")}” from ZED's knowledge?"
+        "teach.forget" -> "Forget the lesson “${args.string("what")}”?"
         "workflow.run" -> "Run workflow “${args.string("name")}”?"
         "phone.call" -> "Call ${args.string("who")}?"
         "sms.compose" -> "Text ${args.string("to")}: “${args.string("message")}”?"
@@ -430,6 +435,12 @@ fun registerExecutors(tm: ToolManager, c: AppContainer, context: Context) {
         else ok("I remember:\n" + list.joinToString("\n") { "• ${it.text}" })
     }
     tm.register("memory.forget") { a, _ ->
+        val q = a.string("query").trim().lowercase()
+        if (q in setOf("everything", "all", "all memories", "all facts", "everything about me", "everything you know")) {
+            val n = c.memory.list(100_000).size
+            c.memory.clear()
+            return@register ok("Done — I forgot everything I knew ($n memories).")
+        }
         val matches = c.memory.find(a.string("query"))
         if (matches.isEmpty()) fail("No memories match “${a.string("query")}”.")
         else { c.memory.delete(matches.map { it.id }); ok("Forgot ${matches.size} memor${if (matches.size == 1) "y" else "ies"}: " + matches.joinToString("; ") { it.text }) }
@@ -440,22 +451,11 @@ fun registerExecutors(tm: ToolManager, c: AppContainer, context: Context) {
         else ok("Found ${hits.size} message(s):\n" + hits.take(10).joinToString("\n") { "• ${it.createdAt.prettyMillis()} (${it.role}): ${it.content.take(160).replace('\n', ' ')}" })
     }
 
-    // ---- Settings ----
-    tm.register("settings.set") { a, _ ->
-        val value = a.string("value").trim().lowercase()
-        fun bool(): Boolean? = when (value) { "on", "true", "yes", "enable", "enabled" -> true; "off", "false", "no", "disable", "disabled" -> false; else -> null }
-        when (a.string("key")) {
-            "voice_responses" -> bool()?.let { c.settings.setVoiceResponses(it); ok("Voice responses ${if (it) "on" else "off"}.") } ?: fail("Use on or off.")
-            "auto_index" -> bool()?.let { c.settings.setAutoIndex(it); ok("Automatic indexing ${if (it) "on" else "off"}.") } ?: fail("Use on or off.")
-            "use_knowledge" -> bool()?.let { c.settings.setUseKnowledge(it); ok("Document context ${if (it) "on" else "off"}.") } ?: fail("Use on or off.")
-            "theme_glow" -> bool()?.let { c.settings.setGlow(it); ok("Glow effects ${if (it) "on" else "off"}.") } ?: fail("Use on or off.")
-            "speech_rate" -> value.toFloatOrNull()?.takeIf { it in 0.5f..2.0f }?.let { c.settings.setSpeechRate(it); ok("Speech rate set to $it.") } ?: fail("Speech rate must be between 0.5 and 2.0.")
-            else -> fail("Unknown setting.")
-        }
-    }
-
     // ---- Workflows ----
     tm.register("workflow.run") { a, _ -> c.workflows.run(a.string("name")) }
+
+    // ---- Full control of ZED's own data, settings and lessons ----
+    registerAppControl(tm, c, context)
 
     // ---- Research ----
     tm.register("web.research") { a, _ ->

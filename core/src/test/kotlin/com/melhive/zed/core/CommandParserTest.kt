@@ -106,7 +106,7 @@ class CommandParserTest {
     }
 
     @Test fun removalsAreRoutedToTheRightPlace() {
-        assertIs<ParsedCommand.Clarify>(parser.parse("remove task buy milk"))
+        assertEquals("todo.delete" to mapOf("item" to "buy milk"), tool("remove task buy milk"))
         assertEquals("memory.forget" to mapOf("query" to "sister"), tool("delete memory about sister"))
         assertEquals("file.list", tool("show me my files").first)
         assertEquals("file.delete", tool("delete notes.txt").first)
@@ -125,5 +125,53 @@ class CommandParserTest {
         val v = validator.validate(r.request)
         assertIs<ValidationResult.Invalid>(v)
         assertTrue(v.errors.any { "'..'" in it })
+    }
+
+    @Test fun fullControlOfZedsOwnData() {
+        assertEquals("todo.delete" to mapOf("item" to "eggs"), tool("delete eggs from my shopping list"))
+        assertEquals("todo.delete" to mapOf("item" to "done"), tool("clear completed tasks"))
+        assertEquals("todo.delete" to mapOf("item" to "all"), tool("clear my task list"))
+        assertEquals("reminder.delete" to mapOf("item" to "rent"), tool("delete the reminder about rent"))
+        assertEquals("reminder.delete" to mapOf("item" to "all"), tool("delete all my reminders"))
+        assertEquals("reminder.cancel" to mapOf("id" to "2"), tool("cancel reminder 2"))
+        assertEquals("calendar.delete" to mapOf("query" to "dentist appointment"), tool("delete my dentist appointment"))
+        assertEquals("calendar.delete" to mapOf("query" to "meeting with Ana", "date" to "tomorrow"), tool("cancel the meeting with Ana tomorrow"))
+        assertEquals("calendar.delete" to mapOf("query" to "lunch"), tool("remove lunch from my calendar"))
+        assertEquals("docs.remove" to mapOf("query" to "all"), tool("clear my knowledge"))
+        assertEquals("docs.remove" to mapOf("query" to "notes.txt"), tool("remove notes.txt from the index"))
+        assertEquals("memory.forget" to mapOf("query" to "everything"), tool("forget everything"))
+        assertEquals("memory.forget" to mapOf("query" to "everything"), tool("delete all my memories"))
+        assertEquals("file.delete", tool("delete notes.txt").first, "files still delete as before")
+    }
+
+    @Test fun settingsAndScreensByVoice() {
+        assertEquals("settings.set" to mapOf("key" to "voice", "value" to "Atlas"), tool("change your voice to Atlas"))
+        assertEquals("settings.set" to mapOf("key" to "voice", "value" to "Atlas"), tool("use the Atlas voice"))
+        assertEquals("settings.set" to mapOf("key" to "wake_word", "value" to "off"), tool("turn off the wake word"))
+        assertEquals("settings.set" to mapOf("key" to "web_research", "value" to "on"), tool("enable web research"))
+        assertEquals("settings.set" to mapOf("key" to "wake_sensitivity", "value" to "high"), tool("set wake word sensitivity to high"))
+        assertEquals("settings.set" to mapOf("key" to "briefing_time", "value" to "07:30"), tool("set my briefing to 7:30 am"))
+        assertEquals("settings.set" to mapOf("key" to "user_title", "value" to "boss"), tool("call me boss"))
+        assertEquals("settings.set" to mapOf("key" to "speech_rate", "value" to "slower"), tool("talk slower"))
+        assertEquals("home.control", tool("turn on the bedroom lights").first, "devices are still smart home")
+        assertEquals("app.show" to mapOf("screen" to "reminders"), tool("open my reminders"))
+        assertEquals("app.show" to mapOf("screen" to "settings"), tool("open your settings"))
+        assertEquals("app.open", tool("open settings").first, "plain settings is the phone's Settings app")
+        assertEquals("app.open", tool("open spotify").first)
+        assertEquals(ParsedCommand.NotACommand, parser.parse("call me back later"))
+    }
+
+    @Test fun teachingByVoice() {
+        assertEquals("teach.pronounce" to mapOf("word" to "Cebu", "say" to "seh-boo"), tool("pronounce Cebu as seh-boo"))
+        assertEquals("teach.pronounce" to mapOf("word" to "Siargao", "say" to "shar-gow"), tool("Siargao is pronounced shar-gow"))
+        assertEquals("teach.rule" to mapOf("rule" to "Keep your answers short."), tool("from now on, keep your answers short"))
+        assertEquals("teach.rule" to mapOf("rule" to "Stop calling me sir."), tool("stop calling me sir"))
+        assertEquals("teach.rule" to mapOf("rule" to "Don't use emojis."), tool("don't use emojis"))
+        assertEquals("teach.alias" to mapOf("phrase" to "lights out", "meaning" to "turn off the lights"), tool("when I say lights out, I mean turn off the lights"))
+        assertEquals("teach.list", tool("what have you learned from me").first)
+        assertEquals("teach.forget" to mapOf("what" to "Cebu"), tool("forget the pronunciation of Cebu"))
+        // Ordinary requests are not lessons.
+        assertEquals("todo.add", tool("don't forget to buy batteries").first)
+        assertEquals("media.control", tool("stop the music").first)
     }
 }

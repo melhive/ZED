@@ -37,7 +37,15 @@ class ToolCatalog(specs: List<ToolSpec>) {
         private fun p(name: String, type: ParamType, desc: String, required: Boolean = true, enumValues: List<String> = emptyList(), min: Long? = null, max: Long? = null) =
             ParamSpec(name, type, desc, required, enumValues, min, max)
 
-        val SETTING_KEYS = listOf("voice_responses", "speech_rate", "auto_index", "use_knowledge", "theme_glow")
+        val SETTING_KEYS = listOf(
+            "voice_responses", "speech_rate", "speech_pitch", "voice", "wake_word", "wake_sensitivity", "barge_in", "auto_index", "use_knowledge",
+            "theme_glow", "animation", "auto_learning", "web_research", "think_twice", "proactive_hints", "brain_sounds", "ask_before",
+            "user_title", "weather_city", "briefing", "briefing_time", "check_updates", "persona",
+        )
+
+        /** Screens of the ZED app that [app.show] can open. */
+        val SCREENS = listOf("home", "chat", "live", "tasks", "more", "facts", "task_list", "reminders", "knowledge", "schedule", "taught", "brain",
+            "settings", "voice", "models", "files", "skills", "routines", "diagnostics", "backup", "whats_new")
 
         val DEFAULT = ToolCatalog(
             listOf(
@@ -82,6 +90,9 @@ class ToolCatalog(specs: List<ToolSpec>) {
                 ToolSpec("docs.search", "Search documents", "Searches the local document index.", listOf(
                     p("query", STRING, "Search terms"),
                 ), READ_ONLY),
+                ToolSpec("docs.remove", "Remove from knowledge", "Removes indexed documents from ZED's knowledge (the files themselves stay). Use all to clear the index.", listOf(
+                    p("query", STRING, "Words from the document's name or path, or all"),
+                ), DESTRUCTIVE),
                 ToolSpec("alarm.set", "Set alarm", "Sets an alarm in the system clock app.", listOf(
                     p("hour", INT, "Hour 0-23", min = 0, max = 23),
                     p("minute", INT, "Minute 0-59", min = 0, max = 59),
@@ -105,6 +116,10 @@ class ToolCatalog(specs: List<ToolSpec>) {
                     p("keep_day", BOOLEAN, "Only the time changes (same day)", required = false),
                     p("keep_time", BOOLEAN, "Only the day changes (same time)", required = false),
                 ), MODIFY),
+                ToolSpec("calendar.delete", "Delete calendar event", "Deletes an upcoming calendar event (only that occurrence of a repeating one).", listOf(
+                    p("query", STRING, "Which event: words from its title, e.g. dentist"),
+                    p("date", STRING, "Its day when known: today, tomorrow, or 2026-11-20", required = false),
+                ), DESTRUCTIVE, setOf(CALENDAR_READ)),
                 ToolSpec("reminder.create", "Create reminder", "Schedules a notification reminder.", listOf(
                     p("text", STRING, "What to be reminded about"),
                     p("at", DATETIME, "When, ISO-8601 local date-time"),
@@ -117,6 +132,9 @@ class ToolCatalog(specs: List<ToolSpec>) {
                 ToolSpec("reminder.cancel", "Cancel reminder", "Cancels a scheduled reminder by id.", listOf(
                     p("id", INT, "Reminder id", min = 1),
                 ), MODIFY),
+                ToolSpec("reminder.delete", "Delete reminder", "Deletes reminders for good (scheduled or past) by id or words from the text; all deletes every reminder.", listOf(
+                    p("item", STRING, "Reminder id, words from its text, or all"),
+                ), DESTRUCTIVE),
                 ToolSpec("todo.add", "Add task", "Adds an item to your task list.", listOf(
                     p("title", STRING, "Task title"),
                     p("due", DATETIME, "Optional due date-time", required = false),
@@ -127,6 +145,9 @@ class ToolCatalog(specs: List<ToolSpec>) {
                 ToolSpec("todo.complete", "Complete task", "Marks a task-list item as done, by id or title.", listOf(
                     p("item", STRING, "Item id or title"),
                 ), MODIFY),
+                ToolSpec("todo.delete", "Delete task", "Deletes items from the task list by id or title; done removes completed ones, all clears the list.", listOf(
+                    p("item", STRING, "Item id or title, done, or all"),
+                ), DESTRUCTIVE),
                 ToolSpec("memory.remember", "Remember fact", "Saves a fact you explicitly asked ZED to remember.", listOf(
                     p("fact", STRING, "The fact to remember"),
                 ), MODIFY),
@@ -134,16 +155,34 @@ class ToolCatalog(specs: List<ToolSpec>) {
                 ToolSpec("brain.show", "Show in the Live Brain", "Opens the Live Brain and flies to everything ZED knows about a person, place or topic.", listOf(
                     p("query", STRING, "Who or what to show, e.g. Ana; omit for the whole brain", required = false),
                 ), READ_ONLY),
-                ToolSpec("memory.forget", "Forget fact", "Deletes remembered facts matching the text.", listOf(
+                ToolSpec("memory.forget", "Forget fact", "Deletes remembered facts matching the text; everything forgets all facts.", listOf(
                     p("query", STRING, "Text of the fact(s) to forget"),
                 ), DESTRUCTIVE),
                 ToolSpec("history.search", "Search history", "Searches previous conversations.", listOf(
                     p("query", STRING, "Search terms"),
                 ), READ_ONLY),
-                ToolSpec("settings.set", "Change setting", "Changes an application setting.", listOf(
+                ToolSpec("settings.set", "Change setting", "Changes any ZED setting: on/off switches, voice (a voice name such as Atlas), speech_rate/speech_pitch (0.5–2, or faster/slower), wake_sensitivity (low, balanced, high, maximum), animation (full, balanced, light), ask_before (never, risky, always), user_title, weather_city, briefing (on/off), briefing_time (HH:mm), persona.", listOf(
                     p("key", ENUM, "Setting key", enumValues = SETTING_KEYS),
                     p("value", STRING, "New value"),
                 ), MODIFY),
+                ToolSpec("app.show", "Open a ZED screen", "Opens a screen of the ZED app itself (not another app).", listOf(
+                    p("screen", ENUM, "Which screen", enumValues = SCREENS),
+                ), READ_ONLY),
+                ToolSpec("teach.pronounce", "Learn a pronunciation", "Remembers how to pronounce a word or name when speaking.", listOf(
+                    p("word", STRING, "The word as written, e.g. Cebu"),
+                    p("say", STRING, "How to say it, spelled as it sounds, e.g. seh-boo"),
+                ), MODIFY),
+                ToolSpec("teach.rule", "Learn how to answer", "Saves a rule the user gave about how ZED should answer or behave, followed from now on.", listOf(
+                    p("rule", STRING, "The rule in the user's words, e.g. keep answers short"),
+                ), MODIFY),
+                ToolSpec("teach.alias", "Learn a shortcut", "Saves the user's own phrase and what it means, e.g. lights out → turn off the lights.", listOf(
+                    p("phrase", STRING, "What the user will say"),
+                    p("meaning", STRING, "What ZED should do or understand instead"),
+                ), MODIFY),
+                ToolSpec("teach.forget", "Forget a lesson", "Forgets a pronunciation, shortcut or answering rule the user taught; all forgets every lesson.", listOf(
+                    p("what", STRING, "The word, phrase or rule to forget, or all"),
+                ), DESTRUCTIVE),
+                ToolSpec("teach.list", "What ZED learned", "Lists the rules, pronunciations and shortcuts the user has taught ZED.", emptyList(), READ_ONLY),
                 ToolSpec("workflow.run", "Run workflow", "Runs a predefined workflow by name.", listOf(
                     p("name", STRING, "Workflow name"),
                 ), MODIFY),

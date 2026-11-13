@@ -61,7 +61,7 @@ fun ZedCard(
 ) {
     // Borderless glass panel: deep translucent fill, a soft accent glow from the corner and a small accent tab.
     val shape = RoundedCornerShape(22.dp)
-    // Scans in once: a band of light passes over the panel as it appears (kept across scrolling).
+    // Eases in once as it appears (kept across scrolling); no light band.
     var seen by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     val motion = LocalMotion.current
     val sweep = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(if (seen || motion != "full") 1f else 0f) }
@@ -80,11 +80,6 @@ fun ZedCard(
                     size.minDimension * 0.95f, androidx.compose.ui.geometry.Offset.Zero,
                 )
                 drawContent()
-                val p = sweep.value
-                if (p < 1f) {
-                    val y = size.height * (p * 1.4f - 0.2f)
-                    drawRect(Brush.verticalGradient(listOf(Color.Transparent, accent.copy(alpha = 0.22f * (1f - p)), Color.Transparent), y - 40f, y + 40f))
-                }
             }
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(16.dp),

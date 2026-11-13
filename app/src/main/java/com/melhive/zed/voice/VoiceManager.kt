@@ -70,7 +70,11 @@ class VoiceManager(
     private suspend fun ensure(): TextToSpeechEngine = mutex.withLock {
         val selection = VoiceSelection.parse(settings.current().voiceId)
         val key = keyFor(settings.current().voiceId)
-        engine?.let { if (engineKey == key) return it }
+        engine?.let {
+            if (engineKey == key) return it
+            // Standing in with the phone voice: keep it briefly, then try the chosen voice again.
+            if (engineKey == fallbackKey(key) && System.currentTimeMillis() - fallbackAt < RETRY_AFTER_MS) return it
+        }
         engine?.let { it.stop(); it.release() }
         forwardJob?.cancel()
         val created: TextToSpeechEngine = when (selection) {
@@ -138,22 +142,54 @@ class VoiceManager(
         _status.value = _status.value.copy(detail = detail)
     }
 
-    /** Replaces a failed or crashed neural voice with the phone voice so ZED keeps talking. */
+    private fun fallbackKey(key: String) = "fallback:$key"
+    @Volatile private var fallbackAt = 0L
+    private val restarts = ArrayDeque<Long>()
+
+    /**
+     * Replaces a failed or crashed neural voice. Android often kills the separate voice process
+     * while ZED is in the background; that is not a broken voice, so the chosen voice is simply
+     * restarted (up to 3 times in 5 minutes). Only a voice that cannot load falls back to the
+     * phone voice — and only for a while: the next session tries the chosen voice again.
+     */
     private suspend fun fallBack(failed: IsolatedNeuralTts, reason: String): TextToSpeechEngine? {
+        if (failed.crashed && allowRestart()) {
+            val restarted = mutex.withLock {
+                if (engine !== failed) return@withLock false
+                forwardJob?.cancel()
+                failed.release()
+                engine = null; engineKey = null
+                true
+            }
+            if (restarted) {
+                _status.value = Status(Phase.LOADING, _status.value.voiceLabel, "Restarting the voice engine…")
+                return runCatching { ensure() }.getOrNull()
+            }
+            return mutex.withLock { engine }
+        }
         val replacement = mutex.withLock {
             if (engine !== failed) return@withLock engine
             forwardJob?.cancel()
             failed.release()
-            AndroidTextToSpeech(context).also { attach(it, engineKey ?: "fallback") }
+            fallbackAt = System.currentTimeMillis()
+            AndroidTextToSpeech(context).also { attach(it, fallbackKey(engineKey ?: "voice")) }
         }
         _status.value = Status(Phase.FALLBACK, "System voice", "Neural voice unavailable ($reason). Using the phone voice; details are in Diagnostics.")
         return replacement
     }
 
+    private fun allowRestart(): Boolean = synchronized(restarts) {
+        val now = System.currentTimeMillis()
+        while (restarts.isNotEmpty() && now - restarts.first() > 5 * 60_000L) restarts.removeFirst()
+        if (restarts.size >= 3) false else { restarts.addLast(now); true }
+    }
+
     override fun speak(text: String, flush: Boolean): String? {
         val e = engine
         if (e == null) { scope.launch { awaitReady() }; return null } // reloads after a memory trim
-        return runCatching { e.speak(text, flush) }.onFailure { com.melhive.zed.android.CrashReporter.recordNonFatal("voice speak", it) }.getOrNull()
+        // Words the user taught ZED to say differently ("Cebu" → "seh-boo").
+        val spoken = com.melhive.zed.core.learning.Pronunciations.apply(text, com.melhive.zed.learning.TeachingStore.spoken)
+        return runCatching { e.speak(spoken, flush) }.onFailure { com.melhive.zed.android.CrashReporter.recordNonFatal("voice speak", it) }.getOrNull()
     }
     override fun stop() { runCatching { engine?.stop() } }
     override fun setRate(rate: Float) { this.rate = rate; engine?.setRate(rate) }
@@ -176,6 +212,8 @@ class VoiceManager(
     fun sessionHandle(): TextToSpeechEngine = object : TextToSpeechEngine by this@VoiceManager {
         override fun release() { this@VoiceManager.stop() }
     }
+
+    private companion object { const val RETRY_AFTER_MS = 2 * 60_000L }
 
     /** Speaks a sample with the current settings (used by the voice picker). */
     suspend fun preview(text: String): Boolean = try {
