@@ -46,7 +46,7 @@ class SkillRegistry(val catalog: ToolCatalog, skills: List<SkillDescriptor>) {
             SkillDescriptor("knowledge.local", "Local Knowledge", "Indexes your text documents on-device and searches them.", listOf("docs.index", "docs.search", "docs.remove")),
             SkillDescriptor("clock.alarms", "Alarms & Timers", "Sets alarms and timers through your clock app.", listOf("alarm.set", "timer.set")),
             SkillDescriptor("calendar.events", "Calendar", "Creates calendar events through your calendar app.", listOf("calendar.create", "calendar.move", "calendar.delete")),
-            SkillDescriptor("reminders", "Reminders", "Schedules reminder notifications.", listOf("reminder.create", "reminder.reschedule", "reminder.list", "reminder.cancel", "reminder.delete")),
+            SkillDescriptor("reminders", "Reminders", "Schedules reminder notifications.", listOf("reminder.create", "reminder.reschedule", "reminder.list", "reminder.cancel", "reminder.delete", "reminder.snooze")),
             SkillDescriptor("tasks.list", "Task List", "Keeps your personal to-do list.", listOf("todo.add", "todo.list", "todo.complete", "todo.delete")),
             SkillDescriptor("memory.personal", "Personal Memory", "Remembers facts only when you ask, and forgets on request.", listOf("memory.remember", "memory.list", "memory.forget", "brain.show")),
             SkillDescriptor("history.search", "Conversation History", "Searches your past conversations.", listOf("history.search")),

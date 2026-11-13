@@ -83,6 +83,15 @@ class NeuralTextToSpeech(
 
     private val trackLock = Any()
     private var track: AudioTrack? = null
+    /** Plays from the phone's loudspeaker even when earphones are connected (earphone-mic mode). */
+    @Volatile var speakerOnly = false
+        set(v) { field = v; track?.let { routeTo(it) } }
+    var appContext: android.content.Context? = null
+
+    private fun routeTo(t: AudioTrack) {
+        val ctx = appContext ?: return
+        runCatching { t.setPreferredDevice(if (speakerOnly) AudioRoute.phoneSpeaker(ctx) else null) }
+    }
     private var sampleRate = 0
     @Volatile private var framesWritten = 0L
 
@@ -253,6 +262,7 @@ class NeuralTextToSpeech(
             .build()
         track = t
         applyPitch(t)
+        routeTo(t)
         return t
     }
 

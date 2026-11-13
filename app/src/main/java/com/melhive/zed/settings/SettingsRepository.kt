@@ -68,6 +68,14 @@ data class AppSettings(
     val greetOnCall: Boolean = true,
     /** "auto": on-device recognition when downloaded, else the phone's service; "android": always the phone's service. */
     val speechEngine: String = "auto",
+    /** With earphones: "auto" (Android's routing) or "earphone_mic" (earphone mic, ZED talks from the phone speaker). */
+    val headsetAudio: String = "auto",
+    /** ZED appears and says each reminder when it's due. */
+    val announceReminders: Boolean = true,
+    /** Minutes before a calendar event that ZED announces it (0 = off). */
+    val eventAnnounceMinutes: Int = 10,
+    /** After an alarm is turned off, ZED appears with a good-morning briefing. */
+    val alarmBriefing: Boolean = true,
     val glow: Boolean = true,
     val onboardingDone: Boolean = false,
     val checkUpdates: Boolean = true,
@@ -125,6 +133,10 @@ class SettingsRepository(private val context: Context) {
         val bargeIn = booleanPreferencesKey("barge_in")
         val greetOnCall = booleanPreferencesKey("greet_on_call")
         val speechEngine = stringPreferencesKey("speech_engine")
+        val headsetAudio = stringPreferencesKey("headset_audio")
+        val announceReminders = booleanPreferencesKey("announce_reminders")
+        val eventAnnounceMinutes = androidx.datastore.preferences.core.intPreferencesKey("event_announce_minutes")
+        val alarmBriefing = booleanPreferencesKey("alarm_briefing")
         val glow = booleanPreferencesKey("glow")
         val onboarding = booleanPreferencesKey("onboarding_done")
         val checkUpdates = booleanPreferencesKey("check_updates")
@@ -172,6 +184,10 @@ class SettingsRepository(private val context: Context) {
             bargeIn = p[K.bargeIn] ?: defaults.bargeIn,
             greetOnCall = p[K.greetOnCall] ?: defaults.greetOnCall,
             speechEngine = p[K.speechEngine] ?: defaults.speechEngine,
+            headsetAudio = p[K.headsetAudio] ?: defaults.headsetAudio,
+            announceReminders = p[K.announceReminders] ?: defaults.announceReminders,
+            eventAnnounceMinutes = p[K.eventAnnounceMinutes] ?: defaults.eventAnnounceMinutes,
+            alarmBriefing = p[K.alarmBriefing] ?: defaults.alarmBriefing,
             glow = p[K.glow] ?: defaults.glow,
             onboardingDone = p[K.onboarding] ?: false,
             checkUpdates = p[K.checkUpdates] ?: defaults.checkUpdates,
@@ -215,6 +231,10 @@ class SettingsRepository(private val context: Context) {
     suspend fun setBargeIn(v: Boolean) = context.dataStore.edit { it[K.bargeIn] = v }
     suspend fun setGreetOnCall(v: Boolean) = context.dataStore.edit { it[K.greetOnCall] = v }
     suspend fun setSpeechEngine(v: String) = context.dataStore.edit { it[K.speechEngine] = v }
+    suspend fun setHeadsetAudio(v: String) = context.dataStore.edit { it[K.headsetAudio] = v }
+    suspend fun setAnnounceReminders(v: Boolean) = context.dataStore.edit { it[K.announceReminders] = v }
+    suspend fun setEventAnnounceMinutes(v: Int) = context.dataStore.edit { it[K.eventAnnounceMinutes] = v.coerceIn(0, 120) }
+    suspend fun setAlarmBriefing(v: Boolean) = context.dataStore.edit { it[K.alarmBriefing] = v }
     suspend fun setGlow(v: Boolean) = context.dataStore.edit { it[K.glow] = v }
     suspend fun setLocalContextTokens(v: Int) = context.dataStore.edit { it[K.contextTokens] = v }
     suspend fun setCheckUpdates(v: Boolean) = context.dataStore.edit { it[K.checkUpdates] = v }

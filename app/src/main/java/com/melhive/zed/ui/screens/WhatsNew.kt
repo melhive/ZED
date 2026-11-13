@@ -31,6 +31,12 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.35", "2026-11-13", "Announcements, earphones and a keyboard fix", listOf(
+            "ZED comes to you: when a reminder is due, ZED appears on your screen (even the lock screen), says it and listens — say “snooze ten minutes”. Calendar events are announced 10 minutes before they start (change it in More → Voice → Announcements).",
+            "After your alarm: when you turn off an alarm — any alarm, not only ones ZED set — ZED says good morning with the weather, your schedule and reminders. Snoozed alarms are skipped until you really get up.",
+            "Earphones: everything works the same with earphones or a headset. New option (More → Voice → With earphones): “Earphone mic, phone speaker” — ZED listens through your earphones' or earbuds' mic and talks from the phone. Or say “talk through the phone speaker”.",
+            "Typing in the floating orb and in LIVE: the text box now always sits right above the keyboard, on any phone; the orb shrinks out of the way while you type, and the keyboard opens straight into the box.",
+        )),
         Release("0.1.34", "2026-11-13", "Undo, replies, screen control and offline hearing", listOf(
             "Undo anything: every delete — tasks, reminders, memories, calendar events, documents, lessons and even files — can be taken back. Say “undo” within 30 minutes, or tap Undo on the bar that appears. Deleted files wait in a hidden trash until then.",
             "Reply to messages from any app: “reply to Ana: on my way”, “tell Mark on Messenger I'm coming”, “what did Ana say?”, “read my WhatsApp messages”. ZED answers right from the notification, no app opens. (Needs notification access.)",

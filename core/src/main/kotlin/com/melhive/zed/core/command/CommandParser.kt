@@ -166,6 +166,13 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         // Undo the last delete.
         Rule(rx("undo(?: (?:that|it|this|the (?:last )?(?:delete|deletion)))?|bring (?:it|that|them|those) back|restore (?:it|that|them|those)|put (?:it|that|them) back|(?:no,? )?i didn'?t mean (?:to )?(?:delete )?(?:that|it)(?:,? undo(?: it| that)?)?")) { tool("app.undo") },
 
+        // Snoozing the reminder that just went off.
+        Rule(rx("snooze(?: it| that| the reminder| this)?(?: for)?(?: (.+?))?|remind me again(?: in (.+?))?")) { m ->
+            val spoken = m.groupValues[1].ifEmpty { m.groupValues[2] }
+            val minutes = if (spoken.isBlank()) 10 else TimeParser.parseDurationSeconds(spoken)?.let { (it / 60).coerceAtLeast(1) } ?: return@Rule null
+            tool("reminder.snooze", "minutes" to minutes.toString())
+        },
+
         // Reminders (before generic delete/cancel).
         Rule(rx("(?:list|show)(?: me)?(?: all)? (?:my )?reminders|what are my reminders|reminders")) { tool("reminder.list") },
         Rule(rx("(?:cancel|delete|remove) reminder (?:#|number )?(\\d+)")) { m -> tool("reminder.cancel", "id" to m.groupValues[1]) },
@@ -289,6 +296,8 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         Rule(rx("(?:turn|switch) (on|off) (?:the )?(?:voice responses|voice replies|spoken responses|voice)")) { m -> tool("settings.set", "key" to "voice_responses", "value" to m.groupValues[1].lowercase()) },
         Rule(rx("(enable|disable) (?:the )?(?:voice responses|voice replies|spoken responses|voice)")) { m -> tool("settings.set", "key" to "voice_responses", "value" to if (m.groupValues[1].equals("enable", true)) "on" else "off") },
         Rule(rx("set (?:the )?speech rate to ([0-9.]+)")) { m -> tool("settings.set", "key" to "speech_rate", "value" to m.groupValues[1]) },
+        Rule(rx("(?:talk|speak|answer) (?:through|from|on|out of) (?:the |my )?phone(?: speaker)?(?: when i(?:'m| am) (?:using|wearing) (?:earphones|headphones|earbuds|a headset))?|(?:use|keep) the phone speaker(?: with earphones)?")) { tool("settings.set", "key" to "headset_audio", "value" to "phone speaker") },
+        Rule(rx("(?:talk|speak) (?:through|in|on) (?:my |the )?(?:earphones|headphones|earbuds|headset)")) { tool("settings.set", "key" to "headset_audio", "value" to "auto") },
         Rule(rx("set (?:the |your )?(?:speech |voice )?pitch to ([0-9.]+)")) { m -> tool("settings.set", "key" to "speech_pitch", "value" to m.groupValues[1]) },
         Rule(rx("(?:change|switch|set) (?:your |the |my )?voice to (?:the )?(.+?)(?: voice)?|use (?:the )?([\\p{L}]+(?: [\\p{L}]+)?) voice")) { m ->
             tool("settings.set", "key" to "voice", "value" to m.groupValues[1].ifEmpty { m.groupValues[2] })

@@ -15,6 +15,7 @@ object ToolSelector {
         "reminder.create" to w("remind", "reminder", "don'?t let me forget", "remember to"),
         "reminder.reschedule" to w("(?:move|change|push|shift) (?:[\\w']+ ){0,3}reminders?", "reschedule"),
         "reminder.list" to w("reminders"),
+        "reminder.snooze" to w("snooze", "remind me again", "later please"),
         "reminder.cancel" to w("(?:cancel|delete|remove|stop) (?:[\\w']+ ){0,3}reminders?"),
         "alarm.set" to w("alarm", "wake me"),
         "timer.set" to w("timer", "countdown", "count down"),

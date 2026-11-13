@@ -67,6 +67,7 @@ import com.melhive.zed.ui.theme.ZedColors
 import com.melhive.zed.voice.OrbState
 import kotlinx.coroutines.launch
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit) {
     val c = rememberContainer()
@@ -125,7 +126,9 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit) {
     Box(
         Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF070B16), ZedColors.Background, Color(0xFF02030A))))
     ) {
-        Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        // The whole panel sits above the keyboard; the orb shrinks while typing so the box stays visible.
+        val compact = typing || androidx.compose.foundation.layout.WindowInsets.isImeVisible
+        Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("ZED LIVE", style = MaterialTheme.typography.titleMedium, color = ZedColors.Muted, modifier = Modifier.weight(1f))
                 TaskIndicator(activeTasks, onOpenTasks)
@@ -140,7 +143,7 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit) {
             // The orb sits in the middle of the screen inside its HUD; the conversation lives below.
             Spacer(Modifier.weight(1f))
             androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                val hud = minOf(maxWidth * 0.86f, 340.dp)
+                val hud = if (compact) minOf(maxWidth * 0.4f, 140.dp) else minOf(maxWidth * 0.86f, 340.dp)
                 val interaction = remember { MutableInteractionSource() }
                 Box(Modifier.size(hud).clickable(interactionSource = interaction, indication = null) { live.tapOrb() }, contentAlignment = Alignment.Center) {
                     com.melhive.zed.ui.components.JarvisHud(state, Modifier.fillMaxSize(), animate = settings?.animationLevel != "light")
@@ -156,7 +159,7 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit) {
             Spacer(Modifier.weight(1f))
             if (state.transcript.isNotEmpty()) LazyColumn(
                 state = listState,
-                modifier = Modifier.fillMaxWidth().heightIn(max = 150.dp)
+                modifier = Modifier.fillMaxWidth().heightIn(max = if (compact) 110.dp else 150.dp)
                     .background(ZedColors.Surface.copy(alpha = 0.6f), androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -178,7 +181,7 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit) {
             }
             if (typing) {
                 OutlinedTextField(
-                    value = typed, onValueChange = { typed = it }, singleLine = true, modifier = Modifier.fillMaxWidth().imePadding(),
+                    value = typed, onValueChange = { typed = it }, singleLine = true, modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text("Type to ZED") },
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Send),
                     keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSend = { live.submitText(typed); typed = "" }),

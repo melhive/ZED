@@ -86,6 +86,10 @@ class ReminderReceiver : BroadcastReceiver() {
                 if (r != null && r.status == "scheduled") {
                     Notifications.post(context, Notifications.CHANNEL_REMINDERS, (100_000 + id).toInt(), "Reminder", r.text, "memory")
                     container.db.reminders().setStatus(id, "fired")
+                    // So "snooze ten minutes" knows which reminder.
+                    context.getSharedPreferences("zed_reminders", Context.MODE_PRIVATE).edit().putLong("last_fired", id).apply()
+                    // ZED comes onto the screen and says it.
+                    com.melhive.zed.agents.Announcer.onReminder(context, r.text)
                 }
             } finally {
                 pending.finish()
@@ -102,7 +106,11 @@ class BootReceiver : BroadcastReceiver() {
         val pending = goAsync()
         val container = (context.applicationContext as ZedApp).container
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-            try { container.reminderScheduler.rescheduleAll() } finally { pending.finish() }
+            try {
+                container.reminderScheduler.rescheduleAll()
+                runCatching { com.melhive.zed.agents.Announcer.planEvents(context) }
+                runCatching { com.melhive.zed.agents.Announcer.rememberNextAlarm(context) }
+            } finally { pending.finish() }
         }
     }
 }

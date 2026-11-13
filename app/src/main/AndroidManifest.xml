@@ -161,6 +161,15 @@
                 android:resource="@xml/accessibility_service" />
         </service>
 
+        <!-- Announcements: calendar events before they start, and a briefing after an alarm is turned off -->
+        <receiver
+            android:name=".agents.Announcer$AnnounceReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.app.action.NEXT_ALARM_CLOCK_CHANGED" />
+            </intent-filter>
+        </receiver>
+
         <!-- Quick Settings tile -->
         <service
             android:name=".assist.LiveTileService"

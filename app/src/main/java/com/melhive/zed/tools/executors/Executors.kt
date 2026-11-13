@@ -438,6 +438,13 @@ fun registerExecutors(tm: ToolManager, c: AppContainer, context: Context) {
         val r = c.reminderScheduler.create(old.text, at.epochMillis())
         ok("Reminder #${r.id} moved to ${at.pretty()}: “${r.text}”.")
     }
+    tm.register("reminder.snooze") { a, _ ->
+        val id = context.getSharedPreferences("zed_reminders", Context.MODE_PRIVATE).getLong("last_fired", 0L)
+        val r = c.db.reminders().get(id) ?: return@register fail("There's no reminder that just went off to snooze.")
+        val minutes = a.intOrNull("minutes")?.toInt() ?: 10
+        val again = c.reminderScheduler.create(r.text, System.currentTimeMillis() + minutes * 60_000L)
+        ok("I'll remind you again in $minutes minute${if (minutes == 1) "" else "s"}: “${again.text}”.")
+    }
     tm.register("reminder.list") { _, _ ->
         val list = c.db.reminders().scheduled()
         if (list.isEmpty()) ok("You have no upcoming reminders.")

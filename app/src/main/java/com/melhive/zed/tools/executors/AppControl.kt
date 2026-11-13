@@ -224,6 +224,11 @@ fun registerAppControl(tm: ToolManager, c: AppContainer, context: Context) {
             "think_twice" -> toggle("Think twice", { c.settings.setThinkTwice(it) })
             "brain_sounds" -> toggle("Brain sounds", { c.settings.setBrainSounds(it) })
             "check_updates" -> toggle("Update checks", { c.settings.setCheckUpdates(it) })
+            "headset_audio" -> {
+                val earMic = value.contains("phone") || value.contains("speaker") || value.contains("earphone_mic") || value == "mic"
+                c.settings.setHeadsetAudio(if (earMic) "earphone_mic" else "auto")
+                ok(if (earMic) "Okay — with earphones I'll listen through their mic and talk from the phone's speaker." else "Okay — with earphones I'll talk in them, like everything else.")
+            }
             "greeting" -> toggle("Greeting when you call me", { c.settings.setGreetOnCall(it) })
             "auto_learning" -> toggle("Learning from conversations", { c.settings.setAutoLearning(it) }) { com.melhive.zed.learning.Learner.schedule(context.applicationContext, it) }
             "proactive_hints" -> toggle("Hints", { c.settings.setProactiveHints(it) }) { com.melhive.zed.learning.Dreamer.scheduleHints(context.applicationContext, it) }

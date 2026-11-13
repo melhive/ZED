@@ -198,4 +198,13 @@ class CommandParserTest {
         assertEquals("notifications.recent", tool("show my notifications").first)
         assertEquals("home.secure", tool("lock the front door").first)
     }
+
+    @Test fun snoozeAndEarphones() {
+        assertEquals("reminder.snooze" to mapOf("minutes" to "10"), tool("snooze"))
+        assertEquals("reminder.snooze" to mapOf("minutes" to "15"), tool("snooze for 15 minutes"))
+        assertEquals("reminder.snooze" to mapOf("minutes" to "5"), tool("remind me again in 5 minutes"))
+        assertEquals("settings.set" to mapOf("key" to "headset_audio", "value" to "phone speaker"), tool("talk through the phone speaker"))
+        assertEquals("settings.set" to mapOf("key" to "headset_audio", "value" to "auto"), tool("talk through my earphones"))
+        assertEquals("reminder.create", tool("remind me to stretch in 10 minutes").first, "new reminders still work")
+    }
 }

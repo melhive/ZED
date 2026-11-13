@@ -57,6 +57,13 @@ class VoiceManager(
                 if (engine != null && engineKey != keyFor(id)) runCatching { awaitReady() }
             }
         }
+        // Earphone-mic mode: listening through the earphones, speaking from the phone.
+        scope.launch {
+            settings.settings.map { it.headsetAudio }.distinctUntilChanged().collect { id ->
+                AudioRoute.mode = AudioRoute.Mode.parse(id)
+                (engine as? IsolatedNeuralTts)?.setSpeakerOnly(AudioRoute.speakerForced())
+            }
+        }
         // A pack finishing its download makes its voice usable without restarting.
         scope.launch { packs.installed.collect { if (engine != null && engineKey != keyFor(settings.current().voiceId)) runCatching { awaitReady() } } }
     }
@@ -100,6 +107,7 @@ class VoiceManager(
 
     private fun attach(e: TextToSpeechEngine, key: String) {
         engine = e
+        (e as? IsolatedNeuralTts)?.setSpeakerOnly(AudioRoute.speakerForced())
         engineKey = key
         forwardJob = scope.launch { e.events.collect { _events.emit(it) } }
         e.setRate(rate); e.setPitch(pitch)

@@ -182,6 +182,38 @@ fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
             }
         }
         item {
+            ZedCard {
+                SectionTitle("Announcements")
+                Text("ZED comes onto your screen (even the lock screen) and says what's due, then listens — say “snooze ten minutes” to a reminder.",
+                    style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Reminders", style = MaterialTheme.typography.titleSmall)
+                        Text("Say each reminder when it's due", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
+                    }
+                    androidx.compose.material3.Switch(checked = settings.announceReminders, onCheckedChange = { on -> safely { c.settings.setAnnounceReminders(on) } })
+                }
+                Text("Calendar events", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 10.dp))
+                WrapRow(Modifier.padding(top = 4.dp)) {
+                    listOf(0 to "Off", 5 to "5 min before", 10 to "10 min", 15 to "15 min", 30 to "30 min").forEach { (m, label) ->
+                        FilterChip(selected = settings.eventAnnounceMinutes == m, onClick = { safely {
+                            c.settings.setEventAnnounceMinutes(m)
+                            com.melhive.zed.agents.Announcer.planEvents(context)
+                        } }, label = { Text(label) })
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
+                    Column(Modifier.weight(1f)) {
+                        Text("After my alarm", style = MaterialTheme.typography.titleSmall)
+                        Text("When you turn off an alarm, ZED says good morning with the weather and your day (skipped when you snooze)", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
+                    }
+                    androidx.compose.material3.Switch(checked = settings.alarmBriefing, onCheckedChange = { on -> safely { c.settings.setAlarmBriefing(on) } })
+                }
+                if (!android.provider.Settings.canDrawOverlays(context))
+                    Text("Allow ZED to display over other apps so it can appear on screen; without it, ZED only speaks.", style = MaterialTheme.typography.bodySmall, color = ZedColors.Amber, modifier = Modifier.padding(top = 6.dp))
+            }
+        }
+        item {
             val speech = com.melhive.zed.core.voice.VoiceCatalog.SPEECH
             val speechInstalled = speech.id in installed
             val speechTask = tasks.firstOrNull { it.type == TaskTypes.VOICE_DOWNLOAD && it.input()["pack"] == speech.id && !it.statusEnum().terminal }
@@ -223,6 +255,17 @@ fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
                     }
                 }
                 Text(com.melhive.zed.core.voice.SoundSynth.Style.parse(settings.liveSound).description, style = MaterialTheme.typography.labelSmall, color = ZedColors.Cyan)
+                Text("With earphones", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 10.dp))
+                WrapRow(Modifier.padding(top = 4.dp)) {
+                    listOf("auto" to "Automatic", "earphone_mic" to "Earphone mic, phone speaker").forEach { (id, label) ->
+                        FilterChip(selected = settings.headsetAudio == id, onClick = { safely { c.settings.setHeadsetAudio(id) } }, label = { Text(label) })
+                    }
+                }
+                Text(
+                    if (settings.headsetAudio == "earphone_mic") "ZED listens through your earphones' or earbuds' mic and talks from the phone's speaker. (Bluetooth earbuds switch to their call mic while LIVE is open.)"
+                    else "Everything works the same with earphones: ZED talks in them, a wired headset's mic is used automatically, and Bluetooth earbuds use the phone's mic. With earphones you can also interrupt ZED by talking.",
+                    style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted,
+                )
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
                     Column(Modifier.weight(1f)) {
                         Text("Greet me when I call", style = MaterialTheme.typography.titleSmall)

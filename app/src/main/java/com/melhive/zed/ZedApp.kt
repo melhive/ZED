@@ -41,6 +41,11 @@ class ZedApp : Application() {
             runCatching { container.reminderScheduler.rescheduleAll() }
             runCatching { container.routines.scheduleAll() }
             runCatching { container.audit.prune() }
+            // Announcements: the next calendar event, and the alarm to brief after.
+            runCatching { com.melhive.zed.agents.Announcer.planEvents(this@ZedApp) }
+            runCatching { com.melhive.zed.agents.Announcer.rememberNextAlarm(this@ZedApp) }
+            // Where ZED listens and speaks with earphones (read by LIVE and the recognizer).
+            launch { container.settings.settings.collect { com.melhive.zed.voice.AudioRoute.mode = com.melhive.zed.voice.AudioRoute.Mode.parse(it.headsetAudio) } }
             // Deleted files wait in a hidden trash only while they can be undone (this run of the app).
             runCatching { container.files.emptyTrash() }
             runCatching { com.melhive.zed.backup.AutoBackupWorker.schedule(this@ZedApp, container.settings.current().autoBackupFolder.isNotBlank()) }

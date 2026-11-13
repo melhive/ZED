@@ -27,6 +27,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -114,11 +117,18 @@ class AssistOverlayActivity : ComponentActivity() {
         intent?.getLongExtra(com.melhive.zed.voice.WakeWordService.EXTRA_WAKE_AT, 0L)?.takeIf { it > 0 }?.let {
             com.melhive.zed.diagnostics.SpeedLog.record(com.melhive.zed.diagnostics.SpeedLog.Stage.WAKE, System.currentTimeMillis() - it)
         }
-        // Called by "Hey Zed" or the assistant shortcut: ZED greets first.
-        live.start(greet = true)
+        // Called by "Hey Zed" or the assistant shortcut: ZED greets first. Or ZED came by itself to announce something.
+        val announcement = intent?.getStringExtra(com.melhive.zed.agents.Announcer.EXTRA_ANNOUNCE)
+        live.start(greet = announcement == null, announcement = announcement)
         // Have the on-device model ready by the time the question is asked.
         (application as com.melhive.zed.ZedApp).container.warmUpModel()
         setContent { ZedTheme { AssistOverlay(onClose = ::close, onOpenApp = ::openApp) } }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        // Already open: say the new announcement in the same session.
+        intent.getStringExtra(com.melhive.zed.agents.Announcer.EXTRA_ANNOUNCE)?.let { (application as ZedApp).container.live.announce(it) }
     }
 
     private fun close() {
@@ -140,6 +150,7 @@ class AssistOverlayActivity : ComponentActivity() {
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun AssistOverlay(onClose: () -> Unit, onOpenApp: () -> Unit) {
     val activity = androidx.compose.ui.platform.LocalContext.current as AssistOverlayActivity
@@ -219,12 +230,15 @@ private fun AssistOverlay(onClose: () -> Unit, onOpenApp: () -> Unit) {
                     .statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
+                // While the keyboard is up, the orb steps aside so the typing box sits right on top of the keyboard.
+                val keyboardUp = androidx.compose.foundation.layout.WindowInsets.isImeVisible
+                val compact = keyboardUp || typing
                 Text("ZED", style = MaterialTheme.typography.titleMedium, color = ZedColors.Cyan, letterSpacing = 8.sp, modifier = Modifier.padding(top = 8.dp))
-                com.melhive.zed.ui.screens.MiniBrain(Modifier.padding(top = 6.dp).size(64.dp))
+                if (!compact) com.melhive.zed.ui.screens.MiniBrain(Modifier.padding(top = 6.dp).size(64.dp))
                 Spacer(Modifier.weight(1f))
                 // The orb in the middle of the screen, as large as the screen allows.
                 androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    val hud = minOf(maxWidth * 0.88f, 380.dp)
+                    val hud = if (compact) minOf(maxWidth * 0.42f, 150.dp) else minOf(maxWidth * 0.88f, 380.dp)
                     Box(Modifier.size(hud).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { live.tapOrb() }, contentAlignment = Alignment.Center) {
                         JarvisHud(state, Modifier.fillMaxSize(), animate = !light)
                         ZedOrb(state.orb, micLevel = state.micLevel, speechPulse = state.speechPulse, size = hud * 0.58f, glow = settings?.glow ?: true, light = light)
@@ -240,15 +254,27 @@ private fun AssistOverlay(onClose: () -> Unit, onOpenApp: () -> Unit) {
                 val answering = state.orb == OrbState.THINKING || state.orb == OrbState.SPEAKING
                 val lastZed = if (answering && streaming.isNotBlank()) streaming.substringBefore("```")
                     else state.transcript.lastOrNull { !it.fromUser }?.text.orEmpty().takeIf { state.transcript.lastOrNull()?.fromUser == false }.orEmpty()
-                com.melhive.zed.ui.components.LiveCaptions(lastUser, lastZed)
-                com.melhive.zed.ui.components.ResultChips(results, Modifier.padding(top = 10.dp))
-                card?.let { r -> com.melhive.zed.ui.components.ResultCard(r, onDismiss = { card = null }, modifier = Modifier.padding(top = 10.dp)) }
+                // Captions and results scroll when space is short, so they never push the typing box away.
+                Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
+                    com.melhive.zed.ui.components.LiveCaptions(lastUser, lastZed)
+                    com.melhive.zed.ui.components.ResultChips(results, Modifier.padding(top = 10.dp))
+                    card?.let { r -> com.melhive.zed.ui.components.ResultCard(r, onDismiss = { card = null }, modifier = Modifier.padding(top = 10.dp)) }
+                }
                 Spacer(Modifier.weight(1f))
-                if (typing) OutlinedTextField(
-                    value = typed, onValueChange = { typed = it }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                    placeholder = { Text("Type to ZED") },
-                    trailingIcon = { IconButton(onClick = { live.submitText(typed); typed = ""; typing = false }) { Icon(Icons.AutoMirrored.Outlined.Send, "Send") } },
-                )
+                if (typing) {
+                    val focus = remember { androidx.compose.ui.focus.FocusRequester() }
+                    fun send() { if (typed.isNotBlank()) live.submitText(typed); typed = ""; typing = false }
+                    OutlinedTextField(
+                        value = typed, onValueChange = { typed = it }, singleLine = true,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp).focusRequester(focus),
+                        placeholder = { Text("Type to ZED") },
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Send),
+                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSend = { send() }),
+                        trailingIcon = { IconButton(onClick = { send() }) { Icon(Icons.AutoMirrored.Outlined.Send, "Send") } },
+                    )
+                    // Open the keyboard straight into the box.
+                    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+                }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                     HudButton(if (state.micMuted) Icons.Outlined.MicOff else Icons.Outlined.Mic, if (state.micMuted) "Unmute" else "Mute", live::toggleMute)
                     HudButton(if (state.speakerOn) Icons.AutoMirrored.Outlined.VolumeUp else Icons.AutoMirrored.Outlined.VolumeOff, "Voice replies", live::toggleSpeaker)

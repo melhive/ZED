@@ -78,6 +78,7 @@ class NeuralVoiceService : Service() {
                     if (pack == null || voice == null) { reply(MSG_READY, Bundle().apply { putBoolean(K_OK, false); putString(K_MESSAGE, "Unknown voice") }); return }
                     val e = NeuralTextToSpeech(pack, voice, File(data.getString(K_DIR).orEmpty()), data.getString(K_LANG).orEmpty())
                     e.setRate(data.getFloat(K_RATE, 1f)); e.setPitch(data.getFloat(K_PITCH, 1f))
+                    e.appContext = applicationContext; e.speakerOnly = data.getBoolean(K_SPEAKER, false)
                     e.onRealTimeFactor = { rtf -> reply(MSG_STATS, Bundle().apply { putFloat(K_RTF, rtf) }) }
                     e.onLevels = { bins -> reply(MSG_LEVELS, Bundle().apply { putFloatArray(K_BINS, bins) }) }
                     engine = e
@@ -93,6 +94,7 @@ class NeuralVoiceService : Service() {
                 MSG_STOP -> engine?.stop()
                 MSG_RATE -> engine?.setRate(data.getFloat(K_RATE, 1f))
                 MSG_PITCH -> engine?.setPitch(data.getFloat(K_PITCH, 1f))
+                MSG_ROUTE -> engine?.speakerOnly = data.getBoolean(K_SPEAKER, false)
             }
         } catch (e: Throwable) {
             com.melhive.zed.android.CrashReporter.recordNonFatal("voice process message ${msg.what}", e)
@@ -116,7 +118,8 @@ class NeuralVoiceService : Service() {
     }
 
     companion object {
-        const val MSG_LOAD = 1; const val MSG_SPEAK = 2; const val MSG_STOP = 3; const val MSG_RATE = 4; const val MSG_PITCH = 5
+        const val MSG_LOAD = 1; const val MSG_SPEAK = 2; const val MSG_STOP = 3; const val MSG_RATE = 4; const val MSG_PITCH = 5; const val MSG_ROUTE = 6
+        const val K_SPEAKER = "speaker"
         const val MSG_READY = 10; const val MSG_EVENT = 11; const val MSG_STATS = 12; const val MSG_LEVELS = 13
         const val EV_STARTED = 1; const val EV_WORD = 2; const val EV_DONE = 3; const val EV_STOPPED = 4; const val EV_ERROR = 5
         const val K_PACK = "pack"; const val K_SID = "sid"; const val K_DIR = "dir"; const val K_LANG = "lang"; const val K_RATE = "rate"
@@ -170,6 +173,7 @@ class IsolatedNeuralTts(
                 putString(NeuralVoiceService.K_PACK, pack.id); putInt(NeuralVoiceService.K_SID, voice.sid)
                 putString(NeuralVoiceService.K_DIR, dir.absolutePath); putString(NeuralVoiceService.K_LANG, languageTag)
                 putFloat(NeuralVoiceService.K_RATE, rate); putFloat(NeuralVoiceService.K_PITCH, pitch)
+                putBoolean(NeuralVoiceService.K_SPEAKER, speakerOnly)
             }, replyTo = true)
             synchronized(queued) { queued.forEach { safeSend(m, it) }; queued.clear() }
         }
@@ -258,6 +262,9 @@ class IsolatedNeuralTts(
 
     override fun setRate(rate: Float) { this.rate = rate; if (!released) send(NeuralVoiceService.MSG_RATE, Bundle().apply { putFloat(NeuralVoiceService.K_RATE, rate) }) }
     override fun setPitch(pitch: Float) { this.pitch = pitch; if (!released) send(NeuralVoiceService.MSG_PITCH, Bundle().apply { putFloat(NeuralVoiceService.K_PITCH, pitch) }) }
+    @Volatile private var speakerOnly = false
+    /** Earphone-mic mode: ZED's voice plays from the phone's loudspeaker. */
+    fun setSpeakerOnly(on: Boolean) { speakerOnly = on; if (!released) send(NeuralVoiceService.MSG_ROUTE, Bundle().apply { putBoolean(NeuralVoiceService.K_SPEAKER, on) }) }
     override fun isSpeaking(): Boolean = pending.isNotEmpty()
 
     override fun info(): VoiceInfo? = if (!ready.isCompleted) null else VoiceInfo(

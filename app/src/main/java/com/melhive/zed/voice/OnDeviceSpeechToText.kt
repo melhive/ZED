@@ -26,7 +26,7 @@ import kotlin.math.sqrt
  * no recognizer beep, words appear while you speak. Each start() is one utterance, ending when
  * you pause, like Android's recognizer. The model stays loaded between utterances ([Engine]).
  */
-class OnDeviceSpeechToText(private val dir: File) : SpeechToText {
+class OnDeviceSpeechToText(private val dir: File, private val context: android.content.Context) : SpeechToText {
     private val _events = MutableSharedFlow<SttEvent>(extraBufferCapacity = 128, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     override val events: SharedFlow<SttEvent> = _events.asSharedFlow()
     override val engineName: String = "On-device (NeMo FastConformer)"
@@ -74,6 +74,8 @@ class OnDeviceSpeechToText(private val dir: File) : SpeechToText {
         if (rec == null || rec.state != AudioRecord.STATE_INITIALIZED) {
             rec?.release(); emit(SttEvent.Error(android.speech.SpeechRecognizer.ERROR_AUDIO, "The microphone is busy", true)); return
         }
+        // Earphone-mic mode: record from the earphones' microphone.
+        if (AudioRoute.mode == AudioRoute.Mode.EARPHONE_MIC) AudioRoute.headsetMic(context)?.let { runCatching { rec.setPreferredDevice(it) } }
         val stream = recognizer.createStream("")
         val buf = ShortArray(CHUNK)
         var heardSpeech = false

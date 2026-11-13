@@ -113,8 +113,11 @@ class LiveSessionController(
     private var soundStyle = com.melhive.zed.core.voice.SoundSynth.Style.CORE
     private var hideBeep = true
 
-    /** Starts LIVE. [greet]: ZED was called ("Hey Zed" or the shortcut) and answers with a greeting first. */
-    fun start(greet: Boolean = false) {
+    /**
+     * Starts LIVE. [greet]: ZED was called ("Hey Zed" or the shortcut) and answers with a greeting first.
+     * [announcement]: ZED came onto the screen by itself (a reminder, an event, after an alarm) and says it.
+     */
+    fun start(greet: Boolean = false, announcement: String? = null) {
         if (_state.value.active) return
         if (!PermissionCatalog.isGranted(context, PermissionCatalog.MICROPHONE)) {
             _state.value = LiveUiState(orb = OrbState.ERROR, error = "Microphone permission is required for ZED LIVE.")
@@ -124,6 +127,7 @@ class LiveSessionController(
         scope = s
         WakeWordService.paused.value = true // LIVE takes the microphone
         exchanges = 0
+        AudioRoute.beginSession(context)
         stt = sttFactory()
         (stt as? OnDeviceSpeechToText)?.warm()
         tts = ttsFactory()
@@ -145,6 +149,8 @@ class LiveSessionController(
             if (!recognitionAvailable()) {
                 setOrb(OrbState.ERROR, "No speech recognition service on this phone. Use the keyboard or system voice input below, or install Google's speech services.")
                 com.melhive.zed.android.CrashReporter.recordNonFatal("live", IllegalStateException("No speech recognition service available"))
+            } else if (announcement != null) {
+                say(announcement)
             } else if (greet && cfg.greetOnCall && _state.value.speakerOn) {
                 // Answer like an assistant at the ready; listening starts when the greeting ends (or on a tap).
                 val name = runCatching { userName?.invoke() }.getOrNull()
@@ -166,6 +172,7 @@ class LiveSessionController(
     fun end() {
         if (_state.value.active) ZedSounds.play(context, soundStyle, start = false)
         BeepSuppressor.restore(context)
+        AudioRoute.endSession(context)
         WakeWordService.paused.value = false
         listenJob?.cancel()
         requestJob?.cancel()
@@ -202,6 +209,21 @@ class LiveSessionController(
             OrbState.LISTENING -> stt?.stop()
             else -> { consecutiveErrors = 0; if (_state.value.micMuted) toggleMute() else listen() }
         }
+    }
+
+    /** ZED speaks unprompted (an announcement), then listens for a reply. */
+    private fun say(text: String) {
+        _state.update { it.copy(transcript = it.transcript + LiveTurn(false, text)) }
+        replyFinished = true
+        if (_state.value.speakerOn) speakChunk(text)
+        if (pendingUtterances.isEmpty()) listen()
+    }
+
+    /** Something new to announce while LIVE is already open (a reminder comes due mid-conversation). */
+    fun announce(text: String) {
+        if (!_state.value.active) return
+        listenJob?.cancel(); stt?.cancel(); monitor?.stop()
+        say(text)
     }
 
     /** Sends typed text or text from the system voice-input popup (fallbacks when live recognition fails). */
@@ -399,7 +421,8 @@ class LiveSessionController(
 
     private fun startBargeIn() {
         // On the loudspeaker ZED would hear itself; talk-over interruption needs headphones. Tap the orb otherwise.
-        if (!bargeInEnabled || _state.value.micMuted || focus?.headphonesConnected() != true) return
+        // Also not when ZED speaks from the loudspeaker in earphone-mic mode (the mic would hear it).
+        if (!bargeInEnabled || _state.value.micMuted || focus?.headphonesConnected() != true || AudioRoute.speakerForced()) return
         val m = monitor ?: return
         m.start(
             onLevel = { lvl -> _state.update { it.copy(micLevel = lvl) } },

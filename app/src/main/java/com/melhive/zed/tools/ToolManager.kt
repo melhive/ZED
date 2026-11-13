@@ -65,6 +65,9 @@ class ToolManager(
 
     fun registered(): Set<String> = executors.keys
 
+    /** Called after a tool succeeds (e.g. calendar changes re-plan event announcements). */
+    var afterSuccess: ((String) -> Unit)? = null
+
     suspend fun execute(request: ToolRequest): ToolOutcome {
         val origin = request.origin.name
         val validation = validator.validate(request)
@@ -109,6 +112,7 @@ class ToolManager(
         return try {
             val result = executor.execute(args, request)
             audit.record(spec.name, origin, request.args, if (result.ok) "executed" else "failed", result.message)
+            if (result.ok) runCatching { afterSuccess?.invoke(spec.name) }
             ToolOutcome.Executed(spec, result)
         } catch (e: CancellationException) {
             throw e

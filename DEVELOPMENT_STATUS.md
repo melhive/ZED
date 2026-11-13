@@ -60,6 +60,12 @@ Failed tests: none.
 | Keystore secret storage | | ✅ | ✅ | |
 | STT / TTS / sentence streaming / barge-in / audio focus | VAD only | ✅ | ✅ | |
 
+## Announcements, earphones, keyboard (v0.1.35)
+
+- **Announcer** (`agents/Announcer.kt`): reminders (from `ReminderReceiver`), calendar events (one exact alarm for the next event, `eventAnnounceMinutes` before; re-planned at start, boot, every 3 h and after calendar tools via `ToolManager.afterSuccess`), and a briefing after an alarm: `NEXT_ALARM_CLOCK_CHANGED` fires when an alarm starts ringing, so a check 90 s later briefs unless the next alarm is within 20 min (snoozed). Opens the overlay with `EXTRA_ANNOUNCE` (needs display-over-apps; otherwise speaks in the background). `reminder.snooze` uses the last fired reminder.
+- **Earphones** (`voice/AudioRoute.kt`): `headsetAudio` = auto | earphone_mic. Earphone-mic mode prefers the headset mic (Bluetooth via communication device/SCO during LIVE) and plays the neural voice on the built-in speaker (`AudioTrack.setPreferredDevice`, MSG_ROUTE to the voice process); barge-in is off then (echo).
+- **Keyboard**: overlay and LIVE apply `imePadding` to the whole panel, shrink the orb while typing, and scroll captions, so the text field stays above the keyboard.
+
 ## Undo, replies, screen control, on-device hearing (v0.1.34)
 
 - **Undo** (`tools/Undo.kt`): `UndoLog` (30 min, in memory) + `Deleter` used by every delete path (executors and Memory screen); files go to `.zed-trash` in their granted folder (`SafFileSystem.trash`, emptied at start); `app.undo` tool; global `UndoBar` in `ZedRoot`.

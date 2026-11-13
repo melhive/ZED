@@ -83,6 +83,7 @@ class AppContainer(val context: Context) {
     val toolManager: ToolManager by lazy {
         ToolManager(catalog, skills, settings, AndroidCapabilityChecker(context, this), confirmations, audit, DefaultConfirmationText).also { tm ->
             registerExecutors(tm, this, context)
+            tm.afterSuccess = { tool -> if (tool.startsWith("calendar.") || tool == "app.undo") appScope.launch { runCatching { com.melhive.zed.agents.Announcer.planEvents(context) } } }
             workflows.toolManager = tm
         }
     }
@@ -136,7 +137,7 @@ class AppContainer(val context: Context) {
 
     /** The speech recognizer to use right now: on-device when available, otherwise the phone's service. */
     fun newSpeechToText(): com.melhive.zed.voice.SpeechToText =
-        if (onDeviceSpeech()) com.melhive.zed.voice.OnDeviceSpeechToText(voicePacks.dir(com.melhive.zed.core.voice.VoiceCatalog.SPEECH))
+        if (onDeviceSpeech()) com.melhive.zed.voice.OnDeviceSpeechToText(voicePacks.dir(com.melhive.zed.core.voice.VoiceCatalog.SPEECH), context)
         else AndroidSpeechToText(context)
 
     /** Every delete can be undone for 30 minutes ("undo" or the Undo bar). */

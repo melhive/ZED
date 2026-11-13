@@ -40,7 +40,7 @@ class ToolCatalog(specs: List<ToolSpec>) {
         val SETTING_KEYS = listOf(
             "voice_responses", "speech_rate", "speech_pitch", "voice", "wake_word", "wake_sensitivity", "barge_in", "auto_index", "use_knowledge",
             "theme_glow", "animation", "auto_learning", "web_research", "think_twice", "proactive_hints", "brain_sounds", "ask_before",
-            "user_title", "weather_city", "briefing", "briefing_time", "check_updates", "persona", "greeting",
+            "user_title", "weather_city", "briefing", "briefing_time", "check_updates", "persona", "greeting", "headset_audio",
         )
 
         /** Screens of the ZED app that [app.show] can open. */
@@ -127,6 +127,9 @@ class ToolCatalog(specs: List<ToolSpec>) {
                 ToolSpec("reminder.reschedule", "Move reminder", "Moves a scheduled reminder to a new time.", listOf(
                     p("id", INT, "Reminder id", min = 1),
                     p("at", DATETIME, "New time, ISO-8601 local date-time"),
+                ), MODIFY, setOf(NOTIFICATIONS)),
+                ToolSpec("reminder.snooze", "Snooze reminder", "Reminds again about the reminder that just went off, after some minutes (default 10).", listOf(
+                    p("minutes", INT, "How many minutes", required = false, min = 1, max = 1440),
                 ), MODIFY, setOf(NOTIFICATIONS)),
                 ToolSpec("reminder.list", "List reminders", "Lists upcoming reminders.", emptyList(), READ_ONLY),
                 ToolSpec("reminder.cancel", "Cancel reminder", "Cancels a scheduled reminder by id.", listOf(
