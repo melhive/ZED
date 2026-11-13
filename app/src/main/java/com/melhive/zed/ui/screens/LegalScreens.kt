@@ -78,6 +78,7 @@ private val PRIVACY = LegalDoc(
             "Location (optional): city-level, only for weather.",
             "Bluetooth (optional): to start a routine when a chosen device, such as your car, connects.",
             "Camera: ZED opens your camera app only when you ask “what am I looking at?”; the photo is looked at by the model on your phone.",
+            "Eye mode: while Eye mode is on screen, the front camera is used to find where your face is so the eyes can follow you, and to notice something you hold up. This happens on the phone and the frames are thrown away at once. When you ask “what is this?”, one picture is given to the AI model you chose (on the phone, or your online provider if you set one up) for that one answer; ZED does not save the picture. The camera is off whenever Eye mode is closed.",
         ),
         "Children" to listOf("ZED is not directed at children under 13."),
         "Changes" to listOf("This policy may change with app updates; the date above shows the latest version."),
