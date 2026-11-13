@@ -66,6 +66,8 @@ data class AppSettings(
     val bargeIn: Boolean = true,
     /** ZED speaks a greeting the moment it is called ("Hey Zed" or the assistant shortcut). */
     val greetOnCall: Boolean = true,
+    /** "auto": on-device recognition when downloaded, else the phone's service; "android": always the phone's service. */
+    val speechEngine: String = "auto",
     val glow: Boolean = true,
     val onboardingDone: Boolean = false,
     val checkUpdates: Boolean = true,
@@ -122,6 +124,7 @@ class SettingsRepository(private val context: Context) {
         val knownSkills = stringSetPreferencesKey("known_skills")
         val bargeIn = booleanPreferencesKey("barge_in")
         val greetOnCall = booleanPreferencesKey("greet_on_call")
+        val speechEngine = stringPreferencesKey("speech_engine")
         val glow = booleanPreferencesKey("glow")
         val onboarding = booleanPreferencesKey("onboarding_done")
         val checkUpdates = booleanPreferencesKey("check_updates")
@@ -168,6 +171,7 @@ class SettingsRepository(private val context: Context) {
             enabledSkills = (p[K.skills] ?: defaults.enabledSkills) + (defaults.enabledSkills - (p[K.knownSkills] ?: LEGACY_SKILLS)),
             bargeIn = p[K.bargeIn] ?: defaults.bargeIn,
             greetOnCall = p[K.greetOnCall] ?: defaults.greetOnCall,
+            speechEngine = p[K.speechEngine] ?: defaults.speechEngine,
             glow = p[K.glow] ?: defaults.glow,
             onboardingDone = p[K.onboarding] ?: false,
             checkUpdates = p[K.checkUpdates] ?: defaults.checkUpdates,
@@ -210,6 +214,7 @@ class SettingsRepository(private val context: Context) {
     suspend fun setAutoIndex(v: Boolean) = context.dataStore.edit { it[K.autoIndex] = v }
     suspend fun setBargeIn(v: Boolean) = context.dataStore.edit { it[K.bargeIn] = v }
     suspend fun setGreetOnCall(v: Boolean) = context.dataStore.edit { it[K.greetOnCall] = v }
+    suspend fun setSpeechEngine(v: String) = context.dataStore.edit { it[K.speechEngine] = v }
     suspend fun setGlow(v: Boolean) = context.dataStore.edit { it[K.glow] = v }
     suspend fun setLocalContextTokens(v: Int) = context.dataStore.edit { it[K.contextTokens] = v }
     suspend fun setCheckUpdates(v: Boolean) = context.dataStore.edit { it[K.checkUpdates] = v }

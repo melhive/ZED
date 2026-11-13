@@ -60,6 +60,15 @@ Failed tests: none.
 | Keystore secret storage | | ✅ | ✅ | |
 | STT / TTS / sentence streaming / barge-in / audio focus | VAD only | ✅ | ✅ | |
 
+## Undo, replies, screen control, on-device hearing (v0.1.34)
+
+- **Undo** (`tools/Undo.kt`): `UndoLog` (30 min, in memory) + `Deleter` used by every delete path (executors and Memory screen); files go to `.zed-trash` in their granted folder (`SafFileSystem.trash`, emptied at start); `app.undo` tool; global `UndoBar` in `ZedRoot`.
+- **Message replies**: `ZedNotificationListener` keeps each messaging notification's RemoteInput action; `message.reply` fills and sends it (name boundary resolved against chat titles), falls back to SMS or a prefilled WhatsApp chat; `messages.read`.
+- **Screen control** (`assist/ZedAccessibilityService.kt`): reads the top non-ZED app window, taps by label (node click, gesture fallback), scrolls, types (ACTION_SET_TEXT), global actions; `screen.read` summarized by Gemma.
+- **On-device ASR** (`voice/OnDeviceSpeechToText.kt`, pack `asr-nemo-en`): NeMo streaming FastConformer CTC 80 ms int8 via sherpa-onnx; measured locally with the real engine: ~2 s load, RTF 0.3 on 2 threads, ZED's voices transcribed correctly. `SpokenText.normalize` turns spoken numbers into digits/times (`SpokenTextTest`). Setting `speechEngine` (auto/android).
+- **Wake word**: ASR verification was measured and rejected (the recognizer hears “Hey Zed” as “he said”: 102→30/170). Instead a second phoneme model (`kws-phone-zh-en`) runs in parallel (OR): High 68→91/170 (FA 1→4/100), Maximum 103→112 (FA 10→13).
+- **Conversation mode** (overlay): follow-up listening after an answer, auto-close when quiet. **SelfTest** and **SpeedLog** in Diagnostics.
+
 ## Eight AI-assistant sounds and a spoken greeting (v0.1.32)
 
 - **Sounds** (`SoundSynth`): Hologram (default), Reactor, Neural, Scanner, Armor, Sonar, Core, Command, using FM "glass" tones, resonant sweeps, electric crackle, saturated low impacts and a Freeverb-style reverb; tails fade over the last 12%. Retired ids fall back to Hologram.

@@ -189,6 +189,8 @@ fun ZedRoot(requestedRoute: String?, onRouteConsumed: () -> Unit) {
                 screen(Routes.ROUTINES) { com.melhive.zed.ui.screens.RoutinesScreen(onBack = { nav.popBackStack() }) }
                 screen(Routes.VOICE) { com.melhive.zed.ui.screens.VoiceScreen(onBack = { nav.popBackStack() }, onOpenTasks = { nav.navigateTab(Routes.TASKS) }) }
             }
+            // Undo for the last delete, wherever it happened (voice, chat or a delete button).
+            com.melhive.zed.ui.components.UndoBar(container, Modifier.align(androidx.compose.ui.Alignment.BottomCenter))
         }
     }
 

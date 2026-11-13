@@ -19,6 +19,7 @@ class ZedApp : Application() {
         super.onCreate()
         CrashReporter.install(this)
         container = AppContainer(this)
+        com.melhive.zed.diagnostics.SpeedLog.init(this)
         isVoiceProcess = currentProcessName().endsWith(":voice")
         if (isVoiceProcess) return
         // A verified restore waiting from Backup & restore is swapped in now, before the database or settings are opened.
@@ -40,6 +41,8 @@ class ZedApp : Application() {
             runCatching { container.reminderScheduler.rescheduleAll() }
             runCatching { container.routines.scheduleAll() }
             runCatching { container.audit.prune() }
+            // Deleted files wait in a hidden trash only while they can be undone (this run of the app).
+            runCatching { container.files.emptyTrash() }
             runCatching { com.melhive.zed.backup.AutoBackupWorker.schedule(this@ZedApp, container.settings.current().autoBackupFolder.isNotBlank()) }
             // Automatic learning: after conversations while ZED is open, and twice a day while charging.
             runCatching { com.melhive.zed.learning.Learner.schedule(this@ZedApp, container.settings.current().autoLearning); container.learner.watch() }
@@ -80,6 +83,7 @@ class ZedApp : Application() {
             container.appScope.launch { runCatching { container.localRuntime.unload() } }
             // Neural voices hold 100–300 MB; release them only while ZED is in the background.
             if (level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) runCatching { if (!container.voice.isSpeaking()) container.voice.unload() }
+            if (level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND && !container.live.state.value.active) runCatching { com.melhive.zed.voice.OnDeviceSpeechToText.Engine.unload() }
         }
     }
 

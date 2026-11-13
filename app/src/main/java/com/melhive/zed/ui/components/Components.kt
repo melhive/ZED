@@ -30,6 +30,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -196,3 +198,32 @@ fun Modifier.hudBackground(): Modifier = this.drawBehind {
     drawCircle(Brush.radialGradient(listOf(ZedColors.Violet.copy(alpha = 0.06f), Color.Transparent), androidx.compose.ui.geometry.Offset(size.width, size.height), size.width),
         size.width, androidx.compose.ui.geometry.Offset(size.width, size.height))
 }
+
+/** "Deleted … · Undo" for a few seconds after any delete. Saying "undo" works for 30 minutes. */
+@Composable
+fun UndoBar(c: com.melhive.zed.AppContainer, modifier: Modifier = Modifier) {
+    val entry by c.undo.latest.collectAsState()
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var visible by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(entry?.id) {
+        val e = entry
+        visible = e != null && System.currentTimeMillis() - e.at < com.melhive.zed.tools.UndoLog.BAR_MS
+        if (visible && e != null) { kotlinx.coroutines.delay(com.melhive.zed.tools.UndoLog.BAR_MS - (System.currentTimeMillis() - e.at)); visible = false }
+    }
+    androidx.compose.animation.AnimatedVisibility(visible, modifier = modifier.padding(16.dp),
+        enter = androidx.compose.animation.slideInVertically { it } + androidx.compose.animation.fadeIn(),
+        exit = androidx.compose.animation.slideOutVertically { it } + androidx.compose.animation.fadeOut()) {
+        Row(
+            Modifier.clip(RoundedCornerShape(14.dp)).background(ZedColors.SurfaceHigh).padding(start = 16.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Deleted ${entry?.label.orEmpty()}", style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+            androidx.compose.material3.TextButton(onClick = {
+                visible = false
+                scope.launch { c.undo.undo()?.let { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_SHORT).show() } }
+            }) { Text("Undo", color = ZedColors.Cyan) }
+        }
+    }
+}
+

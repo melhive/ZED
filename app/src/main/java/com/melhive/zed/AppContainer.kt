@@ -1,5 +1,9 @@
 package com.melhive.zed
 
+import kotlinx.coroutines.flow.stateIn
+
+import kotlinx.coroutines.flow.map
+
 import android.content.Context
 import com.melhive.zed.agents.AssistantOrchestrator
 import com.melhive.zed.agents.ConfirmationBroker
@@ -35,7 +39,7 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 /** Manual dependency container. One instance per process, owned by [ZedApp]. */
-class AppContainer(private val context: Context) {
+class AppContainer(val context: Context) {
     /** Background scope: failures are recorded for Diagnostics instead of crashing the app. */
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default + kotlinx.coroutines.CoroutineExceptionHandler { _, e ->
         com.melhive.zed.android.CrashReporter.recordNonFatal("background", e)
@@ -111,7 +115,7 @@ class AppContainer(private val context: Context) {
     }
 
     val live by lazy {
-        LiveSessionController(context, orchestrator, conversations, settings, { AndroidSpeechToText(context) }, { voice.sessionHandle() })
+        LiveSessionController(context, orchestrator, conversations, settings, { newSpeechToText() }, { voice.sessionHandle() })
             .also { it.userName = { memory.userName() } }
     }
 
@@ -124,6 +128,20 @@ class AppContainer(private val context: Context) {
     val voicePacks by lazy { com.melhive.zed.voice.VoicePackRepository(context) }
 
     /** The voice ZED speaks with everywhere (system or neural, per Settings → Voice). */
+    // Lazy: the separate voice process also builds a container and must not open settings.
+    private val speechEngine by lazy { settings.settings.map { it.speechEngine }.stateIn(appScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, "auto") }
+
+    /** True when speech is recognized on the phone (model downloaded and not switched off). */
+    fun onDeviceSpeech(): Boolean = speechEngine.value != "android" && voicePacks.isInstalled(com.melhive.zed.core.voice.VoiceCatalog.SPEECH)
+
+    /** The speech recognizer to use right now: on-device when available, otherwise the phone's service. */
+    fun newSpeechToText(): com.melhive.zed.voice.SpeechToText =
+        if (onDeviceSpeech()) com.melhive.zed.voice.OnDeviceSpeechToText(voicePacks.dir(com.melhive.zed.core.voice.VoiceCatalog.SPEECH))
+        else AndroidSpeechToText(context)
+
+    /** Every delete can be undone for 30 minutes ("undo" or the Undo bar). */
+    val undo by lazy { com.melhive.zed.tools.UndoLog(appScope, context) }
+    val deleter by lazy { com.melhive.zed.tools.Deleter(this) }
     /** Pronunciations and shortcuts the user taught (loaded before the voice so taught words are said right). */
     val teaching by lazy { com.melhive.zed.learning.TeachingStore(context) }
     val voice by lazy { teaching; com.melhive.zed.voice.VoiceManager(context, settings, voicePacks, appScope) }

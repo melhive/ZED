@@ -176,7 +176,51 @@ object VoiceCatalog {
         voices = emptyList(),
     )
 
-    fun pack(id: String): VoicePack? = packs.firstOrNull { it.id == id } ?: WAKE_WORD.takeIf { it.id == id }
+    /**
+     * A second, phoneme-based wake word model (sherpa-onnx zh-en 3M, 2025-12-20). Run alongside
+     * [WAKE_WORD], waking when either hears "Zed": measured on 34 wake phrases × 5 conditions,
+     * High went from 68 to 91 of 170 and Maximum from 103 to 112 (false alarms on 100 near-miss
+     * sentences: 1→4 and 10→13).
+     */
+    val WAKE_WORD_2 = VoicePack(
+        id = "kws-phone-zh-en",
+        name = "Wake word booster",
+        kind = VoiceEngineKind.SYSTEM,
+        tagline = "Hey Zed",
+        description = "A second listening model that catches more “Hey Zed”s, especially quiet or distant ones.",
+        archiveUrl = "https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20.tar.bz2",
+        archiveRoot = "sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20",
+        sizeBytes = 32_885_699L,
+        sha256 = "68447f4fbc67e70eee3a93961f36e81e98f47aef73ce7e7ca00885c6cd3616a6",
+        keepFiles = setOf(
+            "encoder-epoch-13-avg-2-chunk-16-left-64.int8.onnx", "decoder-epoch-13-avg-2-chunk-16-left-64.onnx",
+            "joiner-epoch-13-avg-2-chunk-16-left-64.int8.onnx", "tokens.txt",
+        ),
+        license = "Apache-2.0 (k2-fsa)",
+        voices = emptyList(),
+    )
+
+    /**
+     * On-device English speech recognition: NVIDIA NeMo streaming FastConformer (CTC, 80 ms, int8)
+     * through sherpa-onnx. Measured on a Dimensity 7300: loads in ~2 s, transcribes 3× faster than
+     * real time on 2 threads, and reads back ZED's own voices word for word.
+     */
+    val SPEECH = VoicePack(
+        id = "asr-nemo-en",
+        name = "On-device speech recognition",
+        kind = VoiceEngineKind.SYSTEM,
+        tagline = "Offline · English",
+        description = "Understands what you say right on the phone: works offline, no Google beep, and words appear as you speak.",
+        archiveUrl = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-streaming-fast-conformer-ctc-en-80ms-int8.tar.bz2",
+        archiveRoot = "sherpa-onnx-nemo-streaming-fast-conformer-ctc-en-80ms-int8",
+        sizeBytes = 99_459_493L,
+        sha256 = "479759fbd5c69c909e7175d7773105a1bfabf82fa533de68c546c89d85f234e8",
+        keepFiles = setOf("model.int8.onnx", "tokens.txt"),
+        license = "CC-BY-4.0 (NVIDIA NeMo)",
+        voices = emptyList(),
+    )
+
+    fun pack(id: String): VoicePack? = packs.firstOrNull { it.id == id } ?: WAKE_WORD.takeIf { it.id == id } ?: SPEECH.takeIf { it.id == id } ?: WAKE_WORD_2.takeIf { it.id == id }
 
     fun voice(id: String): NeuralVoice? {
         val packId = id.substringBefore(':', "")

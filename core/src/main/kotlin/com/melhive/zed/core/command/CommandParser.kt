@@ -116,6 +116,8 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         else -> null
     }
 
+    private val MSG_APPS = "whatsapp|messenger|facebook messenger|telegram|viber|signal|instagram|line|discord|slack|teams|google chat|wechat"
+
     private val TITLES = setOf("sir", "ma'am", "maam", "madam", "boss", "chief", "captain", "master", "my lord", "my lady", "commander", "doc", "professor")
 
     private fun tool(name: String, vararg args: Pair<String, String?>): ParsedCommand =
@@ -160,6 +162,9 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         Rule(rx("how much (?:time )?(?:is )?left(?: on (?:my |the )?(.+?))?|how (?:long|much time) (?:is )?(?:left|remaining)(?: (?:on|for|until) (?:my |the )?(.+?))?|time (?:left|remaining)(?: on (?:my |the )?(.+?))?|how long (?:until|till|before) (?:my |the )?(.+?)|when(?:'s| is) my next (reminder|alarm|meeting|event|timer)")) { m ->
             tool("time.left", "target" to m.groupValues.drop(1).firstOrNull { it.isNotEmpty() })
         },
+
+        // Undo the last delete.
+        Rule(rx("undo(?: (?:that|it|this|the (?:last )?(?:delete|deletion)))?|bring (?:it|that|them|those) back|restore (?:it|that|them|those)|put (?:it|that|them) back|(?:no,? )?i didn'?t mean (?:to )?(?:delete )?(?:that|it)(?:,? undo(?: it| that)?)?")) { tool("app.undo") },
 
         // Reminders (before generic delete/cancel).
         Rule(rx("(?:list|show)(?: me)?(?: all)? (?:my )?reminders|what are my reminders|reminders")) { tool("reminder.list") },
@@ -330,6 +335,31 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
             tool("calendar.today", "date" to m.groupValues.drop(1).first { it.isNotEmpty() }.lowercase())
         },
 
+        // The screen (accessibility): read it, tap, scroll, type, phone buttons.
+        Rule(rx("(?:what(?:'s| is) on|read|describe|summari[sz]e|explain) (?:my |the |this )?screen|summari[sz]e (?:this|the) (?:page|article|post|chat|conversation|thread|email)|(?:what(?:'s| is)|what does) (?:this|that) (?:page|article|post|message|email) (?:say|about)(?: say)?")) { m -> tool("screen.read", "question" to m.value) },
+        Rule(rx("(?:tap|click|press|hit|select)(?: on)? (?:the )?(.+?)(?: button| link| icon)?(?: on (?:the|my) screen)?")) { m ->
+            val t = m.groupValues[1].trim()
+            // "press play" and "hit pause" are media keys; "press the back button" is the phone's Back.
+            if (Regex("^(?:play|pause|stop|next|previous)$", RegexOption.IGNORE_CASE).matches(t)) null
+            else if (Regex("^(?:back|home|recents?|recent apps)$", RegexOption.IGNORE_CASE).matches(t)) tool("screen.action", "action" to if (t.lowercase().startsWith("rec")) "recents" else t.lowercase())
+            else tool("screen.tap", "target" to t)
+        },
+        Rule(rx("scroll(?: (up|down|left|right))?(?: a bit| more| please)?|(?:swipe|go) (up|down)(?: the page)?")) { m -> tool("screen.scroll", "direction" to m.groupValues[1].ifEmpty { m.groupValues[2] }.ifEmpty { "down" }.lowercase()) },
+        Rule(rx("type (.+?)(?: (?:in|into) (?:the )?(.+?)(?: box| field| bar)?)?")) { m -> tool("screen.type", "text" to m.groupValues[1], "field" to m.groupValues[2]) },
+        Rule(rx("go back|go home|(?:go to|show(?: me)?) (?:the )?home screen|(?:show|open)(?: me)? (?:my |the )?recent apps|pull down (?:the |my )?notifications(?: shade| panel)?|open (?:the )?notification (?:shade|panel)|(?:open|show|pull down)(?: the)? quick settings|lock (?:my |the )?(?:phone|screen)|take a screenshot|screenshot")) { m ->
+            val v = m.value.lowercase()
+            val action = when {
+                v.startsWith("go back") -> "back"
+                "recent" in v -> "recents"
+                "quick settings" in v -> "quick_settings"
+                "notification" in v -> "notifications"
+                v.startsWith("lock") -> "lock"
+                "screenshot" in v -> "screenshot"
+                else -> "home"
+            }
+            tool("screen.action", "action" to action)
+        },
+
         // Phone and device control.
         Rule(rx("(?:turn|switch) (on|off) (?:the |my )?(?:flash ?light|torch)|(?:turn|switch) (?:the |my )?(?:flash ?light|torch) (on|off)|(?:flash ?light|torch) (on|off)")) { m ->
             tool("flashlight.set", "on" to onOff(m))
@@ -382,6 +412,20 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         Rule(rx("(?:call|phone|ring|dial) (.+?)(?: (?:on|using) (?:speaker|speakerphone))?")) { m ->
             val who = m.groupValues[1]
             if (who.lowercase().startsWith("me ") || who.equals("me", true)) null else tool("phone.call", "who" to who)
+        },
+        // Messaging apps: reply in place from the notification.
+        Rule(rx("(?:reply|respond|answer) to (.+?)(?: on ($MSG_APPS))?(?:,|:| saying| with| that)? (?:saying |that )?(.+)")) { m ->
+            tool("message.reply", "to" to m.groupValues[1], "message" to m.groupValues[3], "app" to m.groupValues[2])
+        },
+        Rule(rx("(?:send|tell|message|text) (.+?) on ($MSG_APPS)(?:,|:| saying| that)? (?:saying |that )?(.+)|(?:send (?:a )?)?($MSG_APPS)(?: message)?(?: to)? (.+?)(?:,|:| saying| that) (.+)")) { m ->
+            val g = m.groupValues
+            if (g[1].isNotEmpty()) tool("message.reply", "to" to g[1], "message" to g[3], "app" to g[2])
+            else tool("message.reply", "to" to g[5], "message" to g[6], "app" to g[4])
+        },
+        Rule(rx("(?:read|check|show)(?: me)? (?:my |the )?(?:latest |new |recent |last )?($MSG_APPS|text)? ?(?:messages|texts|chats)(?: from (.+?))?(?: on ($MSG_APPS))?|what did (.+?) (?:say|text|message|send)(?: me)?(?: on ($MSG_APPS))?|(?:any|do i have any) (?:new )?messages(?: from (.+?))?(?: on ($MSG_APPS))?")) { m ->
+            val g = m.groupValues
+            val app = listOf(g[1], g[3], g[5], g[7]).firstOrNull { it.isNotEmpty() }?.let { if (it.equals("text", true)) "Messages" else it }
+            tool("messages.read", "from" to listOf(g[2], g[4], g[6]).firstOrNull { it.isNotEmpty() }, "app" to app)
         },
         Rule(rx("(?:send (?:a )?(?:text|message|sms) to|text|message|sms) (.+?)(?:,|:| saying| that says| to say| that) (.+)")) { m -> tool("sms.compose", "to" to m.groupValues[1], "message" to m.groupValues[2]) },
         Rule(rx("(?:google|search google for|look up on google) (.+)|(?:open|go to) ((?:https?://)?[\\w-]+(?:\\.[\\w-]+)+(?:/\\S*)?)")) { m -> tool("web.open", "query" to m.groupValues[1].ifEmpty { m.groupValues[2] }) },

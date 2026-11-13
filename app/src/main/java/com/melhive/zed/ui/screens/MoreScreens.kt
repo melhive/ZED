@@ -6,6 +6,7 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -320,6 +321,8 @@ fun DiagnosticsScreen(onBack: () -> Unit) {
         }
         item { SpeedTestCard() }
         item { BackgroundJobsCard() }
+        item { SpeedCard() }
+        item { SelfTestCard() }
         item { SectionTitle("Permissions") }
         items(PermissionCatalog.ALL.filter { PermissionCatalog.applicable(it) }) { p ->
             val granted = remember(refresh) { PermissionCatalog.isGranted(context, p) }
@@ -611,3 +614,72 @@ fun AllowEverythingCard(onHide: (() -> Unit)? = null) {
         }
     }
 }
+
+/** How long each step takes on this phone, measured on real use. */
+@Composable
+private fun SpeedCard() {
+    var tick by remember { mutableIntStateOf(0) }
+    val rows = remember(tick) { com.melhive.zed.diagnostics.SpeedLog.summary() }
+    fun fmt(ms: Long) = if (ms < 1000) "$ms ms" else "%.1f s".format(ms / 1000.0)
+    ZedCard {
+        SectionTitle("Speed")
+        Text("Measured on this phone as you use ZED: the middle of the last 30 times for each step, with the best and the latest.", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
+        if (rows.isEmpty()) Text("Nothing measured yet. Talk to ZED a few times and come back.", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted, modifier = Modifier.padding(top = 8.dp))
+        rows.forEach { r ->
+            Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(r.stage.label, style = MaterialTheme.typography.titleSmall)
+                    Text(r.stage.detail, style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted)
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(fmt(r.median), style = MaterialTheme.typography.titleSmall, color = ZedColors.Cyan)
+                    Text("best ${fmt(r.best)} · last ${fmt(r.last)} · ${r.count}×", style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted)
+                }
+            }
+        }
+        if (rows.isNotEmpty()) TextButton(onClick = { com.melhive.zed.diagnostics.SpeedLog.clear(); tick++ }) { Text("Reset measurements") }
+    }
+}
+
+/** Checks on this phone that everything ZED does works (safely — test items are removed at once). */
+@Composable
+private fun SelfTestCard() {
+    val c = rememberContainer()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val results = remember { androidx.compose.runtime.mutableStateListOf<com.melhive.zed.diagnostics.SelfTest.Check>() }
+    var running by remember { mutableStateOf(false) }
+    ZedCard {
+        SectionTitle("Self-test")
+        Text("Checks that each thing ZED does works on this phone: reminders, calendar, clock, contacts, calls, texts, message replies, the floating orb, speech, “Hey Zed”, the voice, the AI model, files and screen control. It adds and removes a test task, reminder, event and file; nothing is sent or called.",
+            style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
+        Button(enabled = !running, onClick = {
+            results.clear(); running = true
+            scope.launch {
+                runCatching { com.melhive.zed.diagnostics.SelfTest(context, c).run { check -> results += check } }
+                running = false
+            }
+        }, modifier = Modifier.padding(top = 8.dp)) { Text(if (running) "Testing…" else if (results.isEmpty()) "Run self-test" else "Run again") }
+        if (results.isNotEmpty()) {
+            val fails = results.count { it.status == com.melhive.zed.diagnostics.SelfTest.Status.FAIL }
+            val warns = results.count { it.status == com.melhive.zed.diagnostics.SelfTest.Status.WARN }
+            if (!running) Text(if (fails == 0 && warns == 0) "Everything works." else "$fails problem${if (fails == 1) "" else "s"}, $warns to improve.",
+                style = MaterialTheme.typography.titleSmall, color = if (fails > 0) ZedColors.Red else if (warns > 0) ZedColors.Amber else ZedColors.Green, modifier = Modifier.padding(top = 8.dp))
+        }
+        results.forEach { r ->
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.Top) {
+                Text(when (r.status) { com.melhive.zed.diagnostics.SelfTest.Status.PASS -> "✓"; com.melhive.zed.diagnostics.SelfTest.Status.WARN -> "!"; else -> "✕" },
+                    color = when (r.status) { com.melhive.zed.diagnostics.SelfTest.Status.PASS -> ZedColors.Green; com.melhive.zed.diagnostics.SelfTest.Status.WARN -> ZedColors.Amber; else -> ZedColors.Red },
+                    style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(end = 10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(r.name, style = MaterialTheme.typography.titleSmall)
+                    Text(r.detail, style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
+                }
+                Text("${r.ms} ms", style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted)
+            }
+        }
+        if (!com.melhive.zed.assist.ZedAccessibilityService.isEnabled(context))
+            TextButton(onClick = { com.melhive.zed.assist.ZedAccessibilityService.openSettings(context) }) { Text("Turn on screen control") }
+    }
+}
+

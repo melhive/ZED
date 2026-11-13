@@ -243,6 +243,9 @@ interface KnowledgeDao {
     @Insert suspend fun insertDoc(d: KnowledgeDocEntity): Long
     @Insert suspend fun insertChunks(chunks: List<KnowledgeChunkEntity>)
 
+    @Query("SELECT * FROM knowledge_chunks WHERE docId = :docId ORDER BY ordinal")
+    suspend fun chunks(docId: Long): List<KnowledgeChunkEntity>
+
     @Query("DELETE FROM knowledge_docs WHERE id = :id")
     suspend fun deleteDoc(id: Long)
 

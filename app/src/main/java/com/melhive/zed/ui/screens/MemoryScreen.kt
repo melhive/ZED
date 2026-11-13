@@ -58,7 +58,7 @@ fun MemoryScreen(onBack: () -> Unit, initialTab: Int = 0, onOpenBrain: (() -> Un
         val writer = com.melhive.zed.agents.CalendarWriter(context)
         if (!writer.granted()) calendarPermission.launch(arrayOf(android.Manifest.permission.READ_CALENDAR, android.Manifest.permission.WRITE_CALENDAR))
         else scope.launch {
-            val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { writer.delete(item) }
+            val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { c.deleter.calendar(item, item.label.substringAfter(": ")) }
             if (!ok) android.widget.Toast.makeText(context, "Your calendar didn't allow deleting that event.", android.widget.Toast.LENGTH_SHORT).show()
             scheduleRefresh++
         }
@@ -105,7 +105,7 @@ fun MemoryScreen(onBack: () -> Unit, initialTab: Int = 0, onOpenBrain: (() -> Un
                         ZedCard {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(f.text, modifier = Modifier.weight(1f))
-                                IconButton(onClick = { scope.launch { c.memory.delete(listOf(f.id)) } }) { Icon(Icons.Outlined.Delete, "Delete rule", tint = ZedColors.Muted) }
+                                IconButton(onClick = { scope.launch { c.deleter.lessons(listOf(f), emptyMap(), emptyMap()) } }) { Icon(Icons.Outlined.Delete, "Delete rule", tint = ZedColors.Muted) }
                             }
                         }
                     }
@@ -117,7 +117,7 @@ fun MemoryScreen(onBack: () -> Unit, initialTab: Int = 0, onOpenBrain: (() -> Un
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text("$word → $say", modifier = Modifier.weight(1f))
                                 IconButton(onClick = { scope.launch { c.voice.preview("$word.") } }) { Icon(Icons.Outlined.PlayArrow, "Hear it", tint = ZedColors.Cyan) }
-                                IconButton(onClick = { c.teaching.forgetPronunciation(word) }) { Icon(Icons.Outlined.Delete, "Delete pronunciation", tint = ZedColors.Muted) }
+                                IconButton(onClick = { scope.launch { c.deleter.lessons(emptyList(), mapOf(word to say), emptyMap()) } }) { Icon(Icons.Outlined.Delete, "Delete pronunciation", tint = ZedColors.Muted) }
                             }
                         }
                     }
@@ -131,7 +131,7 @@ fun MemoryScreen(onBack: () -> Unit, initialTab: Int = 0, onOpenBrain: (() -> Un
                                     Text("“$phrase”")
                                     Text(meaning, style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
                                 }
-                                IconButton(onClick = { c.teaching.forgetAlias(phrase) }) { Icon(Icons.Outlined.Delete, "Delete shortcut", tint = ZedColors.Muted) }
+                                IconButton(onClick = { scope.launch { c.deleter.lessons(emptyList(), emptyMap(), mapOf(phrase to meaning)) } }) { Icon(Icons.Outlined.Delete, "Delete shortcut", tint = ZedColors.Muted) }
                             }
                         }
                     }
@@ -170,7 +170,7 @@ fun MemoryScreen(onBack: () -> Unit, initialTab: Int = 0, onOpenBrain: (() -> Un
                                 androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
                                     Text(r.text); Text(formatTime(r.triggerAt), style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted)
                                 }
-                                IconButton(onClick = { scope.launch { c.reminderScheduler.deleteReminder(r.id) } }) { Icon(Icons.Outlined.Delete, "Delete reminder", tint = ZedColors.Muted) }
+                                IconButton(onClick = { scope.launch { c.deleter.reminders(listOf(r)) } }) { Icon(Icons.Outlined.Delete, "Delete reminder", tint = ZedColors.Muted) }
                             }
                         }
                     }
@@ -186,7 +186,7 @@ fun MemoryScreen(onBack: () -> Unit, initialTab: Int = 0, onOpenBrain: (() -> Un
                             IconButton(onClick = { scope.launch { c.memory.update(f.copy(pinned = !f.pinned)) } }) {
                                 Icon(Icons.Outlined.PushPin, "Pin", tint = if (f.pinned) ZedColors.Cyan else ZedColors.Muted)
                             }
-                            IconButton(onClick = { scope.launch { c.memory.delete(listOf(f.id)) } }) { Icon(Icons.Outlined.Delete, "Delete", tint = ZedColors.Muted) }
+                            IconButton(onClick = { scope.launch { c.deleter.facts(listOf(f)) } }) { Icon(Icons.Outlined.Delete, "Delete", tint = ZedColors.Muted) }
                         }
                         val learned = f.source == "learned"
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -206,7 +206,7 @@ fun MemoryScreen(onBack: () -> Unit, initialTab: Int = 0, onOpenBrain: (() -> Un
                                 Icon(if (t.done) Icons.Outlined.CheckBox else Icons.Outlined.CheckBoxOutlineBlank, "Toggle done", tint = if (t.done) ZedColors.Green else ZedColors.Muted)
                             }
                             Text("#${t.id} ${t.title}", modifier = Modifier.weight(1f), textDecoration = if (t.done) TextDecoration.LineThrough else null)
-                            IconButton(onClick = { scope.launch { c.todos.delete(t.id) } }) { Icon(Icons.Outlined.Delete, "Delete", tint = ZedColors.Muted) }
+                            IconButton(onClick = { scope.launch { c.deleter.todos(listOf(t)) } }) { Icon(Icons.Outlined.Delete, "Delete", tint = ZedColors.Muted) }
                         }
                         t.dueAt?.let { Text("Due ${formatTime(it)}", style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted) }
                     }
@@ -218,7 +218,7 @@ fun MemoryScreen(onBack: () -> Unit, initialTab: Int = 0, onOpenBrain: (() -> Un
                     ZedCard {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("#${r.id} ${r.text}", modifier = Modifier.weight(1f))
-                            IconButton(onClick = { scope.launch { c.reminderScheduler.deleteReminder(r.id) } }) { Icon(Icons.Outlined.Delete, "Delete reminder", tint = ZedColors.Muted) }
+                            IconButton(onClick = { scope.launch { c.deleter.reminders(listOf(r)) } }) { Icon(Icons.Outlined.Delete, "Delete reminder", tint = ZedColors.Muted) }
                         }
                         Text("${formatTime(r.triggerAt)} · ${r.status}${if (r.status == "scheduled") if (r.exact) " · exact" else " · approximate" else ""}",
                             style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted)
@@ -232,12 +232,12 @@ fun MemoryScreen(onBack: () -> Unit, initialTab: Int = 0, onOpenBrain: (() -> Un
                     ZedCard {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(d.path, modifier = Modifier.weight(1f))
-                            IconButton(onClick = { scope.launch { c.knowledge.deleteDoc(d.id) } }) { Icon(Icons.Outlined.Delete, "Remove from index", tint = ZedColors.Muted) }
+                            IconButton(onClick = { scope.launch { c.deleter.docs(listOf(d)) } }) { Icon(Icons.Outlined.Delete, "Remove from index", tint = ZedColors.Muted) }
                         }
                         Text("${d.chunkCount} chunks · indexed ${formatTime(d.indexedAt)}", style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted)
                     }
                 }
-                if (docs.isNotEmpty()) item { TextButton(onClick = { scope.launch { c.knowledge.clear() } }) { Text("Clear index", color = ZedColors.Red) } }
+                if (docs.isNotEmpty()) item { TextButton(onClick = { scope.launch { c.deleter.docs(docs) } }) { Text("Clear index", color = ZedColors.Red) } }
             }
         }
     }
@@ -262,7 +262,7 @@ fun MemoryScreen(onBack: () -> Unit, initialTab: Int = 0, onOpenBrain: (() -> Un
             onDismissRequest = { confirmClear = false },
             title = { Text("Forget everything?") },
             text = { Text("All ${facts.size} remembered facts will be permanently deleted.") },
-            confirmButton = { TextButton(onClick = { val ids = facts.map { it.id }; scope.launch { c.memory.delete(ids) }; confirmClear = false }) { Text("Delete all", color = ZedColors.Red) } },
+            confirmButton = { TextButton(onClick = { scope.launch { c.deleter.facts(facts, "all your facts") }; confirmClear = false }) { Text("Delete all", color = ZedColors.Red) } },
             dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancel") } },
         )
     }

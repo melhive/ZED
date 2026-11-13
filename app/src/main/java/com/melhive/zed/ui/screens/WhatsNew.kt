@@ -31,6 +31,17 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.34", "2026-11-13", "Undo, replies, screen control and offline hearing", listOf(
+            "Undo anything: every delete — tasks, reminders, memories, calendar events, documents, lessons and even files — can be taken back. Say “undo” within 30 minutes, or tap Undo on the bar that appears. Deleted files wait in a hidden trash until then.",
+            "Reply to messages from any app: “reply to Ana: on my way”, “tell Mark on Messenger I'm coming”, “what did Ana say?”, “read my WhatsApp messages”. ZED answers right from the notification, no app opens. (Needs notification access.)",
+            "Screen control: “what's on my screen?”, “summarize this article”, “tap Send”, “scroll down”, “type pizza near me in the search box”, “go back”, “lock my phone”. Turn on ZED in Accessibility settings; it's used only when you ask and nothing is saved.",
+            "On-device speech recognition (More → Voice): ZED can understand you right on the phone — offline, private, no Google beep, and your words appear as you speak. English, 99 MB.",
+            "“Hey Zed” catches more: a second listening model (31 MB) runs alongside the first. In tests High now catches 91 of 170 wake phrases instead of 68, and Maximum 112 instead of 103.",
+            "Conversation mode: after ZED answers in the floating orb it keeps listening for a follow-up (“Still listening”), and closes by itself when you're done.",
+            "Self-test (More → Permissions & Diagnostics): checks on your phone that reminders, calendar, clock, contacts, calls, texts, replies, the orb, speech, “Hey Zed”, the voice, the AI model, files and screen control all work — and says what to fix.",
+            "Speed (same place): how long each step takes on your phone — hearing you, Gemma's first word, the voice starting, “Hey Zed” to the orb.",
+            "The home-screen widget also shows your next calendar event.",
+        )),
         Release("0.1.33", "2026-11-13", "Updated privacy policy", listOf(
             "The Privacy Policy and Terms are up to date: the removed real-time Gemini voice is no longer mentioned, and the lessons you teach ZED are listed among what stays on your phone. Both are also published at melhive.github.io/ZED.",
         )),

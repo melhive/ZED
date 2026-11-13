@@ -62,7 +62,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     val voicePartial = MutableStateFlow("")
     val notice = MutableStateFlow<String?>(null)
 
-    private var stt: AndroidSpeechToText? = null
+    private var stt: com.melhive.zed.voice.SpeechToText? = null
 
     init {
         viewModelScope.launch {
@@ -149,7 +149,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
     fun toggleVoiceInput() {
         if (listening.value) { stt?.stop(); return }
-        val engine = stt ?: AndroidSpeechToText(getApplication()).also { s ->
+        val engine = stt ?: (getApplication<com.melhive.zed.ZedApp>()).container.newSpeechToText().also { s ->
             stt = s
             viewModelScope.launch {
                 s.events.collect { e ->

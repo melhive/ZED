@@ -111,6 +111,9 @@ class AssistOverlayActivity : ComponentActivity() {
             // The full app asks for the microphone permission.
             startActivity(ZedLaunch.intent(this, ZedLaunch.ROUTE_LIVE)); finish(); return
         }
+        intent?.getLongExtra(com.melhive.zed.voice.WakeWordService.EXTRA_WAKE_AT, 0L)?.takeIf { it > 0 }?.let {
+            com.melhive.zed.diagnostics.SpeedLog.record(com.melhive.zed.diagnostics.SpeedLog.Stage.WAKE, System.currentTimeMillis() - it)
+        }
         // Called by "Hey Zed" or the assistant shortcut: ZED greets first.
         live.start(greet = true)
         // Have the on-device model ready by the time the question is asked.
@@ -181,6 +184,11 @@ private fun AssistOverlay(onClose: () -> Unit, onOpenApp: () -> Unit) {
     }
     val streaming by c.orchestrator.streamingText.collectAsStateWithLifecycle()
 
+    // Conversation mode: once the conversation goes quiet, the orb gets out of the way by itself.
+    LaunchedEffect(state.finished, typing, photoMenu) {
+        if (state.finished && !typing && !photoMenu) { kotlinx.coroutines.delay(1600); if (live.state.value.finished) onClose() }
+    }
+
     // Drag the panel anywhere; fling it away to dismiss.
     val drag = remember { androidx.compose.animation.core.Animatable(Offset.Zero, Offset.VectorConverter) }
     val dismissAt = with(androidx.compose.ui.platform.LocalDensity.current) { 140.dp.toPx() }
@@ -223,7 +231,8 @@ private fun AssistOverlay(onClose: () -> Unit, onOpenApp: () -> Unit) {
                     }
                 }
                 Text(
-                    (state.statusDetail?.takeIf { state.orb == OrbState.ERROR || state.orb == OrbState.EXECUTING } ?: state.orb.label).uppercase(),
+                    (state.statusDetail?.takeIf { state.orb == OrbState.ERROR || state.orb == OrbState.EXECUTING }
+                        ?: if (state.orb == OrbState.LISTENING && state.followUp) "Still listening" else state.orb.label).uppercase(),
                     style = MaterialTheme.typography.labelLarge, color = hudColor(state.orb), letterSpacing = 4.sp, textAlign = TextAlign.Center,
                 )
                 // Live captions: what ZED hears, and what it says while it says it.

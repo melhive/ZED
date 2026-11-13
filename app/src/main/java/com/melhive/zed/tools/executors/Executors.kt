@@ -132,6 +132,50 @@ fun registerExecutors(tm: ToolManager, c: AppContainer, context: Context) {
             }
         }
     }
+    tm.register("message.reply") { a, _ ->
+        val app = a.stringOrNull("app")?.trim()?.takeIf { it.isNotEmpty() }?.let { if (it.equals("facebook messenger", true)) "Messenger" else it }
+        var who = a.string("to").trim()
+        var msg = a.string("message").trim()
+        var targets = ZedNotificationListener.replyTargets(context, who, app)
+        // Spoken requests have no punctuation: "reply to Ana Cruz on my way" — let the chat names decide where the name ends.
+        if (targets.isEmpty()) {
+            val words = msg.split(Regex("\\s+"))
+            for (k in 1..minOf(3, words.size - 1)) {
+                val name = who + " " + words.take(k).joinToString(" ")
+                val t = ZedNotificationListener.replyTargets(context, name, app)
+                if (t.isNotEmpty()) { who = name; msg = words.drop(k).joinToString(" "); targets = t; break }
+            }
+        }
+        targets.firstOrNull()?.let { t ->
+            return@register if (ZedNotificationListener.sendReply(context, t, msg)) ok("Replied to ${t.who} on ${t.app}: “$msg”")
+            else fail("${t.app} didn't accept the reply. Open the chat with ${t.who} to answer.")
+        }
+        val access = ZedNotificationListener.hasAccess(context)
+        when {
+            app == null || app.equals("messages", true) || app.equals("sms", true) || app.equals("text", true) -> when (val t = phone.resolve(who)) {
+                is PhoneControl.Target.Problem -> fail(if (!access) "I can reply inside apps once you allow notification access (More → Permissions). ${t.message}" else t.message)
+                is PhoneControl.Target.Number -> when {
+                    phone.sendSms(t.number, msg) -> ok("Texted ${t.label}: “$msg”")
+                    phone.composeSms(t.number, msg) -> ok("Message to ${t.label} is ready — press send.")
+                    else -> fail("No messaging app is available.")
+                }
+            }
+            app.contains("whatsapp", true) -> when (val t = phone.resolve(who)) {
+                is PhoneControl.Target.Problem -> fail(t.message)
+                is PhoneControl.Target.Number -> if (phone.openWhatsApp(t.number, msg)) ok("There's no WhatsApp message from $who to answer, so I opened the chat with your message ready — tap send.")
+                    else fail("WhatsApp isn't installed.")
+            }
+            !access -> fail("To reply on $app, allow ZED notification access (More → Permissions). Then I can answer messages right from their notifications.")
+            else -> fail("There's no recent $app message from $who to reply to. As soon as they message you, I can answer it from the notification.")
+        }
+    }
+    tm.register("messages.read") { a, _ ->
+        val from = a.stringOrNull("from")?.takeIf { it.isNotBlank() }
+        val app = a.stringOrNull("app")?.takeIf { it.isNotBlank() }
+        val items = ZedNotificationListener.messagesFrom(context, from, app, 24)
+        if (items.isEmpty()) ok("No messages" + (from?.let { " from $it" } ?: "") + (app?.let { " on $it" } ?: "") + " in the last day.")
+        else ok(items.take(10).joinToString("\n") { "• ${it.title} (${it.app}): ${it.text}" })
+    }
     tm.register("app.open") { a, _ -> phone.openApp(a.string("name")).let { if (it.startsWith("Opened")) ok(it) else fail(it) } }
     tm.register("media.control") { a, _ -> ok(phone.media(a.string("action"))) }
     tm.register("music.play") { a, _ -> phone.playMusic(a.string("query")).let { if (it.startsWith("No ")) fail(it) else ok(it) } }
@@ -285,7 +329,10 @@ fun registerExecutors(tm: ToolManager, c: AppContainer, context: Context) {
     tm.register("file.move") { a, _ -> val n = c.files.move(a.string("source"), a.string("destination")); ok("Moved “$n” to “${a.string("destination")}”.") }
     tm.register("file.copy") { a, _ -> val n = c.files.copy(a.string("source"), a.string("destination")); ok("Copied to “${a.string("destination")}/$n”.") }
     tm.register("file.rename") { a, _ -> c.files.rename(a.string("path"), a.string("new_name")); ok("Renamed to “${a.string("new_name")}”.") }
-    tm.register("file.delete") { a, _ -> c.files.delete(a.string("path")); ok("Deleted “${a.string("path")}”.") }
+    tm.register("file.delete") { a, _ ->
+        if (c.deleter.file(a.string("path"))) ok("Deleted “${a.string("path")}”. Say “undo” within 30 minutes to bring it back.")
+        else ok("Deleted “${a.string("path")}”.")
+    }
 
     // ---- Background tasks ----
     tm.register("files.organize") { a, _ ->
@@ -400,7 +447,8 @@ fun registerExecutors(tm: ToolManager, c: AppContainer, context: Context) {
         }
     }
     tm.register("reminder.cancel") { a, _ ->
-        if (c.reminderScheduler.cancelReminder(a.int("id"))) ok("Reminder #${a.int("id")} cancelled.")
+        val before = c.db.reminders().get(a.int("id").toLong())
+        if (c.reminderScheduler.cancelReminder(a.int("id").toLong())) { before?.let { c.deleter.reminderCancelled(it) }; ok("Reminder #${a.int("id")} cancelled.") }
         else fail("No scheduled reminder #${a.int("id")}.")
     }
 
@@ -437,13 +485,13 @@ fun registerExecutors(tm: ToolManager, c: AppContainer, context: Context) {
     tm.register("memory.forget") { a, _ ->
         val q = a.string("query").trim().lowercase()
         if (q in setOf("everything", "all", "all memories", "all facts", "everything about me", "everything you know")) {
-            val n = c.memory.list(100_000).size
-            c.memory.clear()
-            return@register ok("Done — I forgot everything I knew ($n memories).")
+            val all = c.memory.list(100_000)
+            c.deleter.facts(all, "everything I knew")
+            return@register ok("Done — I forgot everything I knew (${all.size} memories). Say “undo” if you didn't mean it.")
         }
         val matches = c.memory.find(a.string("query"))
         if (matches.isEmpty()) fail("No memories match “${a.string("query")}”.")
-        else { c.memory.delete(matches.map { it.id }); ok("Forgot ${matches.size} memor${if (matches.size == 1) "y" else "ies"}: " + matches.joinToString("; ") { it.text }) }
+        else { c.deleter.facts(matches); ok("Forgot ${matches.size} memor${if (matches.size == 1) "y" else "ies"}: " + matches.joinToString("; ") { it.text }) }
     }
     tm.register("history.search") { a, _ ->
         val hits = c.conversations.search(a.string("query"))

@@ -5,6 +5,8 @@
     <string name="tile_live">ZED LIVE</string>
     <string name="tile_live_subtitle">Talk to ZED</string>
     <string name="widget_hint">Tap to talk</string>
+    <string name="accessibility_summary">Lets ZED read your screen and tap, scroll or type when you ask</string>
+    <string name="accessibility_description">ZED uses this only when you ask it to: “what\'s on my screen?”, “tap Send”, “scroll down”, “type hello”, “go back”. It reads the text on screen at that moment and acts on it. Nothing is recorded, saved or sent anywhere.</string>
     <string name="widget_talk">Talk</string>
     <string name="widget_type">Type</string>
     <string name="widget_description">Talk or type to ZED, with your next reminder</string>

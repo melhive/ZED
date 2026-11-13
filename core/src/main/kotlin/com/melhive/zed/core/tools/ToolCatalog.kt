@@ -165,6 +165,7 @@ class ToolCatalog(specs: List<ToolSpec>) {
                     p("key", ENUM, "Setting key", enumValues = SETTING_KEYS),
                     p("value", STRING, "New value"),
                 ), MODIFY),
+                ToolSpec("app.undo", "Undo", "Brings back what was just deleted (tasks, reminders, memories, events, documents, files, lessons) — the last 30 minutes.", emptyList(), MODIFY),
                 ToolSpec("app.show", "Open a ZED screen", "Opens a screen of the ZED app itself (not another app).", listOf(
                     p("screen", ENUM, "Which screen", enumValues = SCREENS),
                 ), READ_ONLY),
@@ -197,6 +198,15 @@ class ToolCatalog(specs: List<ToolSpec>) {
                     p("to", STRING, "Contact name or phone number"),
                     p("message", TEXT, "Message text"),
                 ), MODIFY),
+                ToolSpec("message.reply", "Reply to a message", "Replies inside a messaging app (WhatsApp, Messenger, Telegram, Viber, Signal, Messages…) to someone who messaged you, straight from the notification — no app opens.", listOf(
+                    p("to", STRING, "Who to reply to: their name as it appears in the chat"),
+                    p("message", TEXT, "What to send"),
+                    p("app", STRING, "The app, e.g. WhatsApp or Messenger, when said", required = false),
+                ), MODIFY),
+                ToolSpec("messages.read", "Read messages", "Reads recent messages from a person or a messaging app (from notifications).", listOf(
+                    p("from", STRING, "The person, when said", required = false),
+                    p("app", STRING, "The app, e.g. WhatsApp, when said", required = false),
+                ), READ_ONLY, setOf(NOTIFICATION_ACCESS)),
                 ToolSpec("app.open", "Open app", "Opens an installed app by name.", listOf(
                     p("name", STRING, "App name, e.g. Spotify, Camera, Settings"),
                 ), MODIFY, lowRisk = true),
@@ -256,6 +266,23 @@ class ToolCatalog(specs: List<ToolSpec>) {
                     p("target", STRING, "Device name, e.g. front door, garage"),
                     p("action", ENUM, "What to do", enumValues = listOf("lock", "unlock", "open", "close", "arm", "disarm")),
                 ), MODIFY, setOf(HOME_ASSISTANT, NETWORK), alwaysConfirm = true),
+                // ---- Screen awareness and control (accessibility, only when asked) ----
+                ToolSpec("screen.read", "Read the screen", "Reads what's on the screen in the app the user is looking at, and summarizes it or answers a question about it.", listOf(
+                    p("question", STRING, "What the user wants to know about the screen, when asked", required = false),
+                ), READ_ONLY),
+                ToolSpec("screen.tap", "Tap on screen", "Taps a button, link or item on screen by its label, e.g. Send, Like, Next.", listOf(
+                    p("target", STRING, "The label of what to tap"),
+                ), MODIFY, lowRisk = true),
+                ToolSpec("screen.scroll", "Scroll", "Scrolls the screen.", listOf(
+                    p("direction", ENUM, "Direction", enumValues = listOf("down", "up", "left", "right")),
+                ), MODIFY, lowRisk = true),
+                ToolSpec("screen.type", "Type on screen", "Types text into the text field on screen (the focused one, or the one named).", listOf(
+                    p("text", TEXT, "What to type"),
+                    p("field", STRING, "Which field, when said, e.g. search", required = false),
+                ), MODIFY, lowRisk = true),
+                ToolSpec("screen.action", "Phone button", "Presses Back or Home, opens recent apps, notifications or quick settings, locks the screen or takes a screenshot.", listOf(
+                    p("action", ENUM, "Which", enumValues = listOf("back", "home", "recents", "notifications", "quick_settings", "lock", "screenshot")),
+                ), MODIFY, lowRisk = true),
                 ToolSpec("device.status", "Phone status", "Reports battery, charging, network, storage, volume and Do Not Disturb.", emptyList(), READ_ONLY),
 
                 ToolSpec("web.research", "Search the web", "Searches the web and reads the best pages, for facts that may have changed or that you don't know (news, prices, results, opening hours). Returns numbered sources to cite. Only the query leaves the phone; offline, the request waits for the connection.", listOf(

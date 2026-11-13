@@ -34,6 +34,7 @@ data class FileItem(
  * otherwise the first granted folder is used.
  */
 class SafFileSystem(private val context: Context, private val folders: FolderDao) {
+    companion object { const val TRASH = ".zed-trash" }
 
     val grants: Flow<List<GrantedFolderEntity>> = folders.observeAll()
 
@@ -223,6 +224,26 @@ class SafFileSystem(private val context: Context, private val folders: FolderDao
         val (r, f) = find(path)
         if (r.relative.isEmpty()) throw FileOpException("A granted root folder cannot be deleted; remove the grant instead")
         if (!f.delete()) throw FileOpException("Delete failed")
+    }
+
+    /**
+     * Deletes [path] in a way that can be undone: it moves into a hidden ".zed-trash" folder at the
+     * root of its granted folder. Returns the trashed path and the folder it came from.
+     */
+    suspend fun trash(path: String): Pair<String, String> = withContext(Dispatchers.IO) {
+        val (r, f) = find(path)
+        if (r.relative.isEmpty()) throw FileOpException("A granted root folder cannot be deleted; remove the grant instead")
+        val prefix = if (path.substringBefore('/').equals(r.grant.displayName, ignoreCase = true)) r.grant.displayName else ""
+        val bin = PathPolicy.join(prefix, "$TRASH/${System.currentTimeMillis()}")
+        val name = move(path, bin)
+        PathPolicy.join(bin, name) to path.substringBeforeLast('/', "").let { if (f.parentFile == r.root) prefix else it }
+    }
+
+    /** Empties every ".zed-trash" folder (deleted files whose undo window has passed). */
+    suspend fun emptyTrash() = withContext(Dispatchers.IO) {
+        for (g in validGrants()) runCatching {
+            DocumentFile.fromTreeUri(context, Uri.parse(g.uri))?.listFiles()?.firstOrNull { it.name == TRASH }?.delete()
+        }
     }
 
     /** Moves a direct child of [folderPath] into a sub-folder, used by organize tasks. */

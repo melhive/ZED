@@ -214,6 +214,7 @@ class AssistantOrchestrator(
             val final = reply ?: if (provider != null) handleWithModel(conversationId, provider, voice, meant) else nativeConversation(conversationId, meant)
             // Instant (native) replies record how long the whole turn took; model replies are timed while streaming.
             runCatching { conversations.setTotalOnLastReply(conversationId, (System.nanoTime() - turnStartedAt) / 1_000_000) }
+            if (final.source == "native") com.melhive.zed.diagnostics.SpeedLog.record(com.melhive.zed.diagnostics.SpeedLog.Stage.NATIVE, (System.nanoTime() - turnStartedAt) / 1_000_000)
             setPhase(if (final.ok) AssistantPhase.COMPLETED else AssistantPhase.ERROR, if (final.ok) null else final.text, conversationId)
             final
         } catch (e: CancellationException) {
@@ -566,6 +567,8 @@ class AssistantOrchestrator(
             if (err != null) sb.append("\n\n[Interrupted: ${err.message}]")
             conversations.updateMessage(id, sb.toString(), "complete")
             runCatching { conversations.setTiming(id, firstTokenMs, elapsedMs(), sb.length) }
+            firstTokenMs?.let { com.melhive.zed.diagnostics.SpeedLog.record(com.melhive.zed.diagnostics.SpeedLog.Stage.FIRST_WORD, it) }
+            com.melhive.zed.diagnostics.SpeedLog.record(com.melhive.zed.diagnostics.SpeedLog.Stage.ANSWER, elapsedMs())
             StreamResult(id, sb.toString(), true, calls = calls.toList())
         }
     }

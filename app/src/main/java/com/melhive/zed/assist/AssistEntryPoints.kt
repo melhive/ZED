@@ -144,6 +144,10 @@ class ZedWidgetProvider : AppWidgetProvider() {
             val open = c.db.todos().list(false).size
             val parts = mutableListOf<String>()
             if (next != null) parts += "⏰ ${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(next.triggerAt))} ${next.text}"
+            // The next calendar event today, when it comes before the next reminder.
+            runCatching { com.melhive.zed.agents.CalendarReader(context).nextEvent(System.currentTimeMillis()) }.getOrNull()
+                ?.takeIf { (title, at) -> at - System.currentTimeMillis() < 18 * 3_600_000L && (next == null || at < next.triggerAt) && title.isNotBlank() }
+                ?.let { (title, at) -> parts.add(0, "📅 ${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(at))} $title") }
             if (open > 0) parts += "$open open task${if (open == 1) "" else "s"}"
             return parts.joinToString(" · ").ifEmpty { context.getString(R.string.widget_hint) }
         }

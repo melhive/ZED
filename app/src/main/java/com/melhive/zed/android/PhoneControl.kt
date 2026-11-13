@@ -101,6 +101,20 @@ class PhoneControl(private val context: Context) {
         }.isSuccess
     }
 
+    /** Opens a WhatsApp chat with [message] typed in (WhatsApp needs the number in international form). */
+    fun openWhatsApp(number: String, message: String): Boolean {
+        var digits = number.filter { it.isDigit() || it == '+' }
+        if (digits.startsWith("+")) digits = digits.drop(1)
+        else if (digits.startsWith("00")) digits = digits.drop(2)
+        else if (digits.startsWith("0")) {
+            val iso = runCatching { context.getSystemService(android.telephony.TelephonyManager::class.java).simCountryIso.lowercase() }.getOrDefault("")
+            val code = mapOf("ph" to "63", "us" to "1", "ca" to "1", "gb" to "44", "au" to "61", "in" to "91", "id" to "62", "my" to "60", "sg" to "65", "ae" to "971", "sa" to "966", "jp" to "81", "kr" to "82", "de" to "49", "fr" to "33", "es" to "34", "it" to "39", "nz" to "64", "hk" to "852", "th" to "66", "vn" to "84")[iso]
+            if (code != null) digits = code + digits.drop(1)
+        }
+        return start(Intent(Intent.ACTION_VIEW, Uri.parse("https://api.whatsapp.com/send?phone=$digits&text=" + Uri.encode(message))).setPackage("com.whatsapp")) ||
+            start(Intent(Intent.ACTION_VIEW, Uri.parse("https://api.whatsapp.com/send?phone=$digits&text=" + Uri.encode(message))).setPackage("com.whatsapp.w4b"))
+    }
+
     fun composeSms(number: String, message: String): Boolean =
         start(Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:" + Uri.encode(number))).putExtra("sms_body", message))
 
@@ -281,13 +295,54 @@ class ZedNotificationListener : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         toItem(this, sbn)?.let { item -> synchronized(recent) { recent.removeAll { it.key == item.key }; recent.addLast(item); while (recent.size > 200) recent.removeFirst() } }
+        replyTarget(this, sbn)?.let { t -> synchronized(replyable) { replyable.remove(t.key); replyable[t.key] = t; while (replyable.size > 60) replyable.remove(replyable.keys.first()) } }
     }
+
+    /** A conversation ZED can answer in place: a messaging notification with a reply box. */
+    data class ReplyTarget(val key: String, val app: String, val who: String, val action: android.app.Notification.Action, val time: Long)
 
     data class Item(val key: String, val app: String, val title: String, val text: String, val time: Long)
 
     companion object {
         @Volatile private var instance: ZedNotificationListener? = null
         private val recent = ArrayDeque<Item>()
+        private val replyable = LinkedHashMap<String, ReplyTarget>()
+
+        private fun replyTarget(context: Context, sbn: StatusBarNotification): ReplyTarget? {
+            if (sbn.packageName == context.packageName) return null
+            val n = sbn.notification ?: return null
+            val action = n.actions?.firstOrNull { a -> a.remoteInputs?.any { it.allowFreeFormInput } == true } ?: return null
+            val extras = n.extras
+            val who = (extras.getCharSequence(android.app.Notification.EXTRA_CONVERSATION_TITLE) ?: extras.getCharSequence(android.app.Notification.EXTRA_TITLE))
+                ?.toString()?.replace(Regex("\\s*\\(\\d+ (?:new )?messages?\\)$"), "")?.trim().orEmpty()
+            if (who.isBlank()) return null
+            val app = runCatching { context.packageManager.getApplicationLabel(context.packageManager.getApplicationInfo(sbn.packageName, 0)).toString() }.getOrDefault(sbn.packageName)
+            return ReplyTarget(sbn.key, app, who, action, sbn.postTime)
+        }
+
+        /** Conversations from [who] (and [app], if given) that can be answered right now, newest first. */
+        fun replyTargets(context: Context, who: String, app: String?): List<ReplyTarget> {
+            val active = runCatching { instance?.activeNotifications?.mapNotNull { replyTarget(context, it) } }.getOrNull().orEmpty()
+            val kept = synchronized(replyable) { replyable.values.toList() }
+            val q = who.trim().lowercase()
+            return (active + kept).distinctBy { it.key }
+                .filter { t -> (app == null || t.app.contains(app, ignoreCase = true)) && t.who.lowercase().let { it.contains(q) || (q.contains(it) && it.length >= 3) } }
+                .sortedByDescending { it.time }
+        }
+
+        /** Types [message] into the conversation's reply box and sends it. */
+        fun sendReply(context: Context, target: ReplyTarget, message: String): Boolean = runCatching {
+            val inputs = target.action.remoteInputs ?: return false
+            val results = android.os.Bundle().apply { inputs.filter { it.allowFreeFormInput }.forEach { putCharSequence(it.resultKey, message) } }
+            val intent = Intent().addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
+            android.app.RemoteInput.addResultsToIntent(inputs, intent, results)
+            target.action.actionIntent.send(context, 0, intent)
+            true
+        }.getOrDefault(false)
+
+        /** Recent messages from a person or app (newest first). */
+        fun messagesFrom(context: Context, who: String?, app: String?, hours: Int = 24): List<Item> =
+            recent(context, app, hours).filter { who == null || it.title.contains(who, ignoreCase = true) }
 
         fun hasAccess(context: Context): Boolean =
             androidx.core.app.NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)

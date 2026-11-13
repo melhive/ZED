@@ -49,6 +49,10 @@ data class LiveUiState(
     val echoCancellation: Boolean = false,
     val sttEngine: String = "",
     val error: String? = null,
+    /** Listening for a follow-up after ZED answered (no need to say "Hey Zed" again). */
+    val followUp: Boolean = false,
+    /** The conversation went quiet: the floating orb closes itself. */
+    val finished: Boolean = false,
 )
 
 /**
@@ -79,6 +83,11 @@ class LiveSessionController(
     /** The user's name, for greetings (set by the container). */
     var userName: (suspend () -> String?)? = null
     private var lastGreeting: String? = null
+    /** Answers given in this session; after the first, listening is a follow-up. */
+    private var exchanges = 0
+    private var speechEndedAt = 0L
+    /** When each sentence was handed to the voice, to time how quickly it starts speaking. */
+    private val queuedAt = HashMap<String, Long>()
 
     private val _state = MutableStateFlow(LiveUiState())
     val state: StateFlow<LiveUiState> = _state.asStateFlow()
@@ -114,7 +123,9 @@ class LiveSessionController(
         val s = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         scope = s
         WakeWordService.paused.value = true // LIVE takes the microphone
+        exchanges = 0
         stt = sttFactory()
+        (stt as? OnDeviceSpeechToText)?.warm()
         tts = ttsFactory()
         monitor = BargeInMonitor(s)
         focus = AudioFocus(context) { reason -> s.launch { onInterrupted(reason) } }
@@ -230,7 +241,7 @@ class LiveSessionController(
 
     private fun listen() {
         if (!_state.value.active || _state.value.micMuted) return
-        _state.update { it.copy(partial = "", micLevel = 0f) }
+        _state.update { it.copy(partial = "", micLevel = 0f, followUp = exchanges > 0, finished = false) }
         setOrb(OrbState.LISTENING)
         listenJob?.cancel()
         listenJob = scope?.launch {
@@ -238,7 +249,8 @@ class LiveSessionController(
             monitor?.stopAndJoin()
             delay(120)
             if (_state.value.orb == OrbState.LISTENING && !_state.value.micMuted) {
-                if (hideBeep) BeepSuppressor.suppress(context)
+                // The on-device recognizer makes no beep of its own.
+                if (hideBeep && stt !is OnDeviceSpeechToText) BeepSuppressor.suppress(context)
                 stt?.start()
             }
         }
@@ -249,8 +261,11 @@ class LiveSessionController(
             is SttEvent.Level -> if (_state.value.orb == OrbState.LISTENING) _state.update { it.copy(micLevel = e.level) }
             is SttEvent.Partial -> _state.update { it.copy(partial = e.text) }
             is SttEvent.Ready, is SttEvent.SpeechStarted -> consecutiveErrors = 0
+            is SttEvent.EndOfSpeech -> speechEndedAt = System.currentTimeMillis()
             is SttEvent.Final -> {
                 consecutiveErrors = 0
+                if (speechEndedAt > 0) com.melhive.zed.diagnostics.SpeedLog.record(com.melhive.zed.diagnostics.SpeedLog.Stage.HEARING, System.currentTimeMillis() - speechEndedAt)
+                speechEndedAt = 0
                 val text = e.text.trim()
                 _state.update { it.copy(partial = "", micLevel = 0f) }
                 if (text.isEmpty()) onNothingHeard() else { emptyResults = 0; submit(text) }
@@ -277,8 +292,12 @@ class LiveSessionController(
 
     private fun onNothingHeard() {
         emptyResults++
-        if (emptyResults >= 2) { emptyResults = 0; setOrb(OrbState.IDLE, "Tap the orb to talk") }
-        else listen()
+        // Conversation mode: after an answer, silence means the user is done.
+        if (_state.value.followUp || emptyResults >= 2) {
+            emptyResults = 0
+            setOrb(OrbState.IDLE, "Tap the orb to talk")
+            _state.update { it.copy(followUp = false, finished = true) }
+        } else listen()
     }
 
     /** "What am I looking at?": sends a photo with a question. */
@@ -332,6 +351,7 @@ class LiveSessionController(
     private fun speakChunk(text: String) {
         val id = tts?.speak(text, flush = false) ?: return
         pendingUtterances += id
+        if (pendingUtterances.size == 1) queuedAt[id] = System.currentTimeMillis()
         if (_state.value.orb != OrbState.SPEAKING) {
             focus?.acquire()
             setOrb(OrbState.SPEAKING)
@@ -341,6 +361,7 @@ class LiveSessionController(
 
     private fun onReply(reply: AssistantReply) {
         replyFinished = true
+        exchanges++
         if (!reply.ok) com.melhive.zed.android.CrashReporter.recordNonFatal("live reply", IllegalStateException(reply.text))
         _state.update { it.copy(transcript = it.transcript + LiveTurn(false, reply.text)) }
         if (_state.value.speakerOn) {
@@ -372,7 +393,7 @@ class LiveSessionController(
                     scope?.launch { delay(400); if (pendingUtterances.isEmpty() && replyFinished) listen() }
                 }
             }
-            is TtsEvent.Started -> Unit
+            is TtsEvent.Started -> queuedAt.remove(e.utteranceId)?.let { com.melhive.zed.diagnostics.SpeedLog.record(com.melhive.zed.diagnostics.SpeedLog.Stage.VOICE, System.currentTimeMillis() - it) }
         }
     }
 

@@ -57,7 +57,7 @@ fun registerAppControl(tm: ToolManager, c: AppContainer, context: Context) {
                 }
             }
         }
-        gone.forEach { c.todos.delete(it.id) }
+        c.deleter.todos(gone)
         ok(if (gone.size == 1) "Deleted “${gone.first().title}” from your task list." else "Deleted ${gone.size} tasks.")
     }
 
@@ -80,7 +80,7 @@ fun registerAppControl(tm: ToolManager, c: AppContainer, context: Context) {
                 }
             }
         }
-        gone.forEach { c.reminderScheduler.deleteReminder(it.id) }
+        c.deleter.reminders(gone)
         ok(if (gone.size == 1) "Deleted the reminder “${gone.first().text}”." else "Deleted ${gone.size} reminders.")
     }
 
@@ -101,7 +101,7 @@ fun registerAppControl(tm: ToolManager, c: AppContainer, context: Context) {
             else -> events.first()
         }
         val begin = event.start.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        if (!writer.delete(com.melhive.zed.agents.CalendarReader.Item(event.id, begin, event.title, event.recurring)))
+        if (!c.deleter.calendar(com.melhive.zed.agents.CalendarReader.Item(event.id, begin, event.title, event.recurring), event.title))
             return@register fail("Your calendar didn't allow deleting “${event.title}”.")
         val whenText = event.start.format(DateTimeFormatter.ofPattern("EEEE, MMMM d 'at' h:mm a", Locale.ENGLISH))
         ok("Deleted “${event.title}” ($whenText)" + if (event.recurring) " — just that one; the rest of the series stays." else ".")
@@ -113,14 +113,61 @@ fun registerAppControl(tm: ToolManager, c: AppContainer, context: Context) {
         val docs = c.knowledge.documents.first()
         if (docs.isEmpty()) return@register ok("ZED's knowledge is already empty.")
         if (q.lowercase() in ALL || q.lowercase() in setOf("index", "knowledge", "the index")) {
-            c.knowledge.clear()
+            c.deleter.docs(docs)
             return@register ok("Cleared ZED's knowledge (${docs.size} documents). Your files themselves weren't touched.")
         }
         val found = docs.filter { it.path.contains(q, true) || matches(q, it.path.replace('/', ' ').replace('_', ' ').replace('-', ' ')) }
         if (found.isEmpty()) return@register fail("No indexed document matches “$q”.")
-        found.forEach { c.knowledge.deleteDoc(it.id) }
+        c.deleter.docs(found)
         ok(if (found.size == 1) "Removed “${found.first().path}” from ZED's knowledge (the file itself stays)." else "Removed ${found.size} documents from ZED's knowledge (the files stay).")
     }
+
+    // ---- The screen (accessibility service, only when asked) ----
+    fun screen(): com.melhive.zed.assist.ZedAccessibilityService? = com.melhive.zed.assist.ZedAccessibilityService.instance
+    val notOn = "To do that I need screen access: turn on ZED in Accessibility settings (I've opened them). It's used only when you ask."
+    fun askForAccess(): ToolResult { com.melhive.zed.assist.ZedAccessibilityService.openSettings(context); return fail(notOn) }
+    tm.register("screen.read") { a, _ ->
+        val s = screen() ?: return@register askForAccess()
+        val shot = s.readScreen() ?: return@register fail("I can't see another app on the screen right now.")
+        if (shot.text.isBlank()) return@register ok("${shot.app} is open, but there's no text on the screen I can read.")
+        val question = a.stringOrNull("question")?.takeIf { it.isNotBlank() } ?: "What's on my screen?"
+        // Gemma reads it and answers like a person; without a model, the main text is read out.
+        val provider = c.providers.active()
+        if (provider != null) {
+            val out = StringBuilder()
+            runCatching {
+                provider.generate(com.melhive.zed.intelligence.GenerationRequest(
+                    system = "You see the text on the user's phone screen, in the app ${shot.app}. Answer their request about it briefly and naturally (2–4 sentences): summarize, explain or pick out what matters. Don't list every element and don't mention that you read text.",
+                    turns = listOf(com.melhive.zed.core.intelligence.ChatTurn(com.melhive.zed.core.intelligence.Role.USER, "Screen text:\n${shot.text.take(3500)}\n\nRequest: $question")),
+                    maxOutputTokens = 220, sessionKey = "screen",
+                )).collect { e -> if (e is com.melhive.zed.intelligence.GenerationEvent.Delta) out.append(e.text) }
+            }
+            if (out.isNotBlank()) return@register ok(out.toString().trim())
+        }
+        ok("On ${shot.app}: " + shot.text.lines().take(12).joinToString(" · ").take(600))
+    }
+    tm.register("screen.tap") { a, _ ->
+        val s = screen() ?: return@register askForAccess()
+        val target = a.string("target")
+        s.tap(target)?.let { ok("Tapped “$it”.") } ?: fail("I can't find “$target” on the screen.")
+    }
+    tm.register("screen.scroll") { a, _ ->
+        val s = screen() ?: return@register askForAccess()
+        if (s.scroll(a.string("direction"))) ok("Scrolled ${a.string("direction")}.") else fail("There's nothing to scroll here.")
+    }
+    tm.register("screen.type") { a, _ ->
+        val s = screen() ?: return@register askForAccess()
+        if (s.type(a.string("text"), a.stringOrNull("field"))) ok("Typed “${a.string("text")}”.") else fail("I can't find a text box on the screen.")
+    }
+    tm.register("screen.action") { a, _ ->
+        val s = screen() ?: return@register askForAccess()
+        val act = a.string("action")
+        if (s.global(act)) ok(when (act) { "back" -> "Back."; "home" -> "Home."; "recents" -> "Recent apps."; "notifications" -> "Notifications."; "quick_settings" -> "Quick settings."; "lock" -> "Locked."; else -> "Screenshot taken." })
+        else fail("This phone doesn't allow that.")
+    }
+
+    // ---- Undo ----
+    tm.register("app.undo") { _, _ -> c.undo.undo()?.let { ok(it) } ?: ok("There's nothing to undo.") }
 
     // ---- Screens of the app ----
     tm.register("app.show") { a, _ ->
@@ -277,13 +324,17 @@ fun registerAppControl(tm: ToolManager, c: AppContainer, context: Context) {
         val rules = c.memory.list(1000).filter { it.source == "preference" }
         if (what.lowercase() in ALL || what.lowercase() in setOf("lessons", "everything you learned")) {
             val n = rules.size + c.teaching.pronunciations.size + c.teaching.aliases.size
-            c.memory.delete(rules.map { it.id }); c.teaching.clear()
+            c.deleter.lessons(rules, c.teaching.pronunciations, c.teaching.aliases)
             return@register ok("Forgot all $n things you taught me.")
         }
         val gone = mutableListOf<String>()
-        c.teaching.pronunciations.keys.filter { it.equals(what, true) || matches(what, it) }.forEach { c.teaching.forgetPronunciation(it); gone += "how to say “$it”" }
-        c.teaching.aliases.keys.filter { it.equals(what, true) || matches(what, it) }.forEach { c.teaching.forgetAlias(it); gone += "the shortcut “$it”" }
-        rules.filter { matches(what, it.text) }.forEach { c.memory.delete(listOf(it.id)); gone += "the rule “${it.text.trimEnd('.')}”" }
+        val say = c.teaching.pronunciations.filterKeys { it.equals(what, true) || matches(what, it) }
+        val alias = c.teaching.aliases.filterKeys { it.equals(what, true) || matches(what, it) }
+        val ruleHits = rules.filter { matches(what, it.text) }
+        say.keys.forEach { gone += "how to say “$it”" }
+        alias.keys.forEach { gone += "the shortcut “$it”" }
+        ruleHits.forEach { gone += "the rule “${it.text.trimEnd('.')}”" }
+        c.deleter.lessons(ruleHits, say, alias)
         if (gone.isEmpty()) fail("I don't have a lesson about “$what”. Say “what have you learned” to hear them.")
         else ok("Forgot " + gone.joinToString(", ") + ".")
     }

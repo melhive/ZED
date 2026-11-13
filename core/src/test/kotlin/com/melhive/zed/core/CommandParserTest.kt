@@ -174,4 +174,28 @@ class CommandParserTest {
         assertEquals("todo.add", tool("don't forget to buy batteries").first)
         assertEquals("media.control", tool("stop the music").first)
     }
+
+    @Test fun undoRepliesAndScreen() {
+        assertEquals("app.undo", tool("undo").first)
+        assertEquals("app.undo", tool("undo that").first)
+        assertEquals("app.undo", tool("bring it back").first)
+        assertEquals("message.reply" to mapOf("to" to "Ana", "message" to "on my way"), tool("reply to Ana: on my way"))
+        assertEquals("message.reply" to mapOf("to" to "Ana", "message" to "I'm coming", "app" to "WhatsApp"), tool("tell Ana on WhatsApp I'm coming"))
+        assertEquals("message.reply" to mapOf("to" to "Mark", "message" to "see you at 5", "app" to "messenger"), tool("messenger Mark saying see you at 5"))
+        assertEquals("messages.read" to mapOf("from" to "Ana"), tool("what did Ana say"))
+        assertEquals("messages.read" to mapOf("app" to "WhatsApp"), tool("read my WhatsApp messages"))
+        assertEquals("sms.compose", tool("text Mom saying I'm home").first, "plain texts stay SMS")
+        assertEquals("screen.read", tool("what's on my screen").first)
+        assertEquals("screen.read", tool("summarize this article").first)
+        assertEquals("screen.tap" to mapOf("target" to "Send"), tool("tap Send"))
+        assertEquals("screen.tap" to mapOf("target" to "like"), tool("click the like button"))
+        assertEquals("screen.action" to mapOf("action" to "back"), tool("go back"))
+        assertEquals("screen.action" to mapOf("action" to "back"), tool("press the back button"))
+        assertEquals("screen.action" to mapOf("action" to "lock"), tool("lock my phone"))
+        assertEquals("screen.scroll" to mapOf("direction" to "down"), tool("scroll down"))
+        assertEquals("screen.type" to mapOf("text" to "pizza near me", "field" to "search"), tool("type pizza near me in the search box"))
+        assertEquals("media.control", tool("pause the music").first)
+        assertEquals("notifications.recent", tool("show my notifications").first)
+        assertEquals("home.secure", tool("lock the front door").first)
+    }
 }

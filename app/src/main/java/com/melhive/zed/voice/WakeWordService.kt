@@ -101,7 +101,27 @@ class WakeWordService : Service() {
         val known = runCatching { File(dir, "tokens.txt").readLines().map { it.substringBefore(' ') }.toHashSet() }.getOrDefault(hashSetOf())
         val phrases = com.melhive.zed.core.voice.WakeWords.safe(KEYWORDS, known)
         val keywordsFile = File(cacheDir, "wake-keywords.txt").apply { writeText(phrases + "\n") }
-        val level = LEVELS.getOrElse(sensitivity) { LEVELS.last() }
+        // With the booster model installed, both listen and either one can wake ZED.
+        val dir2 = (application as ZedApp).container.voicePacks.let { p -> p.dir(com.melhive.zed.core.voice.VoiceCatalog.WAKE_WORD_2).takeIf { p.isInstalled(com.melhive.zed.core.voice.VoiceCatalog.WAKE_WORD_2) } }
+        val table = if (dir2 != null) DUAL_LEVELS else LEVELS
+        val level = table.getOrElse(sensitivity) { table.last() }
+        val booster = if (dir2 == null || level.second == null) null else runCatching {
+            val known2 = File(dir2, "tokens.txt").readLines().map { it.substringBefore(' ') }.toHashSet()
+            val file2 = File(cacheDir, "wake-keywords-2.txt").apply { writeText(com.melhive.zed.core.voice.WakeWords.safe(KEYWORDS_PHONES, known2) + "\n") }
+            KeywordSpotter(config = KeywordSpotterConfig(
+                featConfig = FeatureConfig(sampleRate = RATE, featureDim = 80),
+                modelConfig = OnlineModelConfig(
+                    transducer = OnlineTransducerModelConfig(
+                        File(dir2, "encoder-epoch-13-avg-2-chunk-16-left-64.int8.onnx").path,
+                        File(dir2, "decoder-epoch-13-avg-2-chunk-16-left-64.onnx").path,
+                        File(dir2, "joiner-epoch-13-avg-2-chunk-16-left-64.int8.onnx").path,
+                    ),
+                    tokens = File(dir2, "tokens.txt").path, numThreads = 1, modelType = "zipformer2",
+                ),
+                maxActivePaths = level.second.paths, keywordsFile = file2.path, keywordsThreshold = level.second.threshold, keywordsScore = level.second.score,
+            ))
+        }.onFailure { com.melhive.zed.android.CrashReporter.recordNonFatal("wake booster model", it) }.getOrNull()
+        val stream2 = booster?.createStream("")
         val kws = try {
             KeywordSpotter(config = KeywordSpotterConfig(
                 featConfig = FeatureConfig(sampleRate = RATE, featureDim = 80),
@@ -145,17 +165,27 @@ class WakeWordService : Service() {
                             kws.decode(stream)
                             if (kws.getResult(stream).keyword.isNotBlank()) { kws.reset(stream); woke = true; break }
                         }
+                        if (booster != null && stream2 != null && !woke) {
+                            stream2.acceptWaveform(block, RATE)
+                            while (booster.isReady(stream2)) {
+                                booster.decode(stream2)
+                                if (booster.getResult(stream2).keyword.isNotBlank()) { booster.reset(stream2); woke = true; break }
+                            }
+                        }
+                        if (woke) { runCatching { kws.reset(stream) }; if (booster != null && stream2 != null) runCatching { booster.reset(stream2) } }
                     }
                 } finally { runCatching { rec.stop() }; rec.release() }
                 if (woke) runCatching { kotlinx.coroutines.runBlocking { onWake() } }.onFailure { com.melhive.zed.android.CrashReporter.recordNonFatal("wake", it) }
             }
         } finally {
             runCatching { stream.release() }; runCatching { kws.release() }
+            runCatching { stream2?.release() }; runCatching { booster?.release() }
         }
     }
 
     /** Opens LIVE when allowed; otherwise handles one request hands-free. */
     private suspend fun onWake() {
+        val wokeAt = System.currentTimeMillis()
         val c = (application as ZedApp).container
         // Start loading the model while the user is still speaking.
         c.warmUpModel()
@@ -163,7 +193,7 @@ class WakeWordService : Service() {
         val foreground = ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
         if (foreground || Settings.canDrawOverlays(this)) {
             // The floating orb over whatever is on screen (not the full app).
-            val opened = runCatching { startActivity(ZedLaunch.overlayIntent(this)) }.isSuccess
+            val opened = runCatching { startActivity(ZedLaunch.overlayIntent(this).putExtra(EXTRA_WAKE_AT, wokeAt)) }.isSuccess
             if (opened) {
                 // LIVE takes the microphone; wait until it is closed again.
                 delay(1500)
@@ -195,7 +225,7 @@ class WakeWordService : Service() {
 
     /** One utterance through the phone's recognizer (main thread). */
     private suspend fun listenOnce(): String? {
-        val stt = AndroidSpeechToText(this)
+        val stt = (application as ZedApp).container.newSpeechToText()
         val result = CompletableDeferred<String?>()
         val job = scope.launch {
             stt.events.collect { e ->
@@ -221,6 +251,8 @@ class WakeWordService : Service() {
 
     companion object {
         private const val RATE = 16_000
+        /** When "Hey Zed" was heard, so the overlay can time how quickly it opened. */
+        const val EXTRA_WAKE_AT = "wake_at"
         private const val NOTIFICATION_ID = 65_000
         private const val ACTION_STOP = "com.melhive.zed.wake.STOP"
         /**
@@ -238,7 +270,19 @@ class WakeWordService : Service() {
          * a wider search ([Level.paths] 8) catches far more quiet and distant “Zed”s; 16 only adds
          * false alarms; middle settings gained little; extra spellings ("Zet", "Z E D") made it worse.
          */
-        data class Level(val threshold: Float, val score: Float, val paths: Int)
+        data class Level(val threshold: Float, val score: Float, val paths: Int, val second: Level? = null)
+        /** The booster model's phrases, in its phonemes (CMU dictionary). */
+        const val KEYWORDS_PHONES = "Z EH1 D @ZED\nHH EY1 Z EH1 D @ZED\nW EY1 K AH1 P Z EH1 D @ZED\nOW2 K EY1 Z EH1 D @ZED\nHH AY1 Z EH1 D @ZED"
+        /**
+         * With the booster: either model wakes ZED. Measured (34 phrases × 5 conditions, 100 near-miss
+         * sentences): balanced 68/170 with 1 false alarm, high 91 with 4, maximum 112 with 13.
+         */
+        val DUAL_LEVELS = listOf(
+            Level(0.12f, 2.0f, 4),
+            Level(0.03f, 3.5f, 4),
+            Level(0.03f, 3.5f, 4, second = Level(0.03f, 3.5f, 4)),
+            Level(0.01f, 4.5f, 8, second = Level(0.03f, 3.5f, 4)),
+        )
         val LEVELS = listOf(
             Level(0.12f, 2.0f, 4),  // fewer false alarms
             Level(0.05f, 3.0f, 4),  // balanced

@@ -260,17 +260,36 @@ class CalendarWriter(private val context: Context) {
      * Deletes one calendar occurrence straight away. A repeating event loses only this
      * occurrence (a cancelled exception), never the whole series. Returns false when refused.
      */
-    fun delete(item: CalendarReader.Item): Boolean = runCatching {
+    fun delete(item: CalendarReader.Item): Boolean = deleteUndoable(item) != null
+
+    /** Like [delete], returning how to bring the event back (for Undo), or null when refused. */
+    fun deleteUndoable(item: CalendarReader.Item): (() -> Boolean)? = runCatching {
+        val resolver = context.contentResolver
         if (item.recurring) {
             val values = android.content.ContentValues().apply {
                 put(CalendarContract.Events.ORIGINAL_INSTANCE_TIME, item.begin)
                 put(CalendarContract.Events.STATUS, CalendarContract.Events.STATUS_CANCELED)
             }
-            context.contentResolver.insert(android.content.ContentUris.withAppendedId(CalendarContract.Events.CONTENT_EXCEPTION_URI, item.eventId), values) != null
+            val exception = resolver.insert(android.content.ContentUris.withAppendedId(CalendarContract.Events.CONTENT_EXCEPTION_URI, item.eventId), values) ?: return@runCatching null
+            // Removing the cancellation brings the occurrence back.
+            ({ runCatching { resolver.delete(exception, null, null) > 0 }.getOrDefault(false) })
         } else {
-            context.contentResolver.delete(android.content.ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, item.eventId), null, null) > 0
+            val uri = android.content.ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, item.eventId)
+            val saved = android.content.ContentValues()
+            val cols = arrayOf(CalendarContract.Events.CALENDAR_ID, CalendarContract.Events.TITLE, CalendarContract.Events.DTSTART, CalendarContract.Events.DTEND,
+                CalendarContract.Events.DURATION, CalendarContract.Events.ALL_DAY, CalendarContract.Events.EVENT_TIMEZONE, CalendarContract.Events.EVENT_LOCATION,
+                CalendarContract.Events.DESCRIPTION, CalendarContract.Events.HAS_ALARM)
+            resolver.query(uri, cols, null, null, null)?.use { c ->
+                if (c.moveToFirst()) for ((i, col) in cols.withIndex()) when (c.getType(i)) {
+                    android.database.Cursor.FIELD_TYPE_INTEGER -> saved.put(col, c.getLong(i))
+                    android.database.Cursor.FIELD_TYPE_STRING -> saved.put(col, c.getString(i))
+                    else -> Unit
+                }
+            }
+            if (resolver.delete(uri, null, null) <= 0) return@runCatching null
+            ({ saved.size() > 0 && runCatching { resolver.insert(CalendarContract.Events.CONTENT_URI, saved) != null }.getOrDefault(false) })
         }
-    }.getOrDefault(false)
+    }.getOrNull()
 
     /** Inserts the event and a 10-minute reminder; returns the new event id. */
     fun insert(title: String, start: java.time.LocalDateTime, end: java.time.LocalDateTime, location: String?, description: String?): Pair<Long, Target>? {

@@ -118,8 +118,15 @@ fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
 
         item {
             val wakeInstalled = com.melhive.zed.core.voice.VoiceCatalog.WAKE_WORD.id in installed
+            val boosterPack = com.melhive.zed.core.voice.VoiceCatalog.WAKE_WORD_2
+            val boosterInstalled = boosterPack.id in installed
+            val boosterTask = tasks.firstOrNull { it.type == TaskTypes.VOICE_DOWNLOAD && it.input()["pack"] == boosterPack.id && !it.statusEnum().terminal }
             LaunchedEffect(wakeInstalled, settings.wakeWordEnabled) {
                 if (wakeInstalled && settings.wakeWordEnabled) com.melhive.zed.voice.WakeWordService.start(context)
+            }
+            // The booster joins in as soon as it's downloaded.
+            LaunchedEffect(boosterInstalled) {
+                if (boosterInstalled && wakeInstalled && settings.wakeWordEnabled) { com.melhive.zed.voice.WakeWordService.stop(context); com.melhive.zed.voice.WakeWordService.start(context) }
             }
             val wakeTask = tasks.firstOrNull { it.type == TaskTypes.VOICE_DOWNLOAD && it.input()["pack"] == com.melhive.zed.core.voice.VoiceCatalog.WAKE_WORD.id && !it.statusEnum().terminal }
             ZedCard(accent = if (settings.wakeWordEnabled && wakeInstalled) ZedColors.Green else ZedColors.Violet) {
@@ -133,6 +140,7 @@ fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
                         safely {
                             c.settings.setWakeWordEnabled(on)
                             if (!on) { com.melhive.zed.voice.WakeWordService.stop(context); return@safely }
+                            if (!boosterInstalled && boosterTask == null) c.taskEngine.create(TaskTypes.VOICE_DOWNLOAD, "Download wake word booster", mapOf("pack" to boosterPack.id))
                             if (!wakeInstalled && wakeTask == null) {
                                 c.taskEngine.create(TaskTypes.VOICE_DOWNLOAD, "Download wake word model", mapOf("pack" to com.melhive.zed.core.voice.VoiceCatalog.WAKE_WORD.id))
                                 message = "Downloading the wake word model (18 MB)… “Hey Zed” starts when it's ready."
@@ -141,6 +149,12 @@ fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
                     })
                 }
                 if (wakeTask != null) RealProgress(wakeTask.progressCurrent, wakeTask.progressTotal, Modifier.padding(top = 6.dp))
+                if (boosterTask != null) RealProgress(boosterTask.progressCurrent, boosterTask.progressTotal, Modifier.padding(top = 6.dp))
+                else if (wakeInstalled && !boosterInstalled) TextButton(onClick = { safely {
+                    c.taskEngine.create(TaskTypes.VOICE_DOWNLOAD, "Download wake word booster", mapOf("pack" to boosterPack.id))
+                    message = "Downloading the wake word booster (${boosterPack.sizeBytes / 1_000_000} MB)…"
+                } }) { Text("Catch more “Hey Zed”s: add the booster (${boosterPack.sizeBytes / 1_000_000} MB)") }
+                else if (boosterInstalled) Text("Booster on: two listening models, so quieter and distant “Hey Zed”s are caught too.", style = MaterialTheme.typography.labelSmall, color = ZedColors.Green, modifier = Modifier.padding(top = 4.dp))
                 if (settings.wakeWordEnabled) {
                     Text("Sensitivity", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 6.dp))
                     WrapRow {
@@ -165,6 +179,34 @@ fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
                         }) { Text("Allow display over other apps") }
                     }
                 }
+            }
+        }
+        item {
+            val speech = com.melhive.zed.core.voice.VoiceCatalog.SPEECH
+            val speechInstalled = speech.id in installed
+            val speechTask = tasks.firstOrNull { it.type == TaskTypes.VOICE_DOWNLOAD && it.input()["pack"] == speech.id && !it.statusEnum().terminal }
+            val onDevice = speechInstalled && settings.speechEngine != "android"
+            ZedCard(accent = if (onDevice) ZedColors.Green else ZedColors.Violet) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Speech recognition", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            if (onDevice) "On the phone: works offline, no beep, and your words appear as you speak (English)."
+                            else "Recognize speech on the phone instead of the phone's speech service: offline, private, no “Google beep”, faster. English. ${speech.sizeBytes / 1_000_000} MB download.",
+                            style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted,
+                        )
+                    }
+                    if (speechInstalled) androidx.compose.material3.Switch(checked = onDevice, onCheckedChange = { on -> safely { c.settings.setSpeechEngine(if (on) "auto" else "android") } })
+                }
+                when {
+                    speechTask != null -> RealProgress(speechTask.progressCurrent, speechTask.progressTotal, Modifier.padding(top = 6.dp))
+                    !speechInstalled -> Button(onClick = { safely {
+                        c.taskEngine.create(TaskTypes.VOICE_DOWNLOAD, "Download speech recognition", mapOf("pack" to speech.id))
+                        message = "Downloading on-device speech recognition (${speech.sizeBytes / 1_000_000} MB)… ZED switches to it when it's ready."
+                    } }, modifier = Modifier.padding(top = 8.dp)) { Text("Download") }
+                    else -> TextButton(onClick = { safely { com.melhive.zed.voice.OnDeviceSpeechToText.Engine.unload(); c.voicePacks.remove(speech) } }) { Text("Remove (${speech.sizeBytes / 1_000_000} MB)", color = ZedColors.Muted) }
+                }
+                Text("Model: NVIDIA NeMo FastConformer · ${speech.license}", style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted, modifier = Modifier.padding(top = 4.dp))
             }
         }
         item {
