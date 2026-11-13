@@ -215,4 +215,9 @@ class CommandParserTest {
         assertEquals("memory.confirm" to mapOf("query" to "my sister"), tool("you're right about my sister"))
         assertEquals("history.search", tool("search history for budget").first)
     }
+
+    @Test fun whereAmI() {
+        assertEquals("location.get", tool("where am I").first)
+        assertEquals("location.get", tool("what's my current location").first)
+    }
 }

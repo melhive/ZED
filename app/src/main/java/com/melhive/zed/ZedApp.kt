@@ -35,6 +35,12 @@ class ZedApp : Application() {
         // If ZED stopped while the recognizer beep was muted, put the volume back.
         runCatching { com.melhive.zed.voice.BeepSuppressor.restore(this) }
         Notifications.createChannels(this)
+        // "Hey Zed" asked to start while ZED was in the background starts once ZED is on screen.
+        runCatching {
+            androidx.lifecycle.ProcessLifecycleOwner.get().lifecycle.addObserver(androidx.lifecycle.LifecycleEventObserver { _, event ->
+                if (event == androidx.lifecycle.Lifecycle.Event.ON_START) com.melhive.zed.voice.WakeWordService.onAppVisible(this)
+            })
+        }
         container.appScope.launch {
             // Recover state after process death: streaming messages and interrupted tasks.
             runCatching { container.afterRestore() }

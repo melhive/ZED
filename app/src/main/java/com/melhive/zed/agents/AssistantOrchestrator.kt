@@ -377,7 +377,7 @@ class AssistantOrchestrator(
         val history0 = conversations.history(conversationId, 6, SESSION_GAP_MS)
         val previousUser = history0.dropLast(1).lastOrNull { it.role == Role.USER }?.content
         // On-device: only the few tools that fit this message (a small model chooses far better from four than from fifty).
-        val toolSpecs = when {
+        val selectedTools = when {
             !useTools -> emptyList()
             isLocal -> com.melhive.zed.core.understanding.ToolSelector.select(userText, enabled, max = if (tinyContext) 3 else 5, context = previousUser).ifEmpty {
                 // A question about the world: let Gemma search the web when its own knowledge may be stale or missing.
@@ -422,6 +422,26 @@ class AssistantOrchestrator(
                 add("the time mentioned = " + at.format(DateTimeFormatter.ofPattern("EEEE d MMMM yyyy, h:mm a", java.util.Locale.ENGLISH)) + " ($at)")
             }
         }
+        // The internet when the question needs it: online, search first and answer from the results;
+        // offline, answer from what the model knows and say it couldn't check.
+        var webResults: String? = null
+        var webNote: String? = null
+        when (val need = if (researchAvailable && currentImage == null) com.melhive.zed.core.understanding.WebNeed.classify(userText, previousUser) else null) {
+            com.melhive.zed.core.understanding.WebNeed.Need.AskedAboutSearching ->
+                webNote = "the user asked whether you can search the internet. You can: whenever a question needs current or outside information, the phone searches the web for you first (only the search words leave the phone). Tell them so, and offer to look something up."
+            is com.melhive.zed.core.understanding.WebNeed.Need.Search -> {
+                val online = environment?.online ?: true
+                if (!online) webNote = "the phone is offline, so you couldn't search the web for this. Start by saying briefly that you tried to check online but there's no internet connection, then answer from your own knowledge; if you don't know, say so plainly."
+                else {
+                    val outcome = runTool(conversationId, ToolRequest("web.research", mapOf("query" to need.query), ToolRequest.Origin.NATIVE))
+                    if (outcome.isSuccess()) webResults = (outcome as ToolOutcome.Executed).result.message.take(if (isLocal) 3200 else 8000)
+                    else webNote = "the web search didn't work just now (${outcome.message.take(120)}). Say briefly that you couldn't check online, then answer from your own knowledge; if you don't know, say so."
+                }
+            }
+            null -> Unit
+        }
+        // Already searched: the model doesn't need to search again this turn.
+        val toolSpecs = if (webResults != null) selectedTools.filter { it.name != "web.research" } else selectedTools
         val origin = if (isLocal) ToolRequest.Origin.LOCAL_MODEL else ToolRequest.Origin.ONLINE_MODEL
         val sourceTag = if (isLocal) "local" else "online:${provider.id}"
         val contextChars = if (isLocal) ((localContext ?: 4096) * 3) else 60_000
@@ -460,7 +480,7 @@ class AssistantOrchestrator(
                 userTitle = s.userTitle.ifBlank { null },
             )
             val brief = if (!isLocal) null else (environment ?: com.melhive.zed.core.understanding.Awareness(ZonedDateTime.now())).let { env ->
-                if (round == 1) env.copy(dialogue = dialogueNote, profile = profile, memories = memories, computed = computed, tools = toolSpecs, knowledge = knowledgeSnippets, plan = plan)
+                if (round == 1) env.copy(dialogue = dialogueNote, profile = profile, memories = memories, computed = computed, tools = toolSpecs, knowledge = knowledgeSnippets, plan = plan, web = webResults, webNote = webNote)
                 else env.copy(tools = toolSpecs) // after a tool result: just the time and the tools
             }.render()
             val request = GenerationRequest(

@@ -341,6 +341,9 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         Rule(rx("(?:run |start |give me |show )?(?:my |the )?(?:morning|daily) (?:briefing|brief|summary)|brief me")) { tool("workflow.run", "name" to "morning briefing") },
         Rule(rx("(?:run|start|execute) (?:the )?workflow (.+)|(?:run|start|execute) (?:the |my )?(.+?) workflow")) { m -> tool("workflow.run", "name" to m.groupValues[1].ifEmpty { m.groupValues[2] }) },
 
+        // Where am I.
+        Rule(rx("where am i(?: right now| now)?|what(?:'s| is) my (?:current )?location|(?:what|which) city am i in|where are we(?: now)?|(?:share|tell me) my location")) { tool("location.get") },
+
         // Routines and weather.
         Rule(rx("(?:run|start|activate|begin|do) (?:my |the )?(.+?) routine")) { m -> tool("routine.run", "name" to m.groupValues[1]) },
         Rule(rx("(?:what(?:'s| is) the |how(?:'s| is) the |check the |today's )?weather(?: like)?(?: (?:today|now|outside))?(?: (?:in|at|for) (.+?))?(?: (?:today|now))?|(?:is it|will it) (?:going to )?rain(?: today)?(?: in (.+))?")) { m ->

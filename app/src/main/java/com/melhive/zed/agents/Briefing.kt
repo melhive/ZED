@@ -49,6 +49,21 @@ class WeatherService(private val context: Context) {
         return Place("", loc.latitude, loc.longitude)
     }
 
+    /** Where the phone is, in words ("Cebu City, Central Visayas, Philippines"), from location or the city setting. */
+    suspend fun whereAmI(defaultCity: String): String? = withContext(Dispatchers.IO) {
+        val here = lastLocation()
+        if (here != null) {
+            val named = runCatching {
+                @Suppress("DEPRECATION")
+                android.location.Geocoder(context, Locale.getDefault()).getFromLocation(here.lat, here.lon, 1)?.firstOrNull()?.let { a ->
+                    listOfNotNull(a.subLocality, a.locality ?: a.subAdminArea, a.adminArea, a.countryName).distinct().joinToString(", ")
+                }
+            }.getOrNull()
+            if (!named.isNullOrBlank()) return@withContext named
+        }
+        defaultCity.takeIf { it.isNotBlank() } ?: here?.let { "%.4f, %.4f".format(it.lat, it.lon) }
+    }
+
     /** Resolves [place] (or the default) and returns the forecast in natural sentences. */
     suspend fun report(place: String?, defaultCity: String): Result<String> =
         fetch(place, defaultCity).map { com.melhive.zed.core.briefing.BriefingText.weather(it) }

@@ -132,6 +132,10 @@ fun registerExecutors(tm: ToolManager, c: AppContainer, context: Context) {
             }
         }
     }
+    tm.register("location.get") { _, _ ->
+        val place = com.melhive.zed.agents.WeatherService(context).whereAmI(c.settings.current().weatherCity)
+        place?.let { ok("You're in $it.") } ?: fail("I can't tell where you are: allow approximate location for ZED, or set your city in Settings → Briefing.")
+    }
     tm.register("message.reply") { a, _ ->
         val app = a.stringOrNull("app")?.trim()?.takeIf { it.isNotEmpty() }?.let { if (it.equals("facebook messenger", true)) "Messenger" else it }
         var who = a.string("to").trim()

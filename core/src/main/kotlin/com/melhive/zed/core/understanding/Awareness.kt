@@ -86,6 +86,10 @@ data class Awareness(
     val tools: List<ToolSpec> = emptyList(),
     /** Excerpts from the user's documents. */
     val knowledge: List<String> = emptyList(),
+    /** Web search results ZED fetched for this message (numbered sources). */
+    val web: String? = null,
+    /** What happened with the internet for this message (offline, search failed, can search). */
+    val webNote: String? = null,
     /** Think twice: the plan made for this answer. */
     val plan: String? = null,
 ) {
@@ -109,6 +113,8 @@ data class Awareness(
             append("]")
         }
         if (computed.isNotEmpty()) append("\n[Computed exactly — use these: ").append(computed.joinToString("; ")).append("]")
+        web?.let { append("\n[Web results — searched just now for this message. Answer from them, cite as [1], [2]:\n").append(it.trim()).append("]") }
+        webNote?.let { append("\n[Internet: ").append(it).append("]") }
         if (knowledge.isNotEmpty()) {
             append("\n").append(com.melhive.zed.core.intelligence.PromptBuilder.KNOWLEDGE_HEADER)
             knowledge.forEachIndexed { i, k -> append("\n[${i + 1}] ").append(k) }

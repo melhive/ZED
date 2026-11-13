@@ -60,7 +60,7 @@ class SkillRegistry(val catalog: ToolCatalog, skills: List<SkillDescriptor>) {
                 listOf("screen.read", "screen.tap", "screen.scroll", "screen.type", "screen.action")),
             SkillDescriptor("apps.media", "Apps, Media & Maps", "Opens apps, controls and plays music, navigates and opens web pages.", listOf("app.open", "media.control", "music.play", "maps.navigate", "web.open")),
             SkillDescriptor("notifications.digest", "What Did I Miss", "Reads your recent notifications when you ask (needs notification access).", listOf("notifications.recent")),
-            SkillDescriptor("daily.briefing", "Briefing, Weather & Agenda", "Weather, today's calendar and your daily briefing.", listOf("weather.get", "calendar.today")),
+            SkillDescriptor("daily.briefing", "Briefing, Weather & Agenda", "Weather, today's calendar and your daily briefing.", listOf("weather.get", "calendar.today", "location.get")),
             SkillDescriptor("automation.routines", "Routines", "Runs your routines (Good morning, Good night, Focus, Driving…).", listOf("routine.run")),
             SkillDescriptor("smart.home", "Smart Home", "Controls Home Assistant lights, switches, climate, locks and covers.", listOf("home.status", "home.control", "home.secure"), requiresOnline = true),
             SkillDescriptor("research.online", "Web Research", "Searches the web without any account or key and answers with sources. Only the search question leaves the phone.", listOf("web.research")),

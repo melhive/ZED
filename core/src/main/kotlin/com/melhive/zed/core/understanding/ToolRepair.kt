@@ -119,8 +119,18 @@ class ToolRepair(private val catalog: ToolCatalog, private val clock: () -> Loca
             val swapped = "${parts[1]}.${parts[0]}"
             if (catalog.find(swapped) != null) return swapped
         }
-        return null
+        // A tool that doesn't exist but says what it wants ("location.get_user_location", "knowledge.lookup_location").
+        return KEYWORD_TOOLS.firstOrNull { (word, _) -> n.contains(word) }?.second?.takeIf { catalog.find(it) != null }
     }
+
+    /** Last resort for invented tool names: a telling word → the real tool. */
+    private val KEYWORD_TOOLS = listOf(
+        "location" to "location.get", "where.am.i" to "location.get", "geolocat" to "location.get", "gps" to "location.get",
+        "weather" to "weather.get", "forecast" to "weather.get",
+        "web" to "web.research", "internet" to "web.research", "search.online" to "web.research", "browse" to "web.research", "news" to "web.research",
+        "remind" to "reminder.create", "alarm" to "alarm.set", "timer" to "timer.set", "calendar" to "calendar.today",
+        "screen" to "screen.read", "notification" to "notifications.recent", "battery" to "device.status",
+    )
 
     fun repair(request: ToolRequest, userText: String?): Repaired {
         val fixes = mutableListOf<String>()

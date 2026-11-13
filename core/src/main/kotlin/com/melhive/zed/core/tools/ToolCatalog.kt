@@ -258,6 +258,7 @@ class ToolCatalog(specs: List<ToolSpec>) {
                     p("app", STRING, "Only from this app", required = false),
                     p("hours", INT, "How far back, in hours (default 12)", required = false, min = 1, max = 72),
                 ), READ_ONLY, setOf(NOTIFICATION_ACCESS)),
+                ToolSpec("location.get", "Where am I", "The phone's current approximate location: city, area and country (from location services, or the city in settings).", emptyList(), READ_ONLY),
                 ToolSpec("weather.get", "Weather", "Current weather and today's forecast for a place (default: the user's city or location).", listOf(
                     p("place", STRING, "City or place; omit for the user's location", required = false),
                 ), READ_ONLY),

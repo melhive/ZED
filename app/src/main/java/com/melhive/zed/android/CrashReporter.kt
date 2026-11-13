@@ -56,6 +56,9 @@ object CrashReporter {
      */
     private fun survivable(e: Throwable): Boolean {
         if (e is OutOfMemoryError || e is StackOverflowError) return false
+        // Android tells the app to crash this way (e.g. a service that didn't start in time); swallowing it
+        // only makes Android kill the app without a report.
+        if (generateSequence(e) { it.cause }.any { it.javaClass.name.contains("RemoteServiceException") || it.javaClass.name.contains("ForegroundService") || it.javaClass.name.contains("DeadSystem") }) return false
         if (generateSequence(e) { it.cause }.any { t -> t.stackTrace.any { it.className.startsWith("androidx.compose.runtime") || it.className.startsWith("androidx.compose.ui.node") } }) return false
         val now = System.currentTimeMillis()
         synchronized(recent) {
@@ -108,8 +111,11 @@ object CrashReporter {
                 appendLine()
                 append(trace.take(30_000))
             }
-            File(dir, CRASH_FILE).writeText(text)
-            saveToDownloads(text)
+            // A Java crash was already written up with its stack trace when it happened: keep that, add this.
+            val existing = File(dir, CRASH_FILE)
+            val fresh = existing.exists() && kotlin.math.abs(existing.lastModified() - worst.timestamp) < 5 * 60_000L && existing.readText().contains("Crash on thread")
+            if (fresh) { existing.appendText("\n\n--- Android's record ---\n$text"); saveToDownloads(existing.readText()) }
+            else { existing.writeText(text); saveToDownloads(text) }
         }
     }
 

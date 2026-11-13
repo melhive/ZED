@@ -31,6 +31,13 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.38", "2026-11-13", "Web search that just works, and a crash fix", listOf(
+            "ZED searches the web by itself when a question needs it — “tell me about the Philippine Eagle”, “who won the NBA finals”, “latest news in Cebu”, “search the internet for cheap flights” — and answers from what it found, with sources. Offline, it tells you it couldn't check online and answers from what it knows (or says it doesn't know).",
+            "Asking “can you search the internet?” now gets the right answer: yes.",
+            "Fixed a crash in the background: “Hey Zed” could ask Android to start listening while ZED wasn't on screen, which Android 14 and 15 don't allow — so Android closed ZED. Now it waits and starts the next time you open ZED.",
+            "“Where am I?” — ZED tells you your city and area. The “Unknown tool” errors about location are gone.",
+            "Crash reports now keep their details instead of being replaced by a short summary.",
+        )),
         Release("0.1.37", "2026-11-13", "ZED controls all of ZED", listOf(
             "Every rule you teach now counts: all of them reach Gemma (before, only the newest 8 did), newest first — when you change your mind, the newer rule wins.",
             "What you teach is safe in backups: pronunciations and shortcuts are now saved with your settings, so a backup and restore keeps them.",

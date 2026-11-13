@@ -60,6 +60,12 @@ Failed tests: none.
 | Keystore secret storage | | ✅ | ✅ | |
 | STT / TTS / sentence streaming / barge-in / audio focus | VAD only | ✅ | ✅ | |
 
+## Web search first, background crash fix (v0.1.38)
+
+- **Crash** (0.1.36–0.1.37 reports: REASON_CRASH, importance 125, no trace): `WakeWordService.start` from the background on Android 14+ → microphone FGS not allowed → Android kills the app (RemoteServiceException, which the safety net swallowed so no report). Now start is deferred until ZED is visible (`onAppVisible` via ProcessLifecycleOwner); RemoteServiceException/ForegroundService errors are never swallowed; exit-info reports append to a fresh Java crash report instead of replacing it.
+- **Web** (`core/understanding/WebNeed.kt`, `WebNeedTest`): explicit searches, "tell me about…", who/what/where/when questions and fresh topics are searched before Gemma answers (results in the brief as `[Web results]`); offline → `[Internet]` note to answer from knowledge and say so; "can you search?" answered truthfully.
+- **Location**: `location.get` (last location + Geocoder, or city setting); `ToolRepair` maps invented tool names by keyword (location, weather, web…).
+
 ## Full self-control (v0.1.37)
 
 - All answering rules (≤25, newest first, newest overrides) reach the model; facts considered raised to 1000.

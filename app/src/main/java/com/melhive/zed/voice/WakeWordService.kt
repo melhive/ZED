@@ -297,10 +297,23 @@ class WakeWordService : Service() {
         /** True while ZED LIVE is using the microphone. */
         val paused = MutableStateFlow(false)
 
+        @Volatile private var startWhenVisible = false
+
+        /**
+         * Starts listening. On Android 14+ a microphone service may only start while ZED is on screen;
+         * asking from the background made Android kill the app a few seconds later. So from the
+         * background it waits and starts the next time ZED is opened ([onAppVisible]).
+         */
         fun start(context: Context) {
+            val visible = runCatching { ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) }.getOrDefault(false)
+            if (Build.VERSION.SDK_INT >= 34 && !visible) { startWhenVisible = true; return }
+            startWhenVisible = false
             runCatching { ContextCompat.startForegroundService(context, Intent(context, WakeWordService::class.java)) }
                 .onFailure { com.melhive.zed.android.CrashReporter.recordNonFatal("wake word start", it) }
         }
+
+        /** ZED came on screen: start listening if that was waiting. */
+        fun onAppVisible(context: Context) { if (startWhenVisible) start(context) }
 
         fun stop(context: Context) { context.stopService(Intent(context, WakeWordService::class.java)) }
     }

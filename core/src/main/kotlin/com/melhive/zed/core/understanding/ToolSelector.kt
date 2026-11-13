@@ -54,6 +54,7 @@ object ToolSelector {
         "device.status" to w("battery", "storage", "phone status", "charging"),
         "camera.open" to w("camera", "photo", "picture", "selfie", "video"),
         "maps.navigate" to w("navigate", "directions", "take me to", "how do i get", "route"),
+        "location.get" to w("where am i", "my location", "current location", "what city", "which city", "where are we", "my address"),
         "weather.get" to w("weather", "rain", "temperature outside", "forecast", "sunny", "umbrella", "hot today", "cold today"),
         "notifications.recent" to w("notifications", "what did i miss", "missed"),
         "web.open" to w("google", "website", "browser", "open .+\\.(?:com|org|net)"),
