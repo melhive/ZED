@@ -295,9 +295,9 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
   <section class="hero">
     <div class="wrap">
       <div>
-        <span class="pill"><span class="tag zed-version">v0.1.32</span> Gemma on-device · wake word · offline voices</span>
+        <span class="pill"><span class="tag zed-version">v0.1.35</span> Gemma · offline speech · screen control</span>
         <h1>The AI assistant that <span class="grad">runs on your phone.</span></h1>
-        <p class="sub">ZED runs Gemma locally, wakes on your voice and controls your Android device through typed, validated tools. No account, no cloud inference, no API keys.</p>
+        <p class="sub">ZED runs Gemma locally, hears and speaks offline, and controls your phone through typed, validated tools: apps, messages, your screen and its own data. No account, no cloud inference, no API keys.</p>
         <div class="cta">
           <a class="btn primary lg" href="https://github.com/melhive/ZED/releases/latest/download/zed.apk">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 2v8m0 0l-3.2-3.2M8 10l3.2-3.2M3 13.5h10" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -331,8 +331,8 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
 
   <div class="strip">
     <div class="wrap">
-      <div class="stat"><div class="n">100<small>%</small></div><div class="l">on-device inference</div></div>
-      <div class="stat"><div class="n">60<small>+</small></div><div class="l">typed device tools</div></div>
+      <div class="stat"><div class="n">100<small>%</small></div><div class="l">on-device AI, speech and voice</div></div>
+      <div class="stat"><div class="n">70<small>+</small></div><div class="l">typed device tools</div></div>
       <div class="stat"><div class="n">0</div><div class="l">accounts or API keys</div></div>
       <div class="stat"><div class="n">31</div><div class="l">languages, offline neural voice</div></div>
     </div>
@@ -354,9 +354,9 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
         </div>
         <div class="card">
           <div class="ico"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="7" y="2" width="6" height="10" rx="3"/><path d="M4 9.5a6 6 0 0012 0M10 15.5V18"/></svg></div>
-          <h3>Always-on wake word</h3>
-          <p>A 3.3M-parameter keyword spotter listens for “Zed” on-device and opens a floating HUD over any app, with a spoken greeting.</p>
-          <div class="spec">sherpa-onnx kws · zipformer · 4 sensitivity levels</div>
+          <h3>Hears you offline</h3>
+          <p>Two keyword spotters listen for “Zed” together, then a streaming NeMo FastConformer transcribes you on the device. No beep, no server, and your words appear as you speak.</p>
+          <div class="spec">dual kws · fastconformer ctc · ~3× real time</div>
         </div>
         <div class="card">
           <div class="ico"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 7.5v5M6.5 5v10M10 2.5v15M13.5 5v10M17 7.5v5" stroke-linecap="round"/></svg></div>
@@ -366,9 +366,9 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
         </div>
         <div class="card">
           <div class="ico"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M11 2L4 11h5l-1 7 7-9h-5l1-7z" stroke-linejoin="round"/></svg></div>
-          <h3>Acts immediately</h3>
-          <p>Alarms, reminders, calendar, calls, SMS, files, media, Do Not Disturb, smart home. Requests run directly through system APIs, with no confirmation prompts unless you want them.</p>
-          <div class="spec">63 tools · schema-validated · audit log</div>
+          <h3>Acts immediately, undoes too</h3>
+          <p>Alarms, reminders, calendar, calls, SMS, files, media, Do Not Disturb, smart home. Requests run directly through system APIs, and anything deleted can be brought back with “undo”.</p>
+          <div class="spec">72 tools · schema-validated · audit log · undo</div>
         </div>
         <div class="card">
           <div class="ico"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="2"/><circle cx="4" cy="5" r="1.5"/><circle cx="16" cy="4.5" r="1.5"/><circle cx="15.5" cy="15.5" r="1.5"/><circle cx="4.5" cy="15" r="1.5"/><path d="M5.2 6l3.4 2.8M14.7 5.6l-3.3 3M14.4 14.4l-3-3M5.7 14l3-2.6"/></svg></div>
@@ -381,6 +381,24 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
           <h3>Learns how you work</h3>
           <p>Correct it once and it remembers. Teach it rules (“keep it short”), pronunciations and shortcuts of your own. Every lesson can be reviewed and removed.</p>
           <div class="spec">rules · pronunciations · aliases · corrections</div>
+        </div>
+        <div class="card">
+          <div class="ico"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="2" width="10" height="16" rx="2"/><path d="M8.5 15h3" stroke-linecap="round"/><path d="M8 7l1.5 1.5L12.5 5.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <h3>Sees and uses your screen</h3>
+          <p>“What's on my screen?”, “summarize this article”, “tap Send”, “scroll down”, “type pizza near me”. ZED reads the app you're in and acts on it, only when you ask.</p>
+          <div class="spec">accessibility service · nothing stored</div>
+        </div>
+        <div class="card">
+          <div class="ico"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 5.5A2.5 2.5 0 015.5 3h9A2.5 2.5 0 0117 5.5v5a2.5 2.5 0 01-2.5 2.5H9l-4 3v-3h0A2.5 2.5 0 013 10.5v-5z" stroke-linejoin="round"/><path d="M7 8l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <h3>Replies in any chat app</h3>
+          <p>“Reply to Ana: on my way”, “what did Mark say on Messenger?”. ZED answers WhatsApp, Messenger, Telegram and more right from the notification, without opening the app.</p>
+          <div class="spec">notification reply actions · on-device</div>
+        </div>
+        <div class="card">
+          <div class="ico"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="11" r="6"/><path d="M10 8v3l2 1.5M5 3.5L3 5.5M15 3.5l2 2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <h3>Comes to you</h3>
+          <p>When a reminder is due or a meeting is near, ZED appears on screen, even the lock screen, and tells you. Turn off your alarm and it greets you with the weather and your day.</p>
+          <div class="spec">reminders · events · after-alarm briefing</div>
         </div>
       </div>
     </div>
@@ -425,6 +443,10 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
         <div class="cmd"><q>Organize my downloads</q><code>files.organize</code></div>
         <div class="cmd"><q>Show me everything about Ana</q><code>brain.show</code></div>
         <div class="cmd"><q>Pronounce Cebu as seh-boo</q><code>teach.pronounce</code></div>
+        <div class="cmd"><q>Reply to Ana: on my way</q><code>message.reply</code></div>
+        <div class="cmd"><q>Summarize this article</q><code>screen.read</code></div>
+        <div class="cmd"><q>Tap Send</q><code>screen.tap</code></div>
+        <div class="cmd"><q>Undo that</q><code>app.undo</code></div>
       </div>
     </div>
   </section>
@@ -442,6 +464,8 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
           <p class="note">Processed and stored locally, always.</p>
           <ul>
             <li>Wake word detection and the microphone stream</li>
+            <li>Speech recognition, with the on-device model</li>
+            <li>Screen reading for “what's on my screen”: read once, never stored</li>
             <li>Model inference: every answer and tool call</li>
             <li>Speech synthesis</li>
             <li>Memories, conversations, the Live Brain and indexed documents</li>
@@ -474,8 +498,9 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
         <div class="row"><div>memory</div><div>4 GB RAM for Gemma 4 E2B · 8 GB for E4B</div></div>
         <div class="row"><div>storage</div><div>2.3–3.3 GB for a model · ~130 MB per voice pack · 18 MB wake word</div></div>
         <div class="row"><div>models</div><div>13 on-device models via LiteRT-LM: Gemma 4 E2B / E4B (GPU or CPU, with vision), Qwen 3.5, Phi-4 Mini, Ministral 3, DeepSeek R1 Distill, LFM 2.5, SmolLM2</div></div>
-        <div class="row"><div>speech</div><div>Supertonic 3 (31 languages), Kokoro, or the system voice · Android speech recognition</div></div>
-        <div class="row"><div>wake word</div><div>sherpa-onnx keyword spotting, on-device, adjustable sensitivity</div></div>
+        <div class="row"><div>speech</div><div>Hearing: on-device NeMo FastConformer (English, offline) or Android's recognizer · Voice: Supertonic 3 (31 languages), Kokoro, or the system voice</div></div>
+        <div class="row"><div>audio</div><div>Works the same with earphones; optional earphone mic with the phone speaker</div></div>
+        <div class="row"><div>wake word</div><div>Two sherpa-onnx keyword spotters in parallel, on-device, four sensitivity levels</div></div>
         <div class="row"><div>stack</div><div>Kotlin · Jetpack Compose · Room + FTS · WorkManager · built and signed on GitHub Actions</div></div>
       </div>
     </div>
@@ -510,7 +535,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
       </div>
       <div class="faq">
         <details><summary>Is ZED really free?</summary><p>Yes. There's no subscription, no in-app purchase and no account. The models and voices it downloads are free and come with their own open licenses.</p></details>
-        <details><summary>Does it work without internet?</summary><p>Yes. Once a model and a voice are downloaded, answers, actions, the wake word and speech run on your phone. Only weather, web research and smart home need a connection. Speech recognition depends on your phone; install your language's offline speech pack to use it offline.</p></details>
+        <details><summary>Does it work without internet?</summary><p>Yes. Once a model and a voice are downloaded, answers, actions, the wake word and speech run on your phone. Only weather, web research and smart home need a connection. With the on-device speech model (English), hearing you is offline too.</p></details>
         <details><summary>Will it run on my phone?</summary><p>You need Android 8.0 or newer on a 64-bit ARM phone. Gemma 4 E2B needs about 4 GB of RAM; Model Manager also offers smaller models for older phones and recommends one that fits yours.</p></details>
         <details><summary>Is anything I say sent to a server?</summary><p>No. There is no ZED server. Your conversations, memories and documents are processed and stored on the phone. The few features that go online send only what they need, such as a search query or your city for the weather. See the <a href="privacy.html">Privacy Policy</a>.</p></details>
         <details><summary>Why isn't it on the Play Store?</summary><p>ZED is distributed as a signed APK from GitHub. Every release is signed with the same key, so updates install over the old version and keep your data. ZED tells you when a new version is ready.</p></details>
