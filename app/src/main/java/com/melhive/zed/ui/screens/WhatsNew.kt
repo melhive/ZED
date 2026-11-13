@@ -31,6 +31,10 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.31", "2026-11-13", "Deeper sounds, focused conversations", listOf(
+            "New LIVE sounds, deep and mechanical: Core (a reactor engine spins up and a heavy lock engages), Turbine, Mech (hydraulics and a bolt slamming home) and Command (low starship-console chords). The bright beeps, chirps and 8-bit sounds are gone. The “got it” sound when ZED hears you is now a low thunk. Pick one in More → Voice → LIVE sounds.",
+            "ZED stays on the conversation you're having. It only brings up something from an earlier conversation, a memory, an event or a reminder when you talk about it. After a pause of a few hours, a chat starts fresh, so yesterday's topic doesn't slip into today's answers.",
+        )),
         Release("0.1.30", "2026-11-13", "Full control, and ZED learns from you", listOf(
             "ZED can change anything in ZED by voice or chat: “delete task buy milk”, “delete the reminder about rent”, “delete my dentist appointment”, “remove notes.txt from knowledge”, “forget everything”, “change your voice to Atlas”, “turn off the wake word”, “set my briefing to 7 am”, “open my reminders”. It just does it, no questions asked.",
             "Teach ZED how you like it: “from now on keep answers short”, “stop calling me sir”, “don't use emojis”. It follows these rules in every answer. Say “that's wrong, it's …” and it learns the right answer.",

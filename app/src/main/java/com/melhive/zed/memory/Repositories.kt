@@ -43,9 +43,15 @@ class ConversationRepository(private val db: ZedDatabase) {
     suspend fun allMessages(conversationId: Long) = db.messages().all(conversationId)
     suspend fun deleteMessage(id: Long) = db.messages().delete(id)
 
-    /** Recent turns for model context. Tool results are included; failed/cancelled partials are skipped. */
-    suspend fun history(conversationId: Long, limit: Int = 40): List<ChatTurn> =
-        db.messages().recent(conversationId, limit).asReversed()
+    /**
+     * Recent turns for model context. Tool results are included; failed/cancelled partials are skipped.
+     * With [sessionGapMs], only the current sitting counts: turns before a pause longer than that
+     * (yesterday's chat in the same thread) are left out, so ZED stays on what is being talked about now.
+     */
+    suspend fun history(conversationId: Long, limit: Int = 40, sessionGapMs: Long? = null): List<ChatTurn> =
+        db.messages().recent(conversationId, limit)
+            .let { newestFirst -> if (sessionGapMs == null) newestFirst else currentSitting(newestFirst, sessionGapMs) }
+            .asReversed()
             .filter { it.status == "complete" && it.content.isNotBlank() }
             .map {
                 ChatTurn(
@@ -53,6 +59,16 @@ class ConversationRepository(private val db: ZedDatabase) {
                     it.content,
                 )
             }
+
+    private fun currentSitting(newestFirst: List<MessageEntity>, gap: Long): List<MessageEntity> {
+        val out = ArrayList<MessageEntity>()
+        var later = System.currentTimeMillis()
+        for (m in newestFirst) {
+            if (later - m.createdAt > gap) break
+            out += m; later = m.createdAt
+        }
+        return out
+    }
 
     suspend fun search(query: String): List<MessageEntity> = db.messages().search(likeEscape(query.trim()), 20)
     suspend fun recoverInterrupted() = db.messages().markInterruptedStreams()

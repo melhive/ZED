@@ -30,8 +30,12 @@ object MemoryRanker {
 
     data class Ranked(val fact: MemoryFact, val score: Float)
 
-    /** The memories connected to [question] (and, more weakly, to the [previous] message), best first. */
-    fun rank(question: String, facts: List<MemoryFact>, previous: String? = null, limit: Int = 6): List<Ranked> {
+    /**
+     * The memories connected to [question] (and, more weakly, to the [previous] message), best first.
+     * [bridges] also adds memories that only share an idea with a matched one (good for the Live
+     * Brain; off for answers, where they drag unrelated old topics into the conversation).
+     */
+    fun rank(question: String, facts: List<MemoryFact>, previous: String? = null, limit: Int = 6, bridges: Boolean = true): List<Ranked> {
         val q = keys(question)
         val prev = previous?.let { keys(it) - q }.orEmpty()
         if (q.isEmpty() && prev.isEmpty()) return emptyList()
@@ -47,7 +51,7 @@ object MemoryRanker {
         val scored = facts.mapNotNull { f ->
             val k = factKeys.getValue(f.id)
             var s = direct[f.id] ?: 0f
-            if (s == 0f) s = if (direct.isNotEmpty()) 1f * k.count { it in bridge }.coerceAtMost(2) else 0f
+            if (s == 0f) s = if (bridges && direct.isNotEmpty()) 1f * k.count { it in bridge }.coerceAtMost(2) else 0f
             if (s <= 0f) return@mapNotNull null
             Ranked(f, s + (if (f.pinned) 0.5f else 0f) + 0.5f * f.strength)
         }

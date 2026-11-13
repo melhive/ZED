@@ -107,6 +107,7 @@ class AssistantOrchestrator(
     private val tracker = com.melhive.zed.core.understanding.DialogueTracker()
     private val repair = com.melhive.zed.core.understanding.ToolRepair(skills.catalog)
     private val dialogues = java.util.concurrent.ConcurrentHashMap<Long, com.melhive.zed.core.understanding.DialogueState>()
+    private val lastTurnAt = java.util.concurrent.ConcurrentHashMap<Long, Long>()
     /** What the user said in the turn being answered (dates and durations in it beat the model's). */
     @Volatile private var currentUserText: String? = null
     /** The conversation being answered (requests queued for the internet go back to it). */
@@ -261,6 +262,10 @@ class AssistantOrchestrator(
                 awaitingFix.remove(conversationId)
             }
         }
+        // After a long pause the conversation starts fresh: "her" or "it" no longer points at yesterday's subject.
+        val now = System.currentTimeMillis()
+        if (now - (lastTurnAt[conversationId] ?: now) > SESSION_GAP_MS) dialogues.remove(conversationId)
+        lastTurnAt[conversationId] = now
         val state = dialogue(conversationId).heard(text)
         dialogues[conversationId] = state
         val facts = runCatching { memory.list(200).map { it.text } }.getOrDefault(emptyList())
@@ -368,7 +373,7 @@ class AssistantOrchestrator(
         // conversation instead of re-reading the whole history whenever a message switches between chat and actions.
         val useTools = isLocal || PromptBuilder.looksLikeAction(userText)
         val enabled = skills.enabledTools(s.enabledSkills).filter { it.name != "web.research" || researchAvailable }
-        val history0 = conversations.history(conversationId, 6)
+        val history0 = conversations.history(conversationId, 6, SESSION_GAP_MS)
         val previousUser = history0.dropLast(1).lastOrNull { it.role == Role.USER }?.content
         // On-device: only the few tools that fit this message (a small model chooses far better from four than from fifty).
         val toolSpecs = when {
@@ -387,10 +392,12 @@ class AssistantOrchestrator(
             userText,
             allFacts.map { com.melhive.zed.core.understanding.MemoryFact(it.id, it.text, it.pinned, com.melhive.zed.core.brain.BrainStrength.of(it.uses, it.lastUsedAt, it.createdAt, it.pinned, now0)) },
             previous = previousUser, limit = if (tinyContext) 3 else 6,
+            // Only memories this conversation is actually about — no second-hand associations that drag in old topics.
+            bridges = false,
         )
         val profile = buildList {
             userName?.let { add("name $it") }
-            allFacts.filter { it.pinned && ranked.none { r -> r.fact.id == it.id } }.take(3).forEach { add(it.text) }
+            allFacts.filter { it.pinned && it.source != "preference" && ranked.none { r -> r.fact.id == it.id } }.take(3).forEach { add(it.text) }
         }
         // What ZED learned by itself is marked, so the model treats it as less certain than what the user said.
         val sourceOf = allFacts.associate { it.id to it.source }
@@ -427,7 +434,7 @@ class AssistantOrchestrator(
 
         var lastText = ""
         for (round in 1..MAX_ROUNDS) {
-            val history = conversations.history(conversationId, 40)
+            val history = conversations.history(conversationId, 40, SESSION_GAP_MS)
             val lastUser = history.lastOrNull { it.role == Role.USER }?.content.orEmpty()
             val knowledgeSnippets = if (s.useKnowledge && round == 1) {
                 setPhase(AssistantPhase.SEARCHING, "documents", conversationId)
@@ -565,5 +572,7 @@ class AssistantOrchestrator(
 
     companion object {
         const val MAX_ROUNDS = 3
+        /** A pause this long ends a sitting: what was said before is no longer "the current conversation". */
+        const val SESSION_GAP_MS = 3 * 3_600_000L
     }
 }

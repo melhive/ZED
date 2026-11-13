@@ -173,7 +173,7 @@ fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
                 Text("The sound when ZED LIVE opens and closes. Tap one to hear it.", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
                 WrapRow(Modifier.padding(top = 6.dp)) {
                     com.melhive.zed.core.voice.SoundSynth.Style.entries.forEach { st ->
-                        FilterChip(selected = settings.liveSound == st.id, onClick = {
+                        FilterChip(selected = com.melhive.zed.core.voice.SoundSynth.Style.parse(settings.liveSound) == st, onClick = {
                             safely { c.settings.setLiveSound(st.id) }
                             val ms = com.melhive.zed.voice.ZedSounds.play(context, st, start = true)
                             if (ms > 0) scope.launch { kotlinx.coroutines.delay(ms + 450); com.melhive.zed.voice.ZedSounds.play(context, st, start = false) }

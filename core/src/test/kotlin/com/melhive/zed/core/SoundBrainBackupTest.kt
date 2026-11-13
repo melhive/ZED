@@ -34,7 +34,7 @@ class SoundSynthTest {
             val pcm = SoundSynth.render(style, start)
             val name = "${style.id}/${if (start) "start" else "stop"}"
             val seconds = pcm.size.toDouble() / SoundSynth.RATE
-            assertTrue(seconds in 0.3..0.7, "$name lasts $seconds s")
+            assertTrue(seconds in 0.3..0.9, "$name lasts $seconds s")
             val peak = pcm.maxOf { abs(it.toInt()) }
             assertTrue(peak in 17_000..20_000, "$name peak $peak")
             assertEquals(0, pcm.first().toInt(), "$name starts at silence")
@@ -55,15 +55,31 @@ class SoundSynthTest {
         }
     }
 
-    /** A machine sound is harmonically rich; a ghostly one is a lone sine. Count zero crossings per second as a brightness check. */
-    @Test fun soundsAreBrightNotSineLike() {
-        for (style in styles) {
-            val pcm = SoundSynth.render(style, true)
+    /**
+     * Mature, not toy-like: harmonically rich (not a lone sine — those are dull and ghostly) but
+     * dark (no shrill chirps or bleeps). Zero crossings per second sit between the two.
+     */
+    @Test fun soundsAreRichButDeep() {
+        for (style in styles) for (start in listOf(true, false)) {
+            val pcm = SoundSynth.render(style, start)
             var crossings = 0
             for (i in 1 until pcm.size) if ((pcm[i - 1] < 0) != (pcm[i] < 0)) crossings++
             val perSecond = crossings * SoundSynth.RATE.toDouble() / pcm.size
-            assertTrue(perSecond > 1200, "${style.id} is dull: $perSecond crossings/s")
+            println("${style.id} start=$start crossings/s=$perSecond")
+            assertTrue(perSecond > 700, "${style.id} start=$start is a dull sine: $perSecond crossings/s")
+            assertTrue(perSecond < 2600, "${style.id} start=$start is shrill: $perSecond crossings/s")
         }
+    }
+
+    @Test fun acknowledgementIsAShortLowThunk() {
+        val ack = SoundSynth.ack()
+        assertTrue(ack.size.toDouble() / SoundSynth.RATE < 0.2)
+        assertEquals(0, ack.first().toInt()); assertEquals(0, ack.last().toInt())
+        assertTrue(ack.maxOf { abs(it.toInt()) } in 10_000..13_000)
+    }
+
+    @Test fun retiredSoundsFallBackToCore() {
+        listOf("arc", "droid", "retro", "chime", null).forEach { assertEquals(SoundSynth.Style.CORE, SoundSynth.Style.parse(it)) }
     }
 
     @Test fun startAndStopDifferAndRenderingIsDeterministic() {
@@ -82,12 +98,9 @@ class SoundSynthTest {
         assertContentEquals(SoundSynth.tick(2), SoundSynth.tick(7))
     }
 
-    @Test fun offIsSilentAndRetiredIdsFallBackToArc() {
+    @Test fun offIsSilentAndIdsAreUnique() {
         assertEquals(0, SoundSynth.render(SoundSynth.Style.OFF, true).size)
-        assertEquals(SoundSynth.Style.ARC, SoundSynth.Style.parse("pulse"))
-        assertEquals(SoundSynth.Style.ARC, SoundSynth.Style.parse("chime"))
-        assertEquals(SoundSynth.Style.ARC, SoundSynth.Style.parse(null))
-        assertEquals(SoundSynth.Style.DROID, SoundSynth.Style.parse("droid"))
+        assertEquals(SoundSynth.Style.TURBINE, SoundSynth.Style.parse("turbine"))
         assertEquals(SoundSynth.Style.entries.size, SoundSynth.Style.entries.map { it.id }.toSet().size)
     }
 }

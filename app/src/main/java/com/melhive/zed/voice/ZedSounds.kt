@@ -24,6 +24,11 @@ object ZedSounds {
         runCatching { playPcm(cache.getOrPut("tick/${pitch.mod(5)}") { SoundSynth.tick(pitch) }) }
     }
 
+    /** LIVE's instant "got it" when a request is heard: one low mechanical thunk. */
+    fun ack(context: Context) {
+        runCatching { playPcm(cache.getOrPut("ack") { SoundSynth.ack() }) }
+    }
+
     private fun playPcm(pcm: ShortArray): Long {
         val track = AudioTrack.Builder()
             .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())

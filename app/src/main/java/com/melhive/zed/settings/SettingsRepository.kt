@@ -46,7 +46,7 @@ data class AppSettings(
     /** Last version whose "What's new" the user has seen. */
     val lastSeenVersion: String? = null,
     /** LIVE start/stop sound: arc, pulse, chime or off. */
-    val liveSound: String = "arc",
+    val liveSound: String = "core",
     /** Mute the speech recognizer's own start beep while LIVE listens. */
     val hideRecognizerBeep: Boolean = true,
     /** Home Assistant base URL, e.g. http://homeassistant.local:8123 */

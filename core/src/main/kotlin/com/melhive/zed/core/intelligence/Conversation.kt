@@ -83,7 +83,7 @@ Never claim a device action happened unless a tool result confirms it. If a tool
         }
         if (memories.isNotEmpty()) {
             appendLine()
-            appendLine("Facts the user asked you to remember:")
+            appendLine("Facts the user asked you to remember (use one only when the current message is about it; never bring up a past topic on your own):")
             memories.take(if (compact) 12 else 30).forEach { appendLine("- $it") }
         }
         if (knowledge.isNotEmpty()) {
@@ -126,7 +126,7 @@ Never claim a device action happened unless a tool result confirms it. If a tool
             "Copy times from [Now] and [Computed] instead of working them out. After a tool call stop and wait for the result. Never say an action happened before its result confirms it.")
     }
 
-    const val LOCAL_CONTEXT_GUIDE = """Each user message may start with bracketed lines from the phone: [Now] (date, time, place, battery), [Coming up], [Conversation] (who "her"/"him"/"it" refers to), [About the user], [Related memories], [Computed exactly] and [Tools for this message]. Use them silently: don't repeat them back unless asked. Memories are what the user told you before; trust them over guesses."""
+    const val LOCAL_CONTEXT_GUIDE = """Each user message may start with bracketed lines from the phone: [Now] (date, time, place, battery), [Coming up], [Conversation] (who "her"/"him"/"it" refers to), [About the user], [Related memories], [Computed exactly] and [Tools for this message]. Use them silently: don't repeat them back unless asked. Memories are what the user told you before; trust them over guesses. Stay on what the user is talking about right now: use a memory, an earlier conversation, an event or a reminder only when the current message is about it, and never bring up a past topic, idea or plan on your own."""
 
     const val NATIVE_TOOL_GUIDE = """You can act on the user's phone with the provided tools.
 - When a request needs several steps, chain tools: call one, read its result, then call the next (e.g. read a file, then add a task for each item). Independent calls can be made together.

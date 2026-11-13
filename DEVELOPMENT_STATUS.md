@@ -13,7 +13,7 @@ Native Android personal AI assistant (Kotlin, Jetpack Compose). Three intelligen
 | Default branch | `main` (stable merges) |
 | Latest commit | see `git log -1` (this file is updated with each milestone) |
 | Build status | ✅ GitHub Actions **Android Build** green: core tests, Android unit tests, debug APK |
-| Releases | ✅ Signed release **v0.1.30** published (latest). Install/share link: https://github.com/melhive/ZED/releases/latest/download/zed.apk. Every push to `main` publishes the version in `VERSION` (bump it for a new release; re-pushing the same version replaces that release). App id `com.melhive.zed`, signed with the key in `/root/zed-signing` (back it up — updates need the same key). |
+| Releases | ✅ Signed release **v0.1.31** published (latest). Install/share link: https://github.com/melhive/ZED/releases/latest/download/zed.apk. Every push to `main` publishes the version in `VERSION` (bump it for a new release; re-pushing the same version replaces that release). App id `com.melhive.zed`, signed with the key in `/root/zed-signing` (back it up — updates need the same key). |
 
 ## Milestones
 
@@ -59,6 +59,11 @@ Failed tests: none.
 | Model download (2–3 GB) with resume + SHA-256 | | ✅ | ✅ | |
 | Keystore secret storage | | ✅ | ✅ | |
 | STT / TTS / sentence streaming / barge-in / audio focus | VAD only | ✅ | ✅ | |
+
+## Deeper sounds, focused conversations (v0.1.31)
+
+- **Sounds** (`SoundSynth`): Core, Turbine, Mech, Command, built from low fundamentals (55–220 Hz) with rich harmonics, steep 330 Hz high-pass and 4.2 kHz low-pass so phone speakers play them; LIVE "got it" is `SoundSynth.ack()` (low thunk). Retired ids fall back to Core. `SoundSynthTest` checks richness and darkness (700–2600 zero crossings/s).
+- **Focus**: model history is only the current sitting (`history(…, sessionGapMs = 3 h)`), dialogue state resets after the gap, `MemoryRanker.rank(bridges = false)` for answers (no second-hand associations), preference rules kept out of the profile, and the context guide tells Gemma never to raise past topics on its own (`FocusTest`).
 
 ## Full control and learning from the user (v0.1.30)
 

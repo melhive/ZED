@@ -8,48 +8,57 @@ import kotlin.math.pow
 import kotlin.math.sin
 
 /**
- * ZED's LIVE start and stop sounds, synthesized in code (no audio files).
+ * ZED's LIVE sounds, synthesized in code (no audio files).
  *
- * They are built to sound like a machine, not a voice or a ghost: harmonically
- * rich pulse and saw waves instead of pure sine glides, motor-style amplitude
- * buzz, hard gated beeps, relay clicks and metal latches — and never a slow
- * vibrato or a long soft tail. The energy sits between about 400 Hz and 5 kHz,
- * where small phone speakers are loud (deep bass is inaudible on them).
+ * Deep, mature machine sounds: engines and turbines spinning up, heavy
+ * mechanical locks and low synth chords — never chirps, bleeps or toy
+ * arpeggios. Fundamentals sit low (55–220 Hz) for weight, but the sound is
+ * built from rich harmonics and filtered so its energy lands above ~350 Hz,
+ * where phone speakers can play it: the ear still hears the low pitch.
  */
 object SoundSynth {
     const val RATE = 44_100
 
     enum class Style(val id: String, val label: String, val description: String) {
-        ARC("arc", "Arc", "Reactor power-up: motor spin, lock click and two crisp beeps"),
-        SERVO("servo", "Servo", "A robot joint moving: two motor whirs and a gear lock"),
-        DROID("droid", "Droid", "Quick robotic chirps, rising to say hello and falling to say bye"),
-        DATA("data", "Data", "Computer telemetry: a burst of data blips and a confirm tone"),
-        RETRO("retro", "Retro", "8-bit console arpeggio"),
-        AIRLOCK("airlock", "Airlock", "Pneumatic hiss, metal latch and an armed beep"),
+        CORE("core", "Core", "A reactor engine spins up, a heavy lock engages and a low chord confirms"),
+        TURBINE("turbine", "Turbine", "A jet turbine winds up with a deep roar, then settles"),
+        MECH("mech", "Mech", "Heavy hydraulics: a servo drives, gears grind and a bolt slams home"),
+        COMMAND("command", "Command", "A starship console: low, warm synth chords"),
         OFF("off", "Off", "No sound");
 
         companion object {
-            /** Unknown ids (including the retired "pulse" and "chime") fall back to Arc. */
-            fun parse(id: String?) = entries.firstOrNull { it.id == id } ?: ARC
+            /** Unknown ids (including the retired arc, servo, droid, data, retro and airlock) fall back to Core. */
+            fun parse(id: String?) = entries.firstOrNull { it.id == id } ?: CORE
         }
     }
 
     /** 16-bit mono PCM at [RATE]; empty for [Style.OFF]. */
     fun render(style: Style, start: Boolean): ShortArray {
         val out = when (style) {
-            Style.ARC -> if (start) arcUp() else arcDown()
-            Style.SERVO -> if (start) servoUp() else servoDown()
-            Style.DROID -> if (start) droidUp() else droidDown()
-            Style.DATA -> if (start) dataUp() else dataDown()
-            Style.RETRO -> crush(if (start) retroUp() else retroDown())
-            Style.AIRLOCK -> if (start) airlockUp() else airlockDown()
+            Style.CORE -> if (start) coreUp() else coreDown()
+            Style.TURBINE -> if (start) turbineUp() else turbineDown()
+            Style.MECH -> if (start) mechUp() else mechDown()
+            Style.COMMAND -> if (start) commandUp() else commandDown()
             Style.OFF -> return ShortArray(0)
         }
-        highPass(out, 180.0)
-        lowPass(out, 7000.0)
+        return finish(out, 0.6)
+    }
+
+    /** The instant "got it" when ZED takes a request in LIVE: one low, solid mechanical thunk. */
+    fun ack(): ShortArray {
+        val o = buffer(0.16)
+        clank(o, 0.0, 0.9, 0.8)
+        chord(o, 0.0, 0.09, doubleArrayOf(110.0, 165.0), 0.6, attack = 0.002, release = 0.05)
+        return finish(o, 0.36)
+    }
+
+    /** Band-limits to where phone speakers play (steep high-pass, dark low-pass), normalizes and fades the ends. */
+    private fun finish(out: DoubleArray, level: Double): ShortArray {
+        highPass(out, 330.0); highPass(out, 330.0)
+        lowPass(out, 4200.0); lowPass(out, 4200.0)
         val n = out.size
         val peak = out.maxOf { abs(it) }.takeIf { it > 0 } ?: 1.0
-        val gain = 0.6 / peak
+        val gain = level / peak
         // 3 ms fade at both ends: no clicks from the speaker.
         val fade = RATE * 3 / 1000
         return ShortArray(n) { i ->
@@ -82,110 +91,77 @@ object SoundSynth {
 
     // ---------------------------------------------------------------- styles
 
-    private fun arcUp(): DoubleArray {
+    private fun coreUp(): DoubleArray {
+        val o = buffer(0.82)
+        clank(o, 0.0, 0.75, 0.55)
+        engine(o, 0.02, 0.52, 55.0, 110.0, 0.35, 1.0, whine = 0.14)
+        rumble(o, 0.02, 0.52, 380.0, 760.0, 0.45, fadeIn = 0.08, fadeOut = 0.04)
+        clank(o, 0.55, 1.0, 1.0)
+        chord(o, 0.6, 0.22, doubleArrayOf(110.0, 165.0, 220.0), 0.7, attack = 0.012, release = 0.09)
+        return o
+    }
+
+    private fun coreDown(): DoubleArray {
+        val o = buffer(0.74)
+        chord(o, 0.0, 0.14, doubleArrayOf(110.0, 165.0, 220.0), 0.7, attack = 0.008, release = 0.05)
+        engine(o, 0.12, 0.48, 110.0, 46.0, 1.0, 0.25, whine = 0.12)
+        rumble(o, 0.12, 0.48, 760.0, 340.0, 0.45, fadeIn = 0.02, fadeOut = 0.12)
+        clank(o, 0.6, 0.7, 0.8)
+        return o
+    }
+
+    private fun turbineUp(): DoubleArray {
+        val o = buffer(0.86)
+        rumble(o, 0.0, 0.66, 420.0, 1300.0, 0.9, fadeIn = 0.18, fadeOut = 0.06)
+        whine(o, 0.0, 0.66, 520.0, 2100.0, 0.18, 0.5)
+        engine(o, 0.0, 0.66, 62.0, 124.0, 0.25, 0.8, whine = 0.0)
+        chord(o, 0.64, 0.2, doubleArrayOf(98.0, 147.0, 196.0), 0.75, attack = 0.01, release = 0.1)
+        return o
+    }
+
+    private fun turbineDown(): DoubleArray {
+        val o = buffer(0.8)
+        chord(o, 0.0, 0.12, doubleArrayOf(98.0, 147.0, 196.0), 0.7, attack = 0.006, release = 0.05)
+        rumble(o, 0.08, 0.7, 1300.0, 380.0, 0.9, fadeIn = 0.02, fadeOut = 0.3)
+        whine(o, 0.08, 0.7, 2100.0, 450.0, 0.5, 0.1)
+        engine(o, 0.08, 0.6, 124.0, 52.0, 0.8, 0.2, whine = 0.0)
+        return o
+    }
+
+    private fun mechUp(): DoubleArray {
+        val o = buffer(0.78)
+        hiss(o, 0.0, 0.12, 2600.0, 1800.0, 0.35, fadeIn = 0.005, fadeOut = 0.06)
+        motor(o, 0.04, 0.2, 150.0, 230.0, 38.0, 52.0, 0.7, 0.9, depth = 0.6, whine = 0.1)
+        clank(o, 0.25, 0.8, 0.7)
+        motor(o, 0.3, 0.2, 180.0, 300.0, 44.0, 64.0, 0.8, 1.0, depth = 0.6, whine = 0.1)
+        clank(o, 0.52, 0.62, 1.0)
+        chord(o, 0.56, 0.2, doubleArrayOf(82.0, 123.0, 165.0), 0.6, attack = 0.006, release = 0.1)
+        return o
+    }
+
+    private fun mechDown(): DoubleArray {
+        val o = buffer(0.72)
+        clank(o, 0.0, 0.8, 0.6)
+        motor(o, 0.05, 0.22, 300.0, 180.0, 64.0, 44.0, 1.0, 0.8, depth = 0.6, whine = 0.1)
+        motor(o, 0.3, 0.2, 230.0, 140.0, 52.0, 36.0, 0.9, 0.6, depth = 0.6, whine = 0.1)
+        hiss(o, 0.48, 0.16, 1800.0, 2800.0, 0.35, fadeIn = 0.01, fadeOut = 0.1)
+        clank(o, 0.52, 0.6, 0.9)
+        return o
+    }
+
+    private fun commandUp(): DoubleArray {
+        val o = buffer(0.66)
+        clank(o, 0.0, 1.1, 0.35)
+        chord(o, 0.0, 0.26, doubleArrayOf(110.0, 165.0, 220.0, 277.2), 0.7, attack = 0.03, release = 0.05)
+        chord(o, 0.26, 0.38, doubleArrayOf(146.8, 220.0, 293.7, 370.0), 0.75, attack = 0.02, release = 0.16)
+        return o
+    }
+
+    private fun commandDown(): DoubleArray {
         val o = buffer(0.62)
-        click(o, 0.0, 2800.0, 0.9)
-        motor(o, 0.015, 0.315, 240.0, 1100.0, 45.0, 140.0, 0.55, 1.0)
-        latch(o, 0.335, 1.0, 0.7)
-        beep(o, 0.395, 0.055, 1568.0, 0.75)
-        beep(o, 0.475, 0.095, 2093.0, 0.8)
-        return o
-    }
-
-    private fun arcDown(): DoubleArray {
-        val o = buffer(0.52)
-        beep(o, 0.0, 0.05, 2093.0, 0.8)
-        beep(o, 0.075, 0.05, 1568.0, 0.75)
-        motor(o, 0.15, 0.29, 1000.0, 210.0, 140.0, 35.0, 1.0, 0.45)
-        latch(o, 0.445, 0.75, 0.8)
-        return o
-    }
-
-    private fun servoUp(): DoubleArray {
-        val o = buffer(0.5)
-        motor(o, 0.0, 0.11, 420.0, 640.0, 95.0, 105.0, 0.9, 0.9, depth = 0.7, whine = 0.35)
-        click(o, 0.112, 3200.0, 0.7)
-        motor(o, 0.17, 0.23, 520.0, 980.0, 110.0, 150.0, 0.9, 1.0, depth = 0.7, whine = 0.35)
-        click(o, 0.402, 3200.0, 0.8)
-        latch(o, 0.43, 1.25, 0.6)
-        return o
-    }
-
-    private fun servoDown(): DoubleArray {
-        val o = buffer(0.48)
-        motor(o, 0.0, 0.2, 980.0, 520.0, 150.0, 110.0, 1.0, 0.9, depth = 0.7, whine = 0.35)
-        click(o, 0.202, 3200.0, 0.7)
-        motor(o, 0.26, 0.12, 640.0, 380.0, 105.0, 80.0, 0.9, 0.8, depth = 0.7, whine = 0.35)
-        latch(o, 0.385, 0.8, 0.8)
-        return o
-    }
-
-    private fun droidUp(): DoubleArray {
-        val o = buffer(0.44)
-        chirp(o, 0.0, 0.06, 1400.0, 2100.0)
-        chirp(o, 0.075, 0.045, 2600.0, 2600.0, trill = 45.0)
-        chirp(o, 0.135, 0.07, 1800.0, 1100.0)
-        chirp(o, 0.22, 0.05, 2300.0, 3000.0)
-        chirp(o, 0.285, 0.13, 1500.0, 2700.0)
-        return o
-    }
-
-    private fun droidDown(): DoubleArray {
-        val o = buffer(0.4)
-        chirp(o, 0.0, 0.05, 2700.0, 2000.0)
-        chirp(o, 0.065, 0.05, 2200.0, 2200.0, trill = 45.0)
-        chirp(o, 0.13, 0.06, 1500.0, 2100.0)
-        chirp(o, 0.21, 0.17, 1900.0, 700.0)
-        return o
-    }
-
-    private fun dataUp(): DoubleArray {
-        val o = buffer(0.5)
-        val notes = doubleArrayOf(1175.0, 1568.0, 1319.0, 2093.0, 1760.0, 2349.0, 1568.0, 2637.0, 1976.0)
-        notes.forEachIndexed { k, f -> beep(o, k * 0.034, 0.026, f, 0.6, release = 0.003) }
-        beep(o, 0.33, 0.15, 1760.0, 0.6, width = 0.25)
-        beep(o, 0.33, 0.15, 2637.0, 0.45, width = 0.25)
-        return o
-    }
-
-    private fun dataDown(): DoubleArray {
-        val o = buffer(0.42)
-        beep(o, 0.0, 0.09, 1319.0, 0.6, width = 0.25)
-        beep(o, 0.0, 0.09, 1976.0, 0.45, width = 0.25)
-        val notes = doubleArrayOf(2349.0, 1760.0, 2093.0, 1319.0, 1568.0, 1047.0, 880.0)
-        notes.forEachIndexed { k, f -> beep(o, 0.12 + k * 0.034, 0.026, f, 0.6, release = 0.003) }
-        return o
-    }
-
-    private fun retroUp(): DoubleArray {
-        val o = buffer(0.46)
-        doubleArrayOf(523.25, 659.25, 783.99).forEachIndexed { k, f -> beep(o, k * 0.07, 0.066, f, 0.8, width = 0.25, octave = 0.0) }
-        // Classic power-up finish: the top note flips between the octave and its fifth.
-        for (k in 0 until 8) beep(o, 0.21 + k * 0.028, 0.028, if (k % 2 == 0) 1046.5 else 1568.0, 0.8, width = 0.25, octave = 0.0, attack = 0.001, release = 0.001)
-        return o
-    }
-
-    private fun retroDown(): DoubleArray {
-        val o = buffer(0.42)
-        doubleArrayOf(1046.5, 783.99, 659.25).forEachIndexed { k, f -> beep(o, k * 0.07, 0.066, f, 0.8, width = 0.25, octave = 0.0) }
-        glide(o, 0.21, 0.18, 523.25, 330.0, 0.8, width = 0.25)
-        return o
-    }
-
-    private fun airlockUp(): DoubleArray {
-        val o = buffer(0.56)
-        hiss(o, 0.0, 0.26, 4200.0, 1500.0, 0.9, fadeIn = 0.012, fadeOut = 0.05)
-        latch(o, 0.27, 1.0, 1.0)
-        latch(o, 0.37, 1.5, 0.5)
-        beep(o, 0.45, 0.07, 1976.0, 0.4)
-        return o
-    }
-
-    private fun airlockDown(): DoubleArray {
-        val o = buffer(0.52)
-        latch(o, 0.0, 1.5, 0.6)
-        latch(o, 0.09, 1.0, 1.0)
-        hiss(o, 0.15, 0.34, 1500.0, 4500.0, 0.9, fadeIn = 0.01, fadeOut = 0.2)
+        chord(o, 0.0, 0.24, doubleArrayOf(146.8, 220.0, 293.7, 370.0), 0.7, attack = 0.015, release = 0.05)
+        chord(o, 0.24, 0.36, doubleArrayOf(110.0, 165.0, 220.0, 261.6), 0.75, attack = 0.02, release = 0.18, drop = 0.94)
+        clank(o, 0.5, 0.9, 0.3)
         return o
     }
 
@@ -210,35 +186,6 @@ object SoundSynth {
     /** Hard-gated envelope: on and off in a few milliseconds, like a relay. */
     private fun gate(t: Double, dur: Double, attack: Double, release: Double) =
         min(1.0, min(t / attack, (dur - t) / release)).coerceAtLeast(0.0)
-
-    /** A digital beep: a pulse wave with a touch of the octave above, hard gated. */
-    private fun beep(
-        o: DoubleArray, at: Double, dur: Double, freq: Double, gain: Double,
-        width: Double = 0.5, octave: Double = 0.2, attack: Double = 0.002, release: Double = 0.005,
-    ) = glide(o, at, dur, freq, freq, gain, width, octave, attack, release)
-
-    /** A gated pulse tone sliding from [f0] to [f1]. */
-    private fun glide(
-        o: DoubleArray, at: Double, dur: Double, f0: Double, f1: Double, gain: Double,
-        width: Double = 0.5, octave: Double = 0.0, attack: Double = 0.002, release: Double = 0.005,
-    ) {
-        val i0 = (at * RATE).toInt()
-        val n = (dur * RATE).toInt()
-        var p = 0.0
-        var p2 = 0.0
-        for (k in 0 until n) {
-            val i = i0 + k
-            if (i >= o.size) break
-            val t = k.toDouble() / RATE
-            val f = f0 * (f1 / f0).pow(t / dur)
-            val dt = f / RATE
-            p += dt; if (p >= 1) p -= 1
-            p2 += 2 * dt; if (p2 >= 1) p2 -= 1
-            var v = pulse(p, dt, width)
-            if (octave > 0) v += octave * pulse(p2, 2 * dt, 0.5)
-            o[i] += gain * gate(t, dur, attack, release) * v
-        }
-    }
 
     /**
      * An electric motor: a saw and a narrow pulse an octave apart, chopped by a
@@ -270,8 +217,34 @@ object SoundSynth {
         }
     }
 
-    /** A droid chirp: an FM tone (bright, slightly nasal) sliding quickly, optionally trilled. */
-    private fun chirp(o: DoubleArray, at: Double, dur: Double, f0: Double, f1: Double, trill: Double = 0.0, gain: Double = 0.8) {
+    /**
+     * A combustion engine / reactor: a narrow pulse and a slightly detuned saw on a low
+     * fundamental (the beat between them is the engine's throb), pulsing at half the
+     * firing rate, with a turbine whine 16 harmonics up that grows as it revs.
+     */
+    private fun engine(o: DoubleArray, at: Double, dur: Double, f0: Double, f1: Double, g0: Double, g1: Double, whine: Double = 0.1, throb: Double = 0.35) {
+        val i0 = (at * RATE).toInt()
+        val n = (dur * RATE).toInt()
+        var p1 = 0.0; var p2 = 0.0; var pa = 0.0; var pw = 0.0
+        for (k in 0 until n) {
+            val i = i0 + k
+            if (i >= o.size) break
+            val t = k.toDouble() / RATE
+            val x = t / dur
+            val f = f0 * (f1 / f0).pow(x)
+            val dt = f / RATE
+            p1 += dt; if (p1 >= 1) p1 -= 1
+            p2 += dt * 1.007; if (p2 >= 1) p2 -= 1
+            pa += f * 0.5 / RATE; if (pa >= 1) pa -= 1
+            pw += 16 * dt; if (pw >= 1) pw -= 1
+            val body = 0.55 * pulse(p1, dt, 0.16) + 0.45 * saw(p2, dt * 1.007)
+            val pulseEnv = 1 - throb * (0.5 + 0.5 * sin(2 * PI * pa))
+            o[i] += (g0 + (g1 - g0) * x) * gate(t, dur, 0.02, 0.03) * (body * pulseEnv + whine * x * sin(2 * PI * pw))
+        }
+    }
+
+    /** A turbine's whine: a clean tone with a quiet fifth, sliding [f0]→[f1] Hz, level [g0]→[g1]. */
+    private fun whine(o: DoubleArray, at: Double, dur: Double, f0: Double, f1: Double, g0: Double, g1: Double) {
         val i0 = (at * RATE).toInt()
         val n = (dur * RATE).toInt()
         var ph = 0.0
@@ -279,11 +252,58 @@ object SoundSynth {
             val i = i0 + k
             if (i >= o.size) break
             val t = k.toDouble() / RATE
-            var f = f0 * (f1 / f0).pow(t / dur)
-            if (trill > 0) f *= if (sin(2 * PI * trill * t) >= 0) 1.0 else 1.26
-            ph += 2 * PI * f / RATE
-            o[i] += gain * gate(t, dur, 0.003, 0.006) * sin(ph + 1.2 * sin(2 * ph))
+            val x = t / dur
+            ph += 2 * PI * f0 * (f1 / f0).pow(x) / RATE
+            o[i] += (g0 + (g1 - g0) * x) * gate(t, dur, 0.04, 0.05) * (sin(ph) + 0.3 * sin(1.5 * ph))
         }
+    }
+
+    /** Engine roar: band-passed noise sweeping [c0]→[c1] Hz. */
+    private fun rumble(o: DoubleArray, at: Double, dur: Double, c0: Double, c1: Double, gain: Double, fadeIn: Double, fadeOut: Double) =
+        noise(o, at, dur, c0, c1, 0.55, gain, seed = (at * 1e3).toInt() + 53) { t, d -> gate(t, d, fadeIn, fadeOut) }
+
+    /**
+     * A warm low synth chord: detuned saws per note (slight chorus), soft attack and
+     * release, the whole chord optionally sinking to [drop]× its pitch.
+     */
+    private fun chord(o: DoubleArray, at: Double, dur: Double, notes: DoubleArray, gain: Double, attack: Double, release: Double, drop: Double = 1.0) {
+        val i0 = (at * RATE).toInt()
+        val n = (dur * RATE).toInt()
+        val phases = DoubleArray(notes.size * 2)
+        val each = gain / notes.size
+        for (k in 0 until n) {
+            val i = i0 + k
+            if (i >= o.size) break
+            val t = k.toDouble() / RATE
+            val bend = drop.pow(t / dur)
+            var v = 0.0
+            for ((j, f) in notes.withIndex()) for (d in 0..1) {
+                val dt = f * bend * (if (d == 0) 0.997 else 1.003) / RATE
+                val q = j * 2 + d
+                phases[q] += dt; if (phases[q] >= 1) phases[q] -= 1
+                v += 0.5 * saw(phases[q], dt)
+            }
+            o[i] += each * gate(t, dur, attack, release) * v
+        }
+    }
+
+    /** A heavy steel clank: low inharmonic partials ringing a little longer than a latch, plus the bolt's thud. */
+    private fun clank(o: DoubleArray, at: Double, pitch: Double, gain: Double) {
+        val partials = arrayOf(
+            doubleArrayOf(410.0, 1.0, 0.09), doubleArrayOf(780.0, 0.75, 0.07), doubleArrayOf(1190.0, 0.55, 0.05),
+            doubleArrayOf(1730.0, 0.35, 0.03), doubleArrayOf(2480.0, 0.2, 0.018),
+        )
+        val i0 = (at * RATE).toInt()
+        val n = (0.22 * RATE).toInt()
+        for (k in 0 until n) {
+            val i = i0 + k
+            if (i >= o.size) break
+            val t = k.toDouble() / RATE
+            var v = 0.0
+            for (p in partials) v += p[1] * sin(2 * PI * p[0] * pitch * t) * exp(-t / p[2])
+            o[i] += gain * 0.5 * min(1.0, t / 0.0008) * v
+        }
+        click(o, at, 520.0 * pitch, gain * 0.7)
     }
 
     /** A relay click: a few milliseconds of band-passed noise. */
@@ -316,41 +336,6 @@ object SoundSynth {
             band += f * high
             o[i] += gain * env(t, dur) * band
         }
-    }
-
-    /**
-     * A metal latch: inharmonic partials that ring for a few hundredths of a
-     * second, plus the thud of the bolt. [pitch] scales the partials.
-     */
-    private fun latch(o: DoubleArray, at: Double, pitch: Double, gain: Double) {
-        val partials = arrayOf(
-            doubleArrayOf(540.0, 1.0, 0.045), doubleArrayOf(1290.0, 0.8, 0.05), doubleArrayOf(2210.0, 0.55, 0.035),
-            doubleArrayOf(3370.0, 0.35, 0.022), doubleArrayOf(4480.0, 0.2, 0.014),
-        )
-        val i0 = (at * RATE).toInt()
-        val n = (0.14 * RATE).toInt()
-        for (k in 0 until n) {
-            val i = i0 + k
-            if (i >= o.size) break
-            val t = k.toDouble() / RATE
-            var v = 0.0
-            for (p in partials) v += p[1] * sin(2 * PI * p[0] * pitch * t) * exp(-t / p[2])
-            o[i] += gain * 0.5 * min(1.0, t / 0.0006) * v
-        }
-        click(o, at, 900.0 * pitch, gain * 0.6)
-    }
-
-    /** 8-bit console grit: a low sample rate (sample-and-hold) and 5-bit depth. */
-    private fun crush(o: DoubleArray): DoubleArray {
-        val hold = 3
-        val levels = 16.0
-        val peak = o.maxOf { abs(it) }.takeIf { it > 0 } ?: 1.0
-        var held = 0.0
-        for (i in o.indices) {
-            if (i % hold == 0) held = Math.round(o[i] / peak * levels) / levels * peak
-            o[i] = held
-        }
-        return o
     }
 
     private fun highPass(o: DoubleArray, cutoff: Double) {
