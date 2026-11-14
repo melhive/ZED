@@ -80,6 +80,7 @@ import com.melhive.zed.core.brain.BrainGraph
 import com.melhive.zed.core.brain.BrainLayout
 import com.melhive.zed.core.brain.BrainNode
 import com.melhive.zed.core.brain.BrainNodeType
+import com.melhive.zed.core.brain.BrainItem
 import com.melhive.zed.ui.components.StatusPill
 import com.melhive.zed.ui.components.ZedCard
 import com.melhive.zed.ui.navigation.rememberContainer
