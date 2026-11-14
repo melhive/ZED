@@ -293,6 +293,9 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         },
         Rule(rx("forget (?:that |about )?(.+)")) { m -> tool("memory.forget", "query" to m.groupValues[1]) },
 
+        // Private Connections in the Live Brain.
+        Rule(rx("(?:exit|close|leave|lock|end|quit|turn off|hide) (?:the |my )?private (?:mode|brain|connections)")) { tool("app.show", "screen" to "private_exit") },
+        Rule(rx("(?:(?:open|start|show|enter|go (?:in)?to|switch to|unlock|turn on)(?: me)? )?(?:the |my )?private (?:mode|brain|connections)")) { tool("app.show", "screen" to "private") },
         // Eye mode: ZED's eyes on the whole screen; "chat mode" and "live mode" lead back.
         Rule(rx("(?:(?:open|start|show|enter|launch|activate|go (?:in)?to|switch to|turn on|enable)(?: me)? )?(?:the |your )?eyes? mode|(?:show me|open) your eyes|(?:let me |i want to )?see your eyes")) { tool("app.show", "screen" to "eye") },
         Rule(rx("(?:exit|close|leave|stop|end|quit|turn off|disable) (?:the |your )?eyes? mode|close your eyes|(?:(?:go|switch|back|return)(?: back)? to )?(?:the )?chat mode|(?:go|switch|return) back to (?:the )?chat")) { tool("app.show", "screen" to "chat") },

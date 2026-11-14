@@ -189,7 +189,7 @@ fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long?) -> Unit, onOpenLive: () -
         while (true) {
             delay(500)
             if (camera.faceSeen) goneFor = 0 else if (++goneFor == 4) people.onNoFace()
-            testLine = "Sees: " + (if (!camera.running) "camera off" else if (people.teaching >= 0) "learning your face ${people.teaching}/${com.melhive.zed.eyes.EyePeople.TEACH}" else people.seenLabel) +
+            testLine = if (!c.people.hasOwner() && people.teaching < 0) "Open the people button and tap “Teach my face” to start" else "Sees: " + (if (!camera.running) "camera off" else if (people.teaching >= 0) "learning your face ${people.teaching}/${com.melhive.zed.eyes.EyePeople.TEACH}" else people.seenLabel) +
                 (people.heardLabel.takeIf { it.isNotEmpty() }?.let { "   Hears: $it" } ?: "")
             val now = live.state.value
             // Only speak up when nobody is in the middle of saying something.

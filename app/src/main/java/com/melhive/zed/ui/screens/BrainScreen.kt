@@ -8,6 +8,8 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
@@ -28,6 +30,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CenterFocusStrong
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material3.FilterChip
@@ -92,7 +96,15 @@ import kotlin.math.min
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-private fun BrainNodeType.color(): Color = when (this) {
+/** True while the private brain is open: everything is drawn in black and white. */
+@Volatile private var monochrome = false
+
+private fun BrainNodeType.color(): Color = if (monochrome) when (this) {
+    BrainNodeType.CORE -> Color.White
+    BrainNodeType.CATEGORY -> Color(0xFFD0D0D0)
+    BrainNodeType.CONCEPT -> Color(0xFF9A9A9A)
+    else -> Color(0xFFECECEC)
+} else when (this) {
     BrainNodeType.CORE -> ZedColors.Cyan
     BrainNodeType.CATEGORY -> ZedColors.Violet
     BrainNodeType.CONCEPT -> ZedColors.Amber
@@ -233,8 +245,42 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
     var query by remember { mutableStateOf("") }
     var selectedKey by remember { mutableStateOf<String?>(null) }
 
+    // Private Connections: null while locked. Unlocked notes exist only here, in this screen's memory.
+    var privateNotes by remember { mutableStateOf<List<com.melhive.zed.security.PrivateStore.Note>?>(null) }
+    var privateNote by remember { mutableStateOf("") }
+    var privateMessage by remember { mutableStateOf<String?>(null) }
+    val privateOpen = privateNotes != null
+    val privateSpot = remember { FloatArray(3) }
+    var showDisplay by remember { mutableStateOf(false) }
+    val textFade = settings?.brainTextFade ?: 0.33f
+    val nodeSize = settings?.brainNodeSize ?: 1f
+    val linkWidth = settings?.brainLinkWidth ?: 1f
+    val privateCount = remember(privateOpen) { c.privateStore.count }
+    val tapNodeSize by rememberUpdatedState(nodeSize)
+
+    fun lockPrivate() { privateNotes = null; privateNote = ""; selectedKey = null; monochrome = false }
+    fun unlockPrivate() {
+        val activity = context as? android.app.Activity ?: return
+        if (!com.melhive.zed.security.DeviceAuth.available(context)) { privateMessage = "Set a screen lock (PIN, pattern or fingerprint) on this phone first. Private Connections are opened with it."; return }
+        com.melhive.zed.security.DeviceAuth.confirm(activity, "Private Connections", "Unlock with your fingerprint or PIN") { ok ->
+            if (ok) { selectedKey = null; searching = false; query = ""; monochrome = true; privateNotes = c.privateStore.load() }
+        }
+    }
+    // Locked again when you leave the brain, when ZED goes to the background, and after three minutes untouched.
+    DisposableEffect(Unit) { onDispose { monochrome = false } }
+    androidx.lifecycle.compose.LifecycleStartEffect(Unit) { onStopOrDispose { lockPrivate() } }
+    // "Private mode" and "lock private mode" by voice.
+    val privateAsk by c.brainPrivate.collectAsStateWithLifecycle()
+    LaunchedEffect(privateAsk) {
+        val ask = privateAsk ?: return@LaunchedEffect
+        c.brainPrivate.value = null
+        if (ask && !privateOpen) unlockPrivate() else if (!ask) lockPrivate()
+    }
+
     val counts = remember(allItems) { allItems.groupingBy { it.type }.eachCount() }
-    val items = remember(allItems, hidden) { allItems.filter { it.type !in hidden } }
+    val items = remember(allItems, hidden, privateNotes) {
+        privateNotes?.map { BrainItem(BrainNodeType.FACT, it.id, it.text, it.createdAt, strength = 0.7f) } ?: allItems.filter { it.type !in hidden }
+    }
 
     var graph by remember { mutableStateOf(BrainGraph.EMPTY) }
     var layout by remember { mutableStateOf(BrainLayout()) }
@@ -257,8 +303,8 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
         if (haptic) runCatching { view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK) }
     }
 
-    LaunchedEffect(items, links) {
-        val next = withContext(Dispatchers.Default) { BrainBuilder.build(items, links = links) }
+    LaunchedEffect(items, links, privateOpen) {
+        val next = withContext(Dispatchers.Default) { BrainBuilder.build(items, links = if (privateOpen) emptyList() else links) }
         if (layout.graph.nodes.isEmpty()) {
             // First time: unfold the brain off-screen so it appears already organized.
             layout = withContext(Dispatchers.Default) { BrainLayout().also { it.setGraph(next); it.settle() } }
@@ -290,7 +336,7 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
     LaunchedEffect(Unit) {
         c.brain.events.collect { e ->
             when (e) {
-                is BrainEvent.Recalled -> { e.keys.forEach { signal(it) }; tick(1, haptic = false) }
+                is BrainEvent.Recalled -> if (!monochrome) { e.keys.forEach { signal(it) }; tick(1, haptic = false) }
                 is BrainEvent.Saved -> Unit
             }
         }
@@ -374,12 +420,22 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
         lapse = Lapse(g, times)
     }
 
+    privateMessage?.let { message ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { privateMessage = null }, containerColor = ZedColors.SurfaceHigh,
+            title = { Text("Private Connections") }, text = { Text(message) },
+            confirmButton = { TextButton(onClick = { privateMessage = null }) { Text("OK") } },
+        )
+    }
+
     Column(Modifier.fillMaxSize()) {
         ScreenHeader(
-            "Live Brain", onBack,
-            subtitle = if (graph.itemCount == 0) "Nothing stored yet" else "${graph.itemCount} things known · ${graph.edges.size} connections · ${graph.conceptCount} concepts",
+            if (privateOpen) "Private brain" else "Live Brain", onBack,
+            subtitle = if (privateOpen) "${privateNotes?.size ?: 0} private notes · locks when you leave" else if (graph.itemCount == 0) "Nothing stored yet" else "${graph.itemCount} things known · ${graph.edges.size} connections · ${graph.conceptCount} concepts",
             actions = {
-                if (graph.itemCount >= 2) IconButton(onClick = { if (lapse != null) lapse = null else startLapse() }) {
+                if (privateOpen) IconButton(onClick = { lockPrivate() }) { Icon(Icons.Outlined.Lock, "Lock and leave the private brain", tint = Color.White) }
+                IconButton(onClick = { showDisplay = !showDisplay }) { Icon(Icons.Outlined.Tune, "Display", tint = if (showDisplay) ZedColors.Cyan else ZedColors.Text) }
+                if (graph.itemCount >= 2 && !privateOpen) IconButton(onClick = { if (lapse != null) lapse = null else startLapse() }) {
                     Icon(if (lapse != null) Icons.Outlined.Stop else Icons.Outlined.History, if (lapse != null) "Stop the replay" else "Replay how the brain grew", tint = if (lapse != null) ZedColors.Amber else ZedColors.Text)
                 }
                 IconButton(onClick = { searching = !searching; if (!searching) query = "" }) { Icon(Icons.Outlined.Search, "Search the brain", tint = if (searching) ZedColors.Cyan else ZedColors.Text) }
@@ -393,7 +449,19 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
                 trailingIcon = { if (query.isNotEmpty()) Text("${matches.size}", color = ZedColors.Cyan, modifier = Modifier.padding(end = 12.dp)) },
             )
         }
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (privateOpen) {
+            fun addPrivate() {
+                val text = privateNote.trim()
+                if (text.isEmpty()) return
+                val notes = (privateNotes ?: emptyList()) + com.melhive.zed.security.PrivateStore.Note(((privateNotes ?: emptyList()).maxOfOrNull { it.id } ?: 0L) + 1, text, System.currentTimeMillis())
+                c.privateStore.save(notes); privateNotes = notes; privateNote = ""; cam.lastTouch = frame
+            }
+            OutlinedTextField(
+                value = privateNote, onValueChange = { privateNote = it; cam.lastTouch = frame }, label = { Text("Add a private note") }, maxLines = 3,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                trailingIcon = { if (privateNote.isNotBlank()) TextButton(onClick = { addPrivate() }) { Text("Add") } },
+            )
+        } else Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ITEM_TYPES.filter { (counts[it] ?: 0) > 0 }.forEach { type ->
                 FilterChip(
                     selected = type !in hidden,
@@ -426,11 +494,16 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
                             val g = currentLayout.graph
                             if (cam.fit <= 0f || g !== currentGraph || projection.sx.size != g.nodes.size || lapse != null) return@detectTapGestures
                             cam.lastTouch = frame
+                            // The locked private group beside the brain: tapping its centre asks for your fingerprint or PIN.
+                            if (!monochrome && privateSpot[2] > 0f) {
+                                val dx = tap.x - privateSpot[0]; val dy = tap.y - privateSpot[1]
+                                if (sqrt(dx * dx + dy * dy) < privateSpot[2] + 16.dp.toPx()) { unlockPrivate(); return@detectTapGestures }
+                            }
                             var best = -1; var bestD = Float.MAX_VALUE
                             for (i in g.nodes.indices) {
                                 val dx = projection.sx[i] - tap.x; val dy = projection.sy[i] - tap.y
                                 val d = sqrt(dx * dx + dy * dy)
-                                val reach = nodeRadius(g.nodes[i], cam.fit * cam.zoom * projection.persp[i], density) + 18.dp.toPx()
+                                val reach = nodeRadius(g.nodes[i], cam.fit * cam.zoom * projection.persp[i], density) * tapNodeSize + 18.dp.toPx()
                                 // Of the nodes under the finger, the nearest to the viewer wins.
                                 val rank = d - projection.near[i] * 12.dp.toPx()
                                 if (d < reach && rank < bestD) { best = i; bestD = rank }
@@ -496,8 +569,8 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
                     val k = bend(lo, hi)
                     val alpha = (when { hot -> 0.9f; dim -> 0.06f; else -> (0.16f + 0.16f * edge.strength) * depth }) * grown
                     // Thick where it leaves the hub, thin where it reaches the memory.
-                    val wide = (if (hot) 2.2f else 1.5f) * unit * persp[lo].coerceIn(0.7f, 1.5f)
-                    val thin = (if (hot) 1.2f else 0.7f) * unit * persp[hi].coerceIn(0.7f, 1.5f)
+                    val wide = (if (hot) 2.2f else 1.5f) * unit * persp[lo].coerceIn(0.7f, 1.5f) * linkWidth
+                    val thin = (if (hot) 1.2f else 0.7f) * unit * persp[hi].coerceIn(0.7f, 1.5f) * linkWidth
                     synapse(ax, ay, bx, by, k, color.copy(alpha = alpha.coerceIn(0f, 1f)), wide, thin, segments)
                     // Named relationships ("sister", "works at") are written along the connection when it is in focus or close up.
                     edge.label?.let { lbl ->
@@ -574,7 +647,7 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
                     if (node.itemId != null) alpha *= 0.4f + 0.6f * node.strength
                     if (node.done) alpha *= 0.6f
                     if (isSelected) alpha = 1f
-                    var r = nodeRadius(node, scale * persp[i], density) * grown
+                    var r = nodeRadius(node, scale * persp[i], density) * grown * nodeSize
 
                     // New memories grow in with a ripple.
                     births[node.key]?.let { born ->
@@ -622,20 +695,72 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
 
                     val hub = node.type == BrainNodeType.CORE || node.type == BrainNodeType.CATEGORY
                     val apparent = scale * persp[i]
+                    // Display → Text fade threshold: how far you must zoom in before names appear.
+                    val nameAt = 0.35f + 2.75f * textFade
+                    val threshold = when { hub -> if (textFade > 0.6f) nameAt * 0.35f else 0f; node.type == BrainNodeType.CONCEPT -> nameAt * 0.48f; else -> nameAt }
+                    val fadeIn = if (threshold <= 0f || isSelected || focusSet != null) 1f else ((apparent - threshold) / (0.25f * threshold)).coerceIn(0f, 1f)
                     val show = grown > 0.9f && when {
                         !lit -> false
                         isSelected -> true
-                        hub -> near[i] > 0.2f || focusSet != null
-                        node.type == BrainNodeType.CONCEPT -> (apparent > 0.6f && near[i] > 0.45f) || focusSet != null
-                        else -> (apparent > 1.25f && near[i] > 0.5f) || focusSet != null
+                        hub -> (near[i] > 0.2f && fadeIn > 0f) || focusSet != null
+                        node.type == BrainNodeType.CONCEPT -> (fadeIn > 0f && near[i] > 0.45f) || focusSet != null
+                        else -> (fadeIn > 0f && near[i] > 0.5f) || focusSet != null
                     }
                     if (show) {
                         val text = labels.getOrPut(node.key) {
                             measurer.measure(if (hub) node.label.uppercase() else node.label, if (hub) hubStyle else labelStyle, overflow = TextOverflow.Ellipsis, maxLines = 1)
                         }
-                        drawText(text, color = ZedColors.Text.copy(alpha = if (hub || isSelected) (0.45f + 0.55f * near[i]) else (0.35f + 0.5f * near[i])), topLeft = Offset(p.x - text.size.width / 2f, p.y + r + 3f * unit))
+                        drawText(text, color = ZedColors.Text.copy(alpha = fadeIn * if (hub || isSelected) (0.45f + 0.55f * near[i]) else (0.35f + 0.5f * near[i])), topLeft = Offset(p.x - text.size.width / 2f, p.y + r + 3f * unit))
                     }
                 }
+
+                // Private Connections: a separate black-and-white group that turns with the brain but is joined to nothing.
+                if (!monochrome && !booting && lapse == null) {
+                    val a = 0.9f - cam.yaw
+                    val reachOut = (radius + 95f) * scale
+                    val px = sx[0] + cos(a) * reachOut
+                    val py = sy[0] + sin(a) * reachOut * 0.45f + reachOut * 0.25f
+                    val depth = 0.55f + 0.45f * ((sin(a) + 1f) / 2f)
+                    val r = 9.5f * unit * sqrt(scale.coerceIn(0.3f, 3f)) * nodeSize
+                    privateSpot[0] = px; privateSpot[1] = py; privateSpot[2] = r
+                    // Its notes circle it as plain grey points: how many there are, nothing about what they hold.
+                    val dots = min(privateCount, 16)
+                    for (k in 0 until dots) {
+                        val ang = t * 0.25f + k * (2f * PI.toFloat() / dots.coerceAtLeast(1))
+                        val orbit = r * (2.3f + 0.5f * sin(k * 1.7f))
+                        drawCircle(Color.White.copy(alpha = 0.32f * depth), 1.7f * unit * nodeSize, Offset(px + cos(ang) * orbit, py + sin(ang) * orbit * 0.6f))
+                    }
+                    drawCircle(Color.Black, r, Offset(px, py))
+                    drawCircle(Color.White.copy(alpha = 0.85f * depth), r, Offset(px, py), style = Stroke(1.3f * unit))
+                    // A small padlock in the middle.
+                    val w = r * 0.8f; val h = r * 0.6f
+                    drawRect(Color.White.copy(alpha = 0.85f * depth), Offset(px - w / 2f, py - h * 0.25f), androidx.compose.ui.geometry.Size(w, h))
+                    drawArc(Color.White.copy(alpha = 0.85f * depth), 180f, 180f, false, Offset(px - w * 0.3f, py - h * 0.85f), androidx.compose.ui.geometry.Size(w * 0.6f, h * 1.2f), style = Stroke(1.3f * unit))
+                    if (scale > 0.5f) {
+                        val text = labels.getOrPut("private-group") { measurer.measure("PRIVATE", hubStyle, maxLines = 1) }
+                        drawText(text, color = Color.White.copy(alpha = 0.6f * depth), topLeft = Offset(px - text.size.width / 2f, py + r + 4f * unit))
+                    }
+                } else privateSpot[2] = 0f
+            }
+
+            // Display options, like a graph view's: when names appear, how big the points are, how thick the links.
+            if (showDisplay) ZedCard(Modifier.align(Alignment.TopEnd).padding(10.dp).widthIn(max = 280.dp)) {
+                var fade by remember(textFade) { mutableFloatStateOf(textFade) }
+                var size by remember(nodeSize) { mutableFloatStateOf(nodeSize) }
+                var link by remember(linkWidth) { mutableFloatStateOf(linkWidth) }
+                fun save() { scope.launch { c.settings.setBrainDisplay(fade, size, link) } }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("DISPLAY", style = MaterialTheme.typography.labelSmall, color = ZedColors.Cyan, modifier = Modifier.weight(1f))
+                    IconButton(onClick = { showDisplay = false }) { Icon(Icons.Outlined.Close, "Close display options", tint = ZedColors.Muted) }
+                }
+                Text("Text fade threshold", style = MaterialTheme.typography.labelMedium)
+                Text(if (fade < 0.05f) "Names always show" else if (fade > 0.6f) "Names only when zoomed in close" else "Names appear as you zoom in", style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted)
+                androidx.compose.material3.Slider(value = fade, onValueChange = { fade = it }, onValueChangeFinished = { save() }, valueRange = 0f..1f)
+                Text("Node size", style = MaterialTheme.typography.labelMedium)
+                androidx.compose.material3.Slider(value = size, onValueChange = { size = it }, onValueChangeFinished = { save() }, valueRange = 0.5f..2.5f)
+                Text("Link thickness", style = MaterialTheme.typography.labelMedium)
+                androidx.compose.material3.Slider(value = link, onValueChange = { link = it }, onValueChangeFinished = { save() }, valueRange = 0.4f..3f)
+                TextButton(onClick = { scope.launch { c.settings.setBrainDisplay(0.33f, 1f, 1f) } }) { Text("Reset to default") }
             }
 
             // HUD readout.
@@ -661,6 +786,32 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
                         else "Turn a type back on above to see it.",
                         style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted, modifier = Modifier.padding(top = 6.dp),
                     )
+                }
+            } else if (selected != null && privateOpen) {
+                // Inside the private brain: the note itself, what it connects to, and a way to delete it.
+                val node = graph.nodes[selected]
+                ZedCard(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp), accent = Color.White) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        StatusPill(if (node.type == BrainNodeType.FACT) "Private note" else if (node.type == BrainNodeType.CATEGORY) "Area" else node.type.label, Color.White)
+                        Spacer(Modifier.weight(1f))
+                        IconButton(onClick = { selectedKey = null }) { Icon(Icons.Outlined.Close, "Close", tint = ZedColors.Muted) }
+                    }
+                    Column(Modifier.heightIn(max = 260.dp).verticalScroll(rememberScrollState())) {
+                        Text(if (node.type == BrainNodeType.CATEGORY) node.label else node.text, style = MaterialTheme.typography.bodyLarge)
+                        val id = node.itemId
+                        if (id != null && node.type == BrainNodeType.FACT) TextButton(onClick = {
+                            val notes = (privateNotes ?: emptyList()).filter { it.id != id }
+                            c.privateStore.save(notes); privateNotes = notes; selectedKey = null
+                        }) { Text("Delete this note", color = ZedColors.Red) }
+                        val linked = graph.neighbors[selected].map { graph.nodes[it] }.filter { it.type != BrainNodeType.CORE }
+                        if (linked.isNotEmpty()) {
+                            Text("CONNECTED TO ${linked.size}", style = MaterialTheme.typography.labelSmall, color = Color.White, modifier = Modifier.padding(top = 8.dp, bottom = 2.dp))
+                            linked.take(24).forEach { other ->
+                                Text(other.label, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.fillMaxWidth().clickable { select(other.key, center = true) }.padding(vertical = 5.dp))
+                            }
+                        }
+                    }
                 }
             } else if (selected != null) {
                 val node = graph.nodes[selected]

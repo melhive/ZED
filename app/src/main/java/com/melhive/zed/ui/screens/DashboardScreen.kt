@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.Chat
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.GraphicEq
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Mic
@@ -289,12 +290,16 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
             if (openTodos.size > 3) Text("+${openTodos.size - 3} more tasks", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
         }
 
+        // Two rows of three, so every label fits on one line on any phone.
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             QuickAction(Icons.Outlined.GraphicEq, "Live", ZedColors.Cyan, Modifier.weight(1f)) { onTab(Routes.LIVE) }
             QuickAction(Icons.Outlined.Visibility, "Eyes", ZedColors.Cyan, Modifier.weight(1f)) { onNavigate(Routes.EYE) }
             QuickAction(Icons.Outlined.Chat, "Chat", ZedColors.Violet, Modifier.weight(1f)) { onTab(Routes.CHAT) }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             QuickAction(Icons.Outlined.Folder, "Files", ZedColors.Teal, Modifier.weight(1f)) { onNavigate(Routes.FILES) }
             QuickAction(Icons.Outlined.Memory, "Memory", ZedColors.Amber, Modifier.weight(1f)) { onNavigate(Routes.MEMORY) }
+            QuickAction(Icons.Outlined.Schedule, "Routines", ZedColors.Violet, Modifier.weight(1f)) { onNavigate(Routes.ROUTINES) }
         }
 
         if (active.isNotEmpty()) {
@@ -343,7 +348,7 @@ private fun QuickAction(icon: ImageVector, label: String, tint: Color, modifier:
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(icon, null, tint = tint)
             Spacer(Modifier.height(6.dp))
-            Text(label, style = MaterialTheme.typography.labelMedium)
+            Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
         }
     }
 }

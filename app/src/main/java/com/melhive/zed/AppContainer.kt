@@ -81,6 +81,10 @@ class AppContainer(val context: Context) {
     fun phoneLocked(): Boolean = runCatching { context.getSystemService(android.app.KeyguardManager::class.java)?.isDeviceLocked == true }.getOrDefault(false)
     /** What the user asked for while the phone was locked; the screen unlocks and asks again. */
     val unlockRequest = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+    /** Private Connections: encrypted notes shown in the Live Brain only after a fingerprint or PIN. */
+    val privateStore by lazy { com.melhive.zed.security.PrivateStore(context) }
+    /** "Private mode" / "lock private mode" by voice: true asks the Live Brain to unlock, false to lock. */
+    val brainPrivate = kotlinx.coroutines.flow.MutableStateFlow<Boolean?>(null)
     /** People ZED has learned to recognise in Eye mode. Kept on the phone only. */
     val people by lazy { com.melhive.zed.eyes.PeopleStore(context) }
     /** How many voice screens (LIVE, Eye mode) are showing: the session ends when the last one closes, not when switching between them. */
@@ -132,7 +136,12 @@ class AppContainer(val context: Context) {
             .also { live ->
                 live.lockedNow = { settings.current().lockGuard && phoneLocked() }
                 live.onCallEnded = { conv ->
-                    appScope.launch { runCatching { orchestrator.summarize(conv)?.let { conversations.setSummary(conv, it) } } }
+                    // Written a little later and only while ZED is idle, so it never delays the next thing you ask.
+                    appScope.launch {
+                        kotlinx.coroutines.delay(20_000)
+                        if (live.state.value.active || orchestrator.activity.value.busy) return@launch
+                        runCatching { orchestrator.summarize(conv)?.let { conversations.setSummary(conv, it) } }
+                    }
                 }
             }
     }

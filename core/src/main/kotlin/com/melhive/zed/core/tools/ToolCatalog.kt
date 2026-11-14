@@ -45,7 +45,7 @@ class ToolCatalog(specs: List<ToolSpec>) {
         )
 
         /** Screens of the ZED app that [app.show] can open. */
-        val SCREENS = listOf("home", "chat", "live", "eye", "tasks", "more", "facts", "task_list", "reminders", "knowledge", "schedule", "taught", "brain",
+        val SCREENS = listOf("home", "chat", "live", "eye", "private", "private_exit", "tasks", "more", "facts", "task_list", "reminders", "knowledge", "schedule", "taught", "brain",
             "settings", "voice", "models", "files", "skills", "routines", "diagnostics", "backup", "whats_new")
 
         val DEFAULT = ToolCatalog(

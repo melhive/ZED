@@ -314,6 +314,18 @@ fun DiagnosticsScreen(onBack: () -> Unit) {
 
     ListScreen("Permissions & Diagnostics", onBack = onBack, actions = { TextButton(onClick = { refresh++ }) { Text("Refresh") } }) {
         item {
+            // Something isn't working? One button collects what ZED was doing and any errors into a file.
+            ZedCard {
+                SectionTitle("Report a problem")
+                Text("Collects what ZED was just doing, the last crash and recent errors into one report. It is saved to Download/ZED and you choose where to send it. Nothing is sent by itself.", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
+                TextButton(onClick = {
+                    val text = com.melhive.zed.android.CrashReporter.problemReport()
+                    val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_SUBJECT, "ZED problem report").putExtra(Intent.EXTRA_TEXT, text.take(60_000))
+                    runCatching { context.startActivity(Intent.createChooser(send, "Share report")) }
+                }) { Text("Make a report") }
+            }
+        }
+        item {
             val crash = remember(refresh) { com.melhive.zed.android.CrashReporter.lastCrash() }
             val errors = remember(refresh) { com.melhive.zed.android.CrashReporter.errors() }
             if (crash != null || errors != null) {

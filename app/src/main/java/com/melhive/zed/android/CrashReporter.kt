@@ -170,9 +170,9 @@ object CrashReporter {
     }
 
     /** Also keeps a copy in Download/ZED, so a crash can be looked at without opening the app. */
-    private fun saveToDownloads(text: String) {
+    private fun saveToDownloads(text: String, prefix: String = "zed-crash-") {
         if (Build.VERSION.SDK_INT < 29 || !::app.isInitialized) return
-        val name = "zed-crash-" + SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date()) + ".txt"
+        val name = prefix + SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date()) + ".txt"
         val values = android.content.ContentValues().apply {
             put(android.provider.MediaStore.Downloads.DISPLAY_NAME, name)
             put(android.provider.MediaStore.Downloads.MIME_TYPE, "text/plain")
@@ -192,6 +192,26 @@ object CrashReporter {
             val existing = if (f.exists()) f.readText().split("\n---\n").takeLast(49) else emptyList()
             f.writeText((existing + entry).joinToString("\n---\n"))
         }
+    }
+
+    /**
+     * Everything useful for tracking down a problem, in one text: the device, what ZED was doing in this
+     * run and the one before, the last crash and the errors it survived. Also saved to Download/ZED.
+     */
+    fun problemReport(): String {
+        val text = buildString {
+            appendLine("ZED problem report")
+            appendLine("Time: ${timestamp()}")
+            appendLine("App: ${BuildConfig.APPLICATION_ID} ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+            appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
+            appendLine()
+            appendLine(trail(CRUMBS).ifEmpty { "(nothing noted in this run yet)" }); appendLine()
+            trail(CRUMBS_BEFORE).takeIf { it.isNotEmpty() }?.let { appendLine("Before the last restart:"); appendLine(it); appendLine() }
+            lastCrash()?.let { appendLine("--- Last crash ---"); appendLine(it.take(20_000)); appendLine() }
+            errors()?.let { appendLine("--- Recent errors ZED survived ---"); appendLine(it.takeLast(10_000)) }
+        }
+        runCatching { saveToDownloads(text, "zed-report-") }
+        return text
     }
 
     fun lastCrash(): String? = if (::dir.isInitialized) File(dir, CRASH_FILE).takeIf { it.exists() }?.readText() else null

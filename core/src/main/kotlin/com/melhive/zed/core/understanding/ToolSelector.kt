@@ -74,7 +74,7 @@ object ToolSelector {
         "settings.set" to w("speech rate", "voice responses", "talk faster", "talk slower", "wake word", "hey zed", "sensitivity", "(?:change|switch|set) (?:your |the )?voice", "animations?",
             "web research", "learning", "briefing", "think twice", "barge", "glow", "hints", "brain sounds", "personality", "persona", "ask before", "confirm", "setting"),
         "app.undo" to w("undo", "bring (?:it|that|them) back", "restore (?:it|that|them)", "put (?:it|that|them) back", "didn'?t mean (?:to|that)"),
-        "app.show" to w("(?:open|show|go to|take me to) (?:my |the |your |zed'?s )?(?:facts|memories|task list|reminders|knowledge|schedule|settings|voice settings|models|routines|diagnostics|backup|skills|what'?s new)", "eyes? mode", "chat mode", "live mode", "your eyes"),
+        "app.show" to w("(?:open|show|go to|take me to) (?:my |the |your |zed'?s )?(?:facts|memories|task list|reminders|knowledge|schedule|settings|voice settings|models|routines|diagnostics|backup|skills|what'?s new)", "eyes? mode", "chat mode", "live mode", "your eyes", "private (?:mode|brain|connections)"),
         "todo.delete" to w("(?:delete|remove|clear|erase) (?:[\\w']+ ){0,4}(?:tasks?|to-?dos?|task list)", "(?:delete|remove) .{1,40} from (?:my )?(?:task |to-?do )?list"),
         "reminder.delete" to w("(?:delete|remove|clear|erase) (?:[\\w']+ ){0,3}reminders?"),
         "calendar.delete" to w("(?:delete|remove|cancel|clear) (?:my |the )?(?:[\\w']+ ){0,4}(?:meeting|appointment|event)", "(?:delete|remove) .{1,40} from (?:my )?(?:calendar|schedule)"),

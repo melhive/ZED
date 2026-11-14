@@ -109,6 +109,21 @@ fun NavHostController.navigateTab(route: String) = navigate(route) {
     restoreState = true
 }
 
+/**
+ * Opens LIVE (the orb) or Eye mode. The two are one conversation with two faces, so switching replaces
+ * the one on screen instead of stacking them. (Stacked, "back to the orb" restored the stack with the
+ * eyes still on top, and nothing appeared to happen.)
+ */
+fun NavHostController.openVoice(route: String) {
+    val here = currentDestination?.route
+    if (here == route) return
+    if (previousBackStackEntry?.destination?.route == route) { popBackStack(); return }
+    navigate(route) {
+        if (here == Routes.LIVE || here == Routes.EYE) popUpTo(here) { inclusive = true }
+        launchSingleTop = true
+    }
+}
+
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun ZedRoot(requestedRoute: String?, onRouteConsumed: () -> Unit) {
@@ -124,7 +139,16 @@ fun ZedRoot(requestedRoute: String?, onRouteConsumed: () -> Unit) {
     LaunchedEffect(requestedRoute) {
         if (requestedRoute != null) {
             // A particular conversation ("chat mode" from Eye mode) is opened as itself, not as the last chat tab.
-            if (requestedRoute.startsWith(Routes.CHAT + "?")) nav.navigate(requestedRoute) { launchSingleTop = true } else nav.navigateTab(requestedRoute)
+            val here = nav.currentDestination?.route
+            when {
+                requestedRoute == Routes.LIVE || requestedRoute == Routes.EYE -> nav.openVoice(requestedRoute)
+                // "Chat mode" from the orb or the eyes: the call's own conversation replaces that screen.
+                requestedRoute.startsWith(Routes.CHAT + "?") -> nav.navigate(requestedRoute) {
+                    if (here == Routes.LIVE || here == Routes.EYE) popUpTo(here) { inclusive = true }
+                    launchSingleTop = true
+                }
+                else -> nav.navigateTab(requestedRoute)
+            }
             onRouteConsumed()
         }
     }
@@ -164,22 +188,22 @@ fun ZedRoot(requestedRoute: String?, onRouteConsumed: () -> Unit) {
                 popEnterTransition = { NavMotion.popEnter(initialState.destination.route, targetState.destination.route) },
                 popExitTransition = { NavMotion.popExit(initialState.destination.route, targetState.destination.route) },
             ) {
-                screen(Routes.HOME) { DashboardScreen(onNavigate = { nav.navigate(it) }, onTab = { nav.navigateTab(it) }) }
+                screen(Routes.HOME) { DashboardScreen(onNavigate = { if (it == Routes.EYE) nav.openVoice(it) else nav.navigate(it) }, onTab = { nav.navigateTab(it) }) }
                 screen(
                     "${Routes.CHAT}?id={id}",
                     arguments = listOf(navArgument("id") { type = NavType.LongType; defaultValue = -1L }),
                 ) { entry ->
                     val id = entry.arguments?.getLong("id")?.takeIf { it > 0 }
-                    ChatScreen(initialConversationId = id, onOpenLive = { nav.navigateTab(Routes.LIVE) }, onOpenModels = { nav.navigate(Routes.MODELS) }, onOpenEye = { nav.navigate(Routes.EYE) { launchSingleTop = true } })
+                    ChatScreen(initialConversationId = id, onOpenLive = { nav.openVoice(Routes.LIVE) }, onOpenModels = { nav.navigate(Routes.MODELS) }, onOpenEye = { nav.openVoice(Routes.EYE) })
                 }
-                screen(Routes.LIVE) { LiveScreen(onClose = { if (!nav.popBackStack()) nav.navigateTab(Routes.HOME) }, onOpenTasks = { nav.navigateTab(Routes.TASKS) }, onOpenEye = { nav.navigate(Routes.EYE) { launchSingleTop = true } },
+                screen(Routes.LIVE) { LiveScreen(onClose = { if (!nav.popBackStack()) nav.navigateTab(Routes.HOME) }, onOpenTasks = { nav.navigateTab(Routes.TASKS) }, onOpenEye = { nav.openVoice(Routes.EYE) },
                     onOpenChat = { id -> if (id != null) nav.navigate(Routes.chat(id)) { popUpTo(Routes.LIVE) { inclusive = true }; launchSingleTop = true } else nav.navigateTab(Routes.CHAT) }) }
                 // Eye mode: ZED's eyes on the whole screen, in landscape.
                 screen(Routes.EYE) {
                     com.melhive.zed.ui.screens.EyeScreen(
                         onClose = { if (!nav.popBackStack()) nav.navigateTab(Routes.HOME) },
                         onOpenChat = { id -> if (id != null) nav.navigate(Routes.chat(id)) { popUpTo(Routes.EYE) { inclusive = true }; launchSingleTop = true } else nav.navigateTab(Routes.CHAT) },
-                        onOpenLive = { nav.navigateTab(Routes.LIVE) },
+                        onOpenLive = { nav.openVoice(Routes.LIVE) },
                     )
                 }
                 screen(Routes.TASKS) { TasksScreen(onOpen = { nav.navigate(Routes.task(it)) }) }
@@ -206,7 +230,7 @@ fun ZedRoot(requestedRoute: String?, onRouteConsumed: () -> Unit) {
                 screen(Routes.VOICE) { com.melhive.zed.ui.screens.VoiceScreen(onBack = { nav.popBackStack() }, onOpenTasks = { nav.navigateTab(Routes.TASKS) }) }
             }
             // On a stand (charging, held sideways): offer Eye mode.
-            if (route != Routes.EYE && route != Routes.LIVE && !imeVisible) StandOffer(Modifier.align(androidx.compose.ui.Alignment.TopCenter)) { nav.navigate(Routes.EYE) { launchSingleTop = true } }
+            if (route != Routes.EYE && route != Routes.LIVE && !imeVisible) StandOffer(Modifier.align(androidx.compose.ui.Alignment.TopCenter)) { nav.openVoice(Routes.EYE) }
             // Undo for the last delete, wherever it happened (voice, chat or a delete button).
             com.melhive.zed.ui.components.UndoBar(container, Modifier.align(androidx.compose.ui.Alignment.BottomCenter))
         }

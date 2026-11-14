@@ -92,6 +92,11 @@ data class AppSettings(
     val brainSounds: Boolean = true,
     /** Eye mode shows what is being said as a line of text under the eyes. */
     val eyeCaptions: Boolean = false,
+    /** Live Brain display: how far you must zoom in before names appear (0 always … 1 only very close). */
+    val brainTextFade: Float = 0.33f,
+    /** Live Brain display: node size and link thickness, 1 = normal. */
+    val brainNodeSize: Float = 1f,
+    val brainLinkWidth: Float = 1f,
     /** Iris colour in Eye mode: cyan, amber, green or violet. */
     val eyeColor: String = "cyan",
     /** Saying "stop" cuts ZED off on the loudspeaker (needs on-device speech recognition). */
@@ -166,6 +171,9 @@ class SettingsRepository(private val context: Context) {
         val autoBackupStatus = stringPreferencesKey("auto_backup_status")
         val brainSounds = booleanPreferencesKey("brain_sounds")
         val eyeCaptions = booleanPreferencesKey("eye_captions")
+        val brainTextFade = floatPreferencesKey("brain_text_fade")
+        val brainNodeSize = floatPreferencesKey("brain_node_size")
+        val brainLinkWidth = floatPreferencesKey("brain_link_width")
         val eyeColor = stringPreferencesKey("eye_color")
         val voiceStop = booleanPreferencesKey("voice_stop")
         val listenPatience = stringPreferencesKey("listen_patience")
@@ -227,6 +235,9 @@ class SettingsRepository(private val context: Context) {
             autoBackupStatus = p[K.autoBackupStatus] ?: "",
             brainSounds = p[K.brainSounds] ?: true,
             eyeCaptions = p[K.eyeCaptions] ?: false,
+            brainTextFade = p[K.brainTextFade] ?: 0.33f,
+            brainNodeSize = p[K.brainNodeSize] ?: 1f,
+            brainLinkWidth = p[K.brainLinkWidth] ?: 1f,
             eyeColor = p[K.eyeColor] ?: "cyan",
             voiceStop = p[K.voiceStop] ?: true,
             listenPatience = p[K.listenPatience] ?: "normal",
@@ -287,6 +298,9 @@ class SettingsRepository(private val context: Context) {
     suspend fun setEyeColor(v: String) = context.dataStore.edit { it[K.eyeColor] = v }
     suspend fun setVoiceStop(v: Boolean) = context.dataStore.edit { it[K.voiceStop] = v }
     suspend fun setListenPatience(v: String) = context.dataStore.edit { it[K.listenPatience] = v }
+    suspend fun setBrainDisplay(textFade: Float, nodeSize: Float, linkWidth: Float) = context.dataStore.edit {
+        it[K.brainTextFade] = textFade.coerceIn(0f, 1f); it[K.brainNodeSize] = nodeSize.coerceIn(0.5f, 2.5f); it[K.brainLinkWidth] = linkWidth.coerceIn(0.4f, 3f)
+    }
     suspend fun setEyeCaptions(v: Boolean) = context.dataStore.edit { it[K.eyeCaptions] = v }
     suspend fun setBrainSounds(v: Boolean) = context.dataStore.edit { it[K.brainSounds] = v }
     suspend fun setAutoLearning(v: Boolean) = context.dataStore.edit { it[K.autoLearning] = v }

@@ -205,6 +205,13 @@ fun registerAppControl(tm: ToolManager, c: AppContainer, context: Context) {
     // ---- Screens of the app ----
     tm.register("app.show") { a, _ ->
         val screen = a.string("screen")
+        // Private Connections: the Live Brain asks for a fingerprint or PIN before showing anything.
+        if (screen == "private") {
+            c.brainPrivate.value = true
+            context.startActivity(com.melhive.zed.assist.ZedLaunch.intent(context, Routes.BRAIN))
+            return@register ok("Opening private mode. Unlock it with your fingerprint or PIN.")
+        }
+        if (screen == "private_exit") { c.brainPrivate.value = false; return@register ok("Private mode is locked.") }
         val (route, label) = when (screen) {
             "home" -> Routes.HOME to "Home"
             "chat" -> (c.live.conversation?.let { Routes.chat(it) } ?: Routes.CHAT) to "Chat"

@@ -31,6 +31,14 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.42", "2026-11-14", "Refinements, brain display options and Private Connections", listOf(
+            "Fixed: from Eye mode, the Orb button did nothing. Orb, Eyes and Chat now switch in every direction, by tap and by voice, and “chat mode” closes the eyes instead of leaving them underneath.",
+            "Home: the quick buttons are two rows of three, so “Memory” and the others no longer split across lines.",
+            "Live Brain → Display (the sliders button): Text fade threshold (names appear only once you zoom in), Node size and Link thickness, with a reset.",
+            "Private Connections: a separate black-and-white group beside the brain, joined to nothing. Tap its centre or say “private mode” and unlock with your fingerprint or the phone's PIN to open your private brain, add notes and see how they connect. It locks when you leave, when ZED goes to the background, or with the lock button or “lock private mode”. Private notes are encrypted and never appear in answers, search, the lock screen or what the AI sees. They are not included in backups.",
+            "Report a problem (Permissions & Diagnostics): one button collects what ZED was just doing, the last crash and recent errors into a file in Download/ZED.",
+            "A call's summary is written a little after the call and only while ZED is idle, so it never delays your next question.",
+        )),
         Release("0.1.41", "2026-11-14", "Safe on the lock screen, new sounds, eyes that know you", listOf(
             "Guest mode while the phone is locked: “Hey Zed” and the shortcut still work, and ZED answers general questions, the time, the weather and web searches, and sets timers, alarms, the flashlight and volume. Anything personal — memories, messages, contacts, calendar, reminders, files, notifications, history, settings, calls, texts, the screen — gets “Unlock your phone for that”; unlock, and ZED carries on with what you asked. Nothing personal reaches the AI while locked. Switch: Settings → Voice.",
             "On a locked phone a due reminder is announced only as “You have a reminder”, and events and the morning briefing keep their details until you unlock.",
