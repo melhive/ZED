@@ -86,11 +86,11 @@ class AppContainer(val context: Context) {
     /** "Private mode" / "lock private mode" by voice: true asks the Live Brain to unlock, false to lock. */
     val brainPrivate = kotlinx.coroutines.flow.MutableStateFlow<Boolean?>(null)
     /** Turns speech into a voiceprint (the owner's voice for "only my voice" and for recognising who is talking). */
-    val voiceId by lazy { com.melhive.zed.eyes.VoiceId(context) }
+    val voiceId: com.melhive.zed.eyes.VoiceId by lazy { com.melhive.zed.eyes.VoiceId(context) }
     /** The owner's name, for "That's only for …" (read once; the guest gate can't wait for the database). */
     @Volatile var ownerName: String? = null
     /** People ZED has learned to recognise in Eye mode. Kept on the phone only. */
-    val people by lazy { com.melhive.zed.eyes.PeopleStore(context) }
+    val people: com.melhive.zed.eyes.PeopleStore by lazy { com.melhive.zed.eyes.PeopleStore(context) }
     /** How many voice screens (LIVE, Eye mode) are showing: the session ends when the last one closes, not when switching between them. */
     val voiceScreens = java.util.concurrent.atomic.AtomicInteger(0)
     /** A request LIVE should send as soon as it opens (from a notification or shortcut). */
@@ -107,7 +107,7 @@ class AppContainer(val context: Context) {
         }
     }
 
-    val orchestrator by lazy {
+    val orchestrator: AssistantOrchestrator by lazy {
         AssistantOrchestrator(appScope, conversations, memory, knowledge, providers, toolManager, skills, settings).also { o ->
             o.routineMatcher = { text -> routines.matchPhrase(text)?.name }
             o.aliases = { teaching.aliases }
@@ -135,7 +135,7 @@ class AppContainer(val context: Context) {
         }
     }
 
-    val live by lazy {
+    val live: LiveSessionController by lazy {
         LiveSessionController(context, orchestrator, conversations, settings, { newSpeechToText() }, { voice.sessionHandle() })
             .also { it.userName = { memory.userName() } }
             .also { live ->

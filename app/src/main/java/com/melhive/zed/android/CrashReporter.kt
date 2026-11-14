@@ -42,7 +42,7 @@ object CrashReporter {
             // An error in a background task or coroutine doesn't have to take the whole app down.
             val main = thread === android.os.Looper.getMainLooper().thread
             val fromCoroutine = Thread.currentThread().stackTrace.any { it.className.startsWith("kotlinx.coroutines") }
-            if ((!main || fromCoroutine) && survivable(error)) { caught(error, thread.name); return@setDefaultUncaughtExceptionHandler }
+            if ((!main || fromCoroutine) && survivable(error)) { caught(error, thread.name); return@UncaughtExceptionHandler }
             // First, and as simply as possible, get the stack trace onto disk: nothing below may prevent that.
             try {
                 val sw = StringWriter(); error.printStackTrace(PrintWriter(sw))
@@ -80,6 +80,7 @@ object CrashReporter {
         }
     }
 
+    private val recent = ArrayDeque<Long>()
     @Volatile private var mine: Thread.UncaughtExceptionHandler? = null
 
     /**
