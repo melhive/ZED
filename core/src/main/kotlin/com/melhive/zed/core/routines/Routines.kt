@@ -98,7 +98,7 @@ object RoutineCatalog {
     }
 
     val presets = listOf(
-        Routine("good_morning", "Good morning", listOf(step(template("briefing")!!, null), step(template("weather")!!, null), step(template("agenda_today")!!, null)),
+        Routine("good_morning", "Good morning", listOf(step(template("briefing")!!, null)),
             enabled = false, time = "07:00", phrases = listOf("good morning", "start my day")),
         Routine("good_night", "Good night", listOf(step(template("dnd_on")!!, null), step(template("pause")!!, null), step(template("flash_off")!!, null), step(template("agenda_tomorrow")!!, null)),
             phrases = listOf("good night", "goodnight", "i'm going to bed", "bedtime")),

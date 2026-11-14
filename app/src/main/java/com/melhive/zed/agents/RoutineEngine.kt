@@ -57,17 +57,57 @@ class RoutineEngine(private val context: Context, private val c: AppContainer) {
             ?: list.firstOrNull { Routine.normalize(it.name).contains(n) || n.contains(Routine.normalize(it.name)) }
     }
 
-    /** Runs every step; a failed step is reported and the rest still run. */
+    /**
+     * Runs a routine and reports it as one piece. Actions run in order (a failed one is said plainly and the rest still
+     * run) and are summed up in a single sentence. Everything a routine reads out — the briefing, the weather, the
+     * calendar, tasks, reminders, what was missed — is gathered first and said once, however many steps ask for it.
+     */
     suspend fun run(r: Routine, origin: ToolRequest.Origin = ToolRequest.Origin.WORKFLOW): Pair<Boolean, String> {
-        val lines = mutableListOf<String>()
+        var briefing = false; var weather = false; var today = false; var tomorrow = false
+        var tasks = false; var reminders = false; var missed = false
+        val done = mutableListOf<String>()
+        val failed = mutableListOf<String>()
+        val said = mutableListOf<String>()
         var allOk = true
         for (step in r.steps) {
-            val out = c.toolManager.execute(ToolRequest(step.tool, step.args, origin))
-            val ok = out is ToolOutcome.Executed && out.result.ok
-            allOk = allOk && ok
-            lines += (if (ok) "" else "⚠ ") + out.message
+            when {
+                step.tool == "workflow.run" && step.args["name"].orEmpty().contains("briefing", ignoreCase = true) -> briefing = true
+                step.tool == "weather.get" && step.args["place"].isNullOrBlank() -> weather = true
+                step.tool == "calendar.today" && step.args["date"].orEmpty().lowercase() in setOf("", "today") -> today = true
+                step.tool == "calendar.today" && step.args["date"].orEmpty().lowercase() == "tomorrow" -> tomorrow = true
+                step.tool == "todo.list" -> tasks = true
+                step.tool == "reminder.list" -> reminders = true
+                step.tool == "notifications.recent" -> missed = true
+                else -> {
+                    val out = c.toolManager.execute(ToolRequest(step.tool, step.args, origin))
+                    val ok = out is ToolOutcome.Executed && out.result.ok
+                    if (ok) {
+                        val clause = com.melhive.zed.core.briefing.RoutineSpeech.done(step.tool, step.args)
+                        if (clause != null) { if (clause !in done) done += clause } else if (out.message !in said) said += out.message
+                    } else {
+                        allOk = false
+                        failed += com.melhive.zed.core.briefing.RoutineSpeech.failure(com.melhive.zed.core.briefing.RoutineSpeech.attempt(step.tool, step.args, step.label), out.message)
+                    }
+                }
+            }
         }
-        return allOk to "${r.name} routine:\n" + lines.joinToString("\n")
+        val text = com.melhive.zed.core.briefing.BriefingText
+        val composer = BriefingComposer(context, c)
+        val parts = mutableListOf<String>()
+        // The briefing already covers the weather, today's calendar, reminders, tasks and what was missed.
+        if (briefing) parts += text.compose(composer.facts())
+        val actions = listOfNotNull(com.melhive.zed.core.briefing.RoutineSpeech.sentence(done)) + failed + said
+        if (actions.isNotEmpty()) parts += actions.joinToString(" ")
+        if (!briefing && (weather || today || tasks || reminders || missed)) {
+            text.compose(composer.facts(BriefingComposer.Wanted(greet = false, weather = weather, calendar = today, reminders = reminders, tasks = tasks, missed = missed, background = false)))
+                .takeIf { it.isNotBlank() }?.let { parts += it }
+        }
+        if (tomorrow) {
+            text.compose(composer.facts(BriefingComposer.Wanted(greet = false, weather = false, calendar = true, tomorrow = true, reminders = false, tasks = false, missed = false, background = false)))
+                .takeIf { it.isNotBlank() }?.let { parts += it }
+        }
+        if (parts.isEmpty()) parts += "Done."
+        return allOk to parts.joinToString("\n\n")
     }
 
     /** (Re)schedules the daily time triggers and the morning briefing. */
@@ -107,7 +147,7 @@ class RoutineWorker(appContext: Context, params: WorkerParameters) : CoroutineWo
         val engine = c.routines
         val r = engine.all().firstOrNull { it.id == inputData.getString(KEY_ID) } ?: return Result.success()
         if (r.enabled) {
-            val (ok, text) = runCatching { engine.run(r) }.getOrElse { false to "${r.name} routine failed: ${it.message}" }
+            val (ok, text) = runCatching { engine.run(r) }.getOrElse { false to "I couldn't finish ${r.name}: ${it.message ?: "something went wrong"}." }
             Notifications.post(applicationContext, Notifications.CHANNEL_TASKS, 62_000 + Math.floorMod(r.id.hashCode(), 1000), if (ok) "${r.name} done" else "${r.name}: some steps failed", text, "home")
         }
         if (!inputData.getBoolean(KEY_ONCE, false)) engine.scheduleAll()

@@ -73,7 +73,7 @@ class WeatherService(private val context: Context) {
             val p = when {
                 !place.isNullOrBlank() -> geocode(place) ?: error("I couldn't find “$place”.")
                 else -> lastLocation() ?: defaultCity.takeIf { it.isNotBlank() }?.let { geocode(it) }
-                    ?: error("Tell me your city in Settings → Briefing, or allow approximate location, so I know where to check.")
+                    ?: error("Tell me your city in More → Routines & briefing, or allow approximate location, so I know where to check.")
             }
             val url = "https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lon}" +
                 "&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m" +
@@ -197,28 +197,59 @@ class CalendarReader(private val context: Context) {
 
 /** Composes the daily briefing from real data: weather, calendar, reminders, tasks, notifications and background work. */
 class BriefingComposer(private val context: Context, private val c: AppContainer) {
-    suspend fun compose(): String {
+    /** Which parts to gather. The morning briefing wants them all; a routine may want only one. */
+    class Wanted(
+        val greet: Boolean = true, val weather: Boolean = true, val calendar: Boolean = true, val tomorrow: Boolean = false,
+        val reminders: Boolean = true, val tasks: Boolean = true, val missed: Boolean = true, val background: Boolean = true,
+    )
+
+    /** The full briefing: every fact once, composed as one piece. */
+    suspend fun compose(): String = com.melhive.zed.core.briefing.BriefingText.compose(facts())
+
+    /**
+     * Gathers the facts. On a locked phone the personal parts (calendar, reminders, tasks, notifications) are left out.
+     * A missing city is mentioned once ever; after that the weather is simply skipped until there is one.
+     */
+    suspend fun facts(want: Wanted = Wanted()): com.melhive.zed.core.briefing.BriefingFacts {
         val s = c.settings.current()
         val now = java.time.LocalDateTime.now()
-        val who = s.userTitle.ifBlank { null } ?: c.memory.userName()
-        val text = com.melhive.zed.core.briefing.BriefingText
-        val parts = mutableListOf<String>()
-        parts += text.greeting(now, who)
-        WeatherService(context).report(null, s.weatherCity).onSuccess { parts += it }
+        val withheld = s.lockGuard && c.phoneLocked()
+        val personal = !withheld
+        val prefs = context.getSharedPreferences("zed_briefing", Context.MODE_PRIVATE)
+
+        var weather: com.melhive.zed.core.briefing.WeatherNow? = null
+        var mentionCity = false
+        if (want.weather) WeatherService(context).fetch(null, s.weatherCity)
+            .onSuccess { weather = it; prefs.edit().remove("city_hint").apply() }
+            .onFailure { e ->
+                // No city and no location: say so once, at the end, then stay quiet about it.
+                if (e.message.orEmpty().startsWith("Tell me your city") && !prefs.getBoolean("city_hint", false)) {
+                    mentionCity = true
+                    prefs.edit().putBoolean("city_hint", true).apply()
+                }
+            }
+
         val cal = CalendarReader(context)
-        if (cal.granted()) parts += text.calendar(cal.dayEvents(LocalDate.now()), now.toLocalTime())
+        val day = if (want.tomorrow) LocalDate.now().plusDays(1) else LocalDate.now()
+        val calendar = want.calendar && personal && cal.granted()
         val nowMs = System.currentTimeMillis()
         val endOfDay = LocalDate.now().plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        val reminders = c.db.reminders().scheduled().filter { it.triggerAt in nowMs until endOfDay }
-        text.reminders(reminders.map { it.text to java.time.Instant.ofEpochMilli(it.triggerAt).atZone(ZoneId.systemDefault()).toLocalTime() })?.let { parts += it }
-        text.tasks(c.todos.list(false).map { it.title })?.let { parts += it }
-        if (com.melhive.zed.android.ZedNotificationListener.hasAccess(context)) {
-            val missed = com.melhive.zed.android.ZedNotificationListener.recent(context, null, 10)
-            text.notifications(missed.size, missed.groupingBy { it.app }.eachCount().entries.sortedByDescending { it.value }.take(2).map { it.key })?.let { parts += it }
-        }
-        val active = c.taskEngine.activeCount.first()
-        if (active > 0) parts += "${if (active == 1) "One background task is" else "$active background tasks are"} still running."
-        return parts.joinToString("\n\n")
+        val reminders = if (want.reminders && personal) c.db.reminders().scheduled().filter { it.triggerAt in nowMs until endOfDay }
+            .sortedBy { it.triggerAt }.map { it.text.trim().trimEnd('.') to java.time.Instant.ofEpochMilli(it.triggerAt).atZone(ZoneId.systemDefault()).toLocalTime() } else emptyList()
+        val missed = if (want.missed && personal && com.melhive.zed.android.ZedNotificationListener.hasAccess(context)) com.melhive.zed.android.ZedNotificationListener.recent(context, null, 10) else emptyList()
+        return com.melhive.zed.core.briefing.BriefingFacts(
+            now = now,
+            who = if (withheld) null else s.userTitle.ifBlank { null } ?: c.memory.userName(),
+            greet = want.greet,
+            weather = weather, mentionCity = mentionCity,
+            calendar = calendar, events = if (calendar) cal.dayEvents(day) else emptyList(), label = if (want.tomorrow) "tomorrow" else "today",
+            remindersWanted = want.reminders && personal, reminders = reminders,
+            tasksWanted = want.tasks && personal, tasks = if (want.tasks && personal) c.todos.list(false).map { it.title } else emptyList(),
+            notifications = missed.size, topApps = missed.groupingBy { it.app }.eachCount().entries.sortedByDescending { it.value }.take(2).map { it.key },
+            backgroundTasks = if (want.background) c.taskEngine.activeCount.first() else 0,
+            withheld = withheld && (want.calendar || want.reminders || want.tasks || want.missed),
+            variation = now.dayOfYear,
+        )
     }
 }
 

@@ -150,4 +150,148 @@ object BriefingText {
     fun notifications(total: Int, topApps: List<String>): String? =
         if (total <= 0) null else "You've had ${plural(total, "notification")} since last night" +
             (if (topApps.isEmpty()) "." else ", mostly from ${list(topApps)}.")
+
+    // ------------------------------------------------------------------ the whole briefing, said once
+
+    /** A task's name, short enough to say: its first clause, at most eight words, without trailing punctuation. */
+    fun shorten(title: String): String {
+        val words = title.trim().trimEnd('.', '!', '?', ',', ';', ':').split(Regex("\\s+")).filter { it.isNotEmpty() }
+        if (words.size <= 8) return words.joinToString(" ").trimEnd(',')
+        // Stop at the first comma once there is enough to recognise it by, otherwise after eight words.
+        val comma = words.indexOfFirst { it.endsWith(",") }.takeIf { it in 3..7 }
+        return words.take(if (comma != null) comma + 1 else 8).joinToString(" ").trimEnd(',', ';', ':')
+    }
+
+    private fun minutes(n: Long): String = when {
+        n <= 1 -> "any minute now"
+        n < 60 -> "in $n minutes"
+        else -> "in an hour"
+    }
+
+    /**
+     * Everything for the briefing as one piece: each fact once, what is urgent first, what is empty
+     * folded into a single sentence, and a missing city mentioned only at the very end.
+     */
+    fun compose(f: BriefingFacts): String {
+        val now = f.now.toLocalTime()
+        val out = mutableListOf<String>()
+
+        // Greeting, and a word about the hour when it is unusual.
+        val opening = StringBuilder()
+        if (f.greet) {
+            opening.append(greeting(f.now, f.who))
+            if (f.now.hour < 5) opening.append(" You're up early.") else if (f.now.hour >= 23) opening.append(" It's late.")
+        }
+        // What can't wait comes straight after the greeting.
+        val soonEvent = if (f.calendar && f.label == "today") f.events.filter { it.start != null && !it.start.isBefore(now) && java.time.Duration.between(now, it.start).toMinutes() <= 60 }.minByOrNull { it.start!! } else null
+        val soonReminder = if (f.remindersWanted) f.reminders.filter { !it.second.isBefore(now) && java.time.Duration.between(now, it.second).toMinutes() <= 60 }.minByOrNull { it.second } else null
+        if (soonEvent != null) opening.append(if (opening.isEmpty()) "" else " ").append("First up: ${soonEvent.title} at ${clock(soonEvent.start!!)}, ${minutes(java.time.Duration.between(now, soonEvent.start).toMinutes())}.")
+        if (soonReminder != null) opening.append(if (opening.isEmpty()) "" else " ").append("${if (soonEvent != null) "And a" else "A"} reminder is due ${minutes(java.time.Duration.between(now, soonReminder.second).toMinutes())}: ${soonReminder.first}.")
+        if (opening.isNotEmpty()) out += opening.toString()
+
+        f.weather?.let { out += weather(it) }
+
+        // The day: calendar, reminders, tasks. Whatever is empty is said together, once.
+        val day = mutableListOf<String>()
+        val noEvents = f.calendar && f.events.isEmpty()
+        val noReminders = f.remindersWanted && f.reminders.isEmpty()
+        val noTasks = f.tasksWanted && f.tasks.isEmpty()
+        when {
+            noEvents && noReminders && noTasks -> day += "Your day is clear: nothing on your calendar, no reminders and no open tasks."
+            noEvents && noReminders -> day += "Nothing on your calendar and no reminders ${f.label}."
+            noEvents -> day += "Your calendar is clear ${f.label}."
+        }
+        if (f.calendar && f.events.isNotEmpty()) day += calendar(f.events, if (f.label == "today") now else null, f.label)
+        if (f.remindersWanted && f.reminders.isNotEmpty()) day += reminders(f.reminders)!!
+        else if (noReminders && !noEvents) day += if (noTasks) "No reminders and no open tasks." else "No reminders today."
+        if (f.tasksWanted && f.tasks.isNotEmpty()) day += tasks(f.tasks.map(::shorten))!!
+        else if (noTasks && !(noEvents && noReminders) && !(noReminders && !noEvents)) day += "No open tasks."
+        if (day.isNotEmpty()) out += day.joinToString(" ")
+
+        val rest = mutableListOf<String>()
+        notifications(f.notifications, f.topApps)?.let { rest += it }
+        if (f.backgroundTasks > 0) rest += "${if (f.backgroundTasks == 1) "One background task is" else "${f.backgroundTasks} background tasks are"} still running."
+        if (f.withheld) rest += "Unlock your phone for your calendar, reminders and tasks."
+        if (rest.isNotEmpty()) out += rest.joinToString(" ")
+
+        val closing = mutableListOf<String>()
+        if (f.greet && !f.withheld) listOf("That's everything for now.", "That's your day so far.", "", "That's all from me.")[Math.floorMod(f.variation, 4)].takeIf { it.isNotEmpty() }?.let { closing += it }
+        if (f.mentionCity) closing += "I can add the weather if you tell me your city."
+        if (closing.isNotEmpty()) out += closing.joinToString(" ")
+        return out.joinToString("\n\n")
+    }
+}
+
+/**
+ * The facts a briefing is made from. Only the parts that were asked for are spoken: the morning briefing
+ * asks for all of them, a routine that just reads tomorrow's calendar asks for one.
+ */
+data class BriefingFacts(
+    val now: LocalDateTime,
+    val who: String? = null,
+    /** Start with "Good morning, … It's Sunday, …". */
+    val greet: Boolean = true,
+    val weather: WeatherNow? = null,
+    /** The weather was wanted but there is no city yet, and the user hasn't been told before. */
+    val mentionCity: Boolean = false,
+    /** The calendar was read (false: not asked for, or not allowed). */
+    val calendar: Boolean = false,
+    val events: List<DayEvent> = emptyList(),
+    /** "today" or "tomorrow": which day [events] are for. */
+    val label: String = "today",
+    val remindersWanted: Boolean = false,
+    val reminders: List<Pair<String, LocalTime>> = emptyList(),
+    val tasksWanted: Boolean = false,
+    val tasks: List<String> = emptyList(),
+    val notifications: Int = 0,
+    val topApps: List<String> = emptyList(),
+    val backgroundTasks: Int = 0,
+    /** The phone is locked: personal parts were left out. */
+    val withheld: Boolean = false,
+    /** Picks between equivalent closings so every day doesn't sound identical (the day of the year). */
+    val variation: Int = 0,
+)
+
+/** How a routine reports what it did: one natural sentence for all its actions, failures said plainly. */
+object RoutineSpeech {
+    /** What an action step did, as a clause ("Do Not Disturb is on"), or null when the step's own message should be used. */
+    fun done(tool: String, args: Map<String, String>): String? = when (tool) {
+        "dnd.set" -> "Do Not Disturb is ${if (args["on"].isTrue()) "on" else "off"}"
+        "flashlight.set" -> "the flashlight is ${if (args["on"].isTrue()) "on" else "off"}"
+        "media.control" -> when (args["action"]?.lowercase()) { "pause", "stop" -> "the music is paused"; "play", "resume" -> "the music is playing"; "next" -> "the next track is playing"; else -> null }
+        "volume.set" -> args["level"]?.let { "${args["stream"]?.takeIf { it != "media" }?.let { "$it volume" } ?: "the volume"} is at $it percent" }
+        "timer.set" -> args["seconds"]?.toLongOrNull()?.let { s -> if (s % 60 == 0L) "a ${s / 60}-minute timer is running" else "a $s-second timer is running" }
+        "app.open" -> args["name"]?.let { "$it is open" }
+        "music.play" -> args["query"]?.let { "$it is playing" }
+        "maps.navigate" -> args["destination"]?.let { "navigation to $it has started" }
+        else -> null
+    }
+
+    private fun String?.isTrue() = this?.lowercase() in setOf("true", "on", "yes", "1")
+
+    /** What an action step was trying to do, for "I couldn't …". */
+    fun attempt(tool: String, args: Map<String, String>, label: String): String = when (tool) {
+        "dnd.set" -> "turn Do Not Disturb ${if (args["on"].isTrue()) "on" else "off"}"
+        "flashlight.set" -> "turn the flashlight ${if (args["on"].isTrue()) "on" else "off"}"
+        "media.control" -> "${args["action"] ?: "control"} the music"
+        "volume.set" -> "set the volume"
+        "timer.set" -> "start the timer"
+        "app.open" -> "open ${args["name"] ?: "the app"}"
+        "music.play" -> "play ${args["query"] ?: "music"}"
+        "maps.navigate" -> "start navigation"
+        else -> label.ifBlank { tool }.replaceFirstChar { it.lowercase() }
+    }
+
+    /** "Do Not Disturb is on, the music is paused and the flashlight is off." */
+    fun sentence(clauses: List<String>): String? {
+        if (clauses.isEmpty()) return null
+        val joined = when (clauses.size) { 1 -> clauses[0]; 2 -> "${clauses[0]} and ${clauses[1]}"; else -> clauses.dropLast(1).joinToString(", ") + " and " + clauses.last() }
+        return joined.replaceFirstChar { it.uppercase() } + "."
+    }
+
+    /** A failure, kept to its first sentence and stripped of the tool's own heading. */
+    fun failure(what: String, reason: String): String {
+        val why = reason.substringAfter(" failed: ", reason).trim().split(Regex("(?<=[.!?])\\s+")).firstOrNull().orEmpty().trimEnd('.', '!')
+        return "I couldn't $what" + (if (why.isBlank()) "." else ": ${why.replaceFirstChar { it.lowercase() }}.")
+    }
 }

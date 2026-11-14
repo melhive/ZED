@@ -31,6 +31,15 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.45", "2026-11-15", "Briefings that say each thing once", listOf(
+            "The briefing and every routine now speak as one piece. Facts are gathered first and each is said once: the greeting, what's urgent, the weather, your calendar, reminders, tasks and what you missed. The calendar is no longer read twice, and nothing starts with “Good morning routine:”.",
+            "What is empty is folded into one sentence (“Nothing on your calendar and no reminders today”), task numbers and bullets are gone, and long task names are shortened to their first clause.",
+            "A meeting or reminder within the hour comes right after the greeting. Before 5 AM ZED notices you're up early.",
+            "No city set: the weather is simply left out, and ZED mentions it once, at the end. Set it in More → Routines & briefing.",
+            "Good night, Focus, Driving and your own routines sum up what they did in one sentence (“Do Not Disturb is on, the music is paused and the flashlight is off”), and say plainly when a step didn't work.",
+            "The built-in Good morning routine is now the briefing alone; if yours has extra weather or calendar steps, they are merged when it runs.",
+            "Terms of Use and the Privacy Policy were rewritten to cover Eye mode, the camera, recognising people, Only my voice, the lock screen, Private Connections and problem reports.",
+        )),
         Release("0.1.44", "2026-11-14", "Everything in its place", listOf(
             "Settings is one page of sections with a search box: You and ZED, Voice and sounds, Eye mode, Who ZED knows, Privacy and lock screen, AI model, Appearance, Backup, Help and reports. Every switch now sits under the section it belongs to; nothing was removed.",
             "More is short: Your things (Memory, Live Brain, Files, Routines, Schedule, Background tasks), ZED (Settings, Models, Skills) and Help.",

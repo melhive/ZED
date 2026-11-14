@@ -66,4 +66,66 @@ class BriefingTextTest {
         lev.process(loud)
         assertTrue(loud.all { abs(it) <= 1f })
     }
+
+    private val sunday = LocalDateTime.of(2026, 11, 15, 4, 48)
+    private fun facts(now: LocalDateTime = sunday) = com.melhive.zed.core.briefing.BriefingFacts(now = now, who = "sir", calendar = true, remindersWanted = true, tasksWanted = true)
+
+    @Test fun `the briefing says each thing once`() {
+        val text = BriefingText.compose(facts().copy(tasks = listOf("Study the setup of Ubuntu on termux, File management, and Coding agents"), mentionCity = true))
+        assertEquals(
+            "Good morning, sir. It's Sunday, November 15th, 4:48 AM. You're up early.\n\n" +
+                "Nothing on your calendar and no reminders today. You have one open task: Study the setup of Ubuntu on termux.\n\n" +
+                "That's everything for now. I can add the weather if you tell me your city.",
+            text,
+        )
+        assertEquals(1, Regex("calendar").findAll(text).count())
+        assertEquals(1, Regex("open task").findAll(text).count())
+        assertFalse(text.contains("#"))
+        assertFalse(text.contains("routine", ignoreCase = true))
+        assertTrue(text.endsWith("I can add the weather if you tell me your city."))
+    }
+
+    @Test fun `an empty day is one sentence`() {
+        val text = BriefingText.compose(facts(LocalDateTime.of(2026, 11, 16, 8, 0)).copy(variation = 2))
+        assertEquals("Good morning, sir. It's Monday, November 16th, 8 AM.\n\nYour day is clear: nothing on your calendar, no reminders and no open tasks.", text)
+    }
+
+    @Test fun `a busy day leads with what is urgent`() {
+        val now = LocalDateTime.of(2026, 11, 16, 8, 30)
+        val text = BriefingText.compose(facts(now).copy(
+            weather = WeatherNow("Cebu", 0, 29, 29, 60, 3, 25, 31, 5),
+            events = listOf(DayEvent("Standup", LocalTime.of(9, 0)), DayEvent("Gym", LocalTime.of(18, 30))),
+            reminders = listOf("pay the bills" to LocalTime.of(15, 0)), tasks = listOf("groceries", "laundry"),
+            notifications = 4, topApps = listOf("Messenger"), backgroundTasks = 1, variation = 2,
+        ))
+        val parts = text.split("\n\n")
+        assertEquals("Good morning, sir. It's Monday, November 16th, 8:30 AM. First up: Standup at 9 AM, in 30 minutes.", parts[0])
+        assertTrue(parts[1].startsWith("Right now in Cebu it's 29 degrees"))
+        assertEquals("You have two events today: Standup at 9 AM and Gym at 6:30 PM. Reminder today: pay the bills at 3 PM. You have two open tasks: groceries and laundry.", parts[2])
+        assertEquals("You've had four notifications since last night, mostly from Messenger. One background task is still running.", parts[3])
+        assertEquals(4, parts.size)
+    }
+
+    @Test fun `only what was asked for is said`() {
+        // "Good night" reads tomorrow's calendar and nothing else: no greeting, no tasks.
+        val tomorrow = BriefingText.compose(com.melhive.zed.core.briefing.BriefingFacts(now = sunday, greet = false, calendar = true, label = "tomorrow", events = listOf(DayEvent("Dentist", LocalTime.of(9, 0)))))
+        assertEquals("You have one event tomorrow: Dentist at 9 AM.", tomorrow)
+        assertEquals("Your calendar is clear tomorrow.", BriefingText.compose(com.melhive.zed.core.briefing.BriefingFacts(now = sunday, greet = false, calendar = true, label = "tomorrow")))
+        // Locked phone: the personal parts are held back.
+        val locked = BriefingText.compose(com.melhive.zed.core.briefing.BriefingFacts(now = LocalDateTime.of(2026, 11, 16, 8, 0), withheld = true))
+        assertEquals("Good morning. It's Monday, November 16th, 8 AM.\n\nUnlock your phone for your calendar, reminders and tasks.", locked)
+    }
+
+    @Test fun `long task names are shortened and routines report in one sentence`() {
+        assertEquals("Study the setup of Ubuntu on termux", BriefingText.shorten("Study the setup of Ubuntu on termux, File management, and Coding agents"))
+        assertEquals("Buy milk", BriefingText.shorten("Buy milk."))
+        val r = com.melhive.zed.core.briefing.RoutineSpeech
+        assertEquals("Do Not Disturb is on, the music is paused and the flashlight is off.", r.sentence(listOfNotNull(
+            r.done("dnd.set", mapOf("on" to "true")), r.done("media.control", mapOf("action" to "pause")), r.done("flashlight.set", mapOf("on" to "false")))))
+        assertEquals("Do Not Disturb is on and a 25-minute timer is running.", r.sentence(listOfNotNull(r.done("dnd.set", mapOf("on" to "true")), r.done("timer.set", mapOf("seconds" to "1500")))))
+        assertEquals("I couldn't turn Do Not Disturb on: allow Do Not Disturb access first.", r.failure(r.attempt("dnd.set", mapOf("on" to "true"), ""), "Do Not Disturb failed: Allow Do Not Disturb access first. Then try again."))
+        assertEquals(null, r.sentence(emptyList()))
+        // The built-in Good morning is the briefing alone.
+        assertEquals(1, com.melhive.zed.core.routines.RoutineCatalog.presets.first { it.id == "good_morning" }.steps.size)
+    }
 }

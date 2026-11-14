@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="ZED is an on-device AI assistant for Android. Gemma runs on your phone, a wake word listens locally, neural voices speak offline, and 60+ typed tools control your device. No account, no cloud, no API keys.">
+<meta name="description" content="ZED is an on-device AI assistant for Android. Gemma runs on your phone, a wake word listens locally, neural voices speak offline, and 70+ typed tools control your device. No account, no cloud, no API keys.">
 <meta name="theme-color" content="#07090d">
 <meta property="og:title" content="ZED · The on-device AI assistant for Android">
-<meta property="og:description" content="Gemma on your phone, an on-device wake word, offline neural voices and 60+ typed tools. No account, no cloud, no API keys.">
+<meta property="og:description" content="Gemma on your phone, an on-device wake word, offline neural voices and 70+ typed tools. No account, no cloud, no API keys.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://melhive.github.io/ZED/">
 <meta property="og:image" content="https://melhive.github.io/ZED/zed-logo.png">
@@ -295,7 +295,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
   <section class="hero">
     <div class="wrap">
       <div>
-        <span class="pill"><span class="tag zed-version">v0.1.41</span> Gemma · offline speech · Eye mode</span>
+        <span class="pill"><span class="tag zed-version">v0.1.45</span> Gemma · offline speech · Eye mode</span>
         <h1>The AI assistant that <span class="grad">runs on your phone.</span></h1>
         <p class="sub">ZED runs Gemma locally, hears and speaks offline, and controls your phone through typed, validated tools: apps, messages, your screen and its own data. No account, no cloud inference, no API keys.</p>
         <div class="cta">
@@ -368,7 +368,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
           <div class="ico"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M11 2L4 11h5l-1 7 7-9h-5l1-7z" stroke-linejoin="round"/></svg></div>
           <h3>Acts immediately, undoes too</h3>
           <p>Alarms, reminders, calendar, calls, SMS, files, media, Do Not Disturb, smart home. Requests run directly through system APIs, and anything deleted can be brought back with “undo”.</p>
-          <div class="spec">72 tools · schema-validated · audit log · undo</div>
+          <div class="spec">77 tools · schema-validated · audit log · undo</div>
         </div>
         <div class="card">
           <div class="ico"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="2"/><circle cx="4" cy="5" r="1.5"/><circle cx="16" cy="4.5" r="1.5"/><circle cx="15.5" cy="15.5" r="1.5"/><circle cx="4.5" cy="15" r="1.5"/><path d="M5.2 6l3.4 2.8M14.7 5.6l-3.3 3M14.4 14.4l-3-3M5.7 14l3-2.6"/></svg></div>
@@ -397,13 +397,13 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
         <div class="card">
           <div class="ico"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="11" r="6"/><path d="M10 8v3l2 1.5M5 3.5L3 5.5M15 3.5l2 2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
           <h3>Comes to you</h3>
-          <p>When a reminder is due or a meeting is near, ZED appears on screen and tells you (on a locked phone, without the details). Turn off your alarm and it greets you with the weather and your day.</p>
+          <p>When a reminder is due or a meeting is near, ZED appears on screen and tells you (on a locked phone, without the details). Turn off your alarm and it gives you one clear briefing: the weather and your day, each thing said once.</p>
           <div class="spec">reminders · events · after-alarm briefing</div>
         </div>
         <div class="card">
           <div class="ico"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1.5 10S4.5 4.5 10 4.5 18.5 10 18.5 10 15.5 15.5 10 15.5 1.5 10 1.5 10z" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.6"/></svg></div>
           <h3>Eye mode</h3>
-          <p>Two robotic owl eyes fill the screen. They blink, look around and show feeling, follow your face, look at what you hold up and answer “what is this?” from what they see.</p>
+          <p>Two eyes fill the screen, upright or sideways: a robotic owl's, or a human's, cat's, lion's, wolf's or leopard's. They blink, show feeling, follow your face, look at what you hold up and answer “what is this?” from what they see.</p>
           <div class="spec">front camera · on-device · frames never stored</div>
         </div>
         <div class="card">
@@ -411,6 +411,18 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
           <h3>Safe on the lock screen</h3>
           <p>On a locked phone ZED still tells the time, searches the web and sets a timer. Anything personal waits until you unlock, and none of it reaches the model.</p>
           <div class="spec">guest mode · Android's own lock</div>
+        </div>
+        <div class="card">
+          <div class="ico"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="7" r="3.2"/><path d="M3.5 17c.8-3.2 3.4-5 6.5-5s5.700 1.800 6.500 5" stroke-linecap="round"/></svg></div>
+          <h3>Knows your voice</h3>
+          <p>Record five sentences and turn on Only my voice: when someone else talks to ZED it says so once and answers general questions only. You can also teach it your face and let it greet the people it has met.</p>
+          <div class="spec">voiceprint on the phone · a privacy guard, not a lock</div>
+        </div>
+        <div class="card">
+          <div class="ico"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="6.500"/><rect x="7.500" y="9.500" width="5" height="3.600" rx="0.800"/><path d="M8.500 9.500V8.300a1.500 1.500 0 013 0v1.200" stroke-linecap="round"/></svg></div>
+          <h3>Private Connections</h3>
+          <p>A separate, black-and-white part of the Live Brain for notes nobody else should see. It opens with your fingerprint or PIN, locks when you leave, and never reaches the model or a backup.</p>
+          <div class="spec">encrypted · Android Keystore</div>
         </div>
       </div>
     </div>
@@ -480,6 +492,8 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
             <li>Screen reading for “what's on my screen”: read once, never stored</li>
             <li>Model inference: every answer and tool call</li>
             <li>Speech synthesis</li>
+            <li>Camera frames in Eye mode: looked at and thrown away</li>
+            <li>Face and voice prints, and private notes (encrypted)</li>
             <li>Memories, conversations, the Live Brain and indexed documents</li>
             <li>Secrets in the Android Keystore</li>
           </ul>
@@ -535,7 +549,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
         <code id="apk">https://github.com/melhive/ZED/releases/latest/download/zed.apk</code>
         <button class="btn" type="button" id="copy">Copy link</button>
       </div>
-      <div class="release" id="release"><span>Latest: <b class="zed-version">v0.1.32</b></span><span id="rel-date"></span><a href="https://github.com/melhive/ZED/releases">Release notes →</a></div>
+      <div class="release" id="release"><span>Latest: <b class="zed-version">v0.1.45</b></span><span id="rel-date"></span><a href="https://github.com/melhive/ZED/releases">Release notes →</a></div>
     </div>
   </section>
 
@@ -551,7 +565,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
         <details><summary>Will it run on my phone?</summary><p>You need Android 8.0 or newer on a 64-bit ARM phone. Gemma 4 E2B needs about 4 GB of RAM; Model Manager also offers smaller models for older phones and recommends one that fits yours.</p></details>
         <details><summary>Is anything I say sent to a server?</summary><p>No. There is no ZED server. Your conversations, memories and documents are processed and stored on the phone. The few features that go online send only what they need, such as a search query or your city for the weather. See the <a href="privacy.html">Privacy Policy</a>.</p></details>
         <details><summary>Why isn't it on the Play Store?</summary><p>ZED is distributed as a signed APK from GitHub. Every release is signed with the same key, so updates install over the old version and keep your data. ZED tells you when a new version is ready.</p></details>
-        <details><summary>Can it act without asking me first?</summary><p>Yes, by default it runs what you ask straight away. If you prefer, Settings → Ask before actions makes it confirm risky actions or every change.</p></details>
+        <details><summary>Can it act without asking me first?</summary><p>Yes, by default it runs what you ask straight away. If you prefer, Settings → Privacy and lock screen → Ask before actions makes it confirm risky actions or every change.</p></details>
         <details><summary>Where is the source code?</summary><p>On <a href="https://github.com/melhive/ZED">GitHub</a>. Every release is built and signed by GitHub Actions, and the build status and tests are public.</p></details>
       </div>
     </div>
@@ -579,7 +593,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
 <footer>
   <div class="wrap">
     <a class="brand" href="#top"><img src="zed-logo.png" alt="">ZED</a>
-    <span>A MelHive Project · <span class="zed-version">v0.1.32</span></span>
+    <span>A MelHive Project · <span class="zed-version">v0.1.45</span></span>
     <nav aria-label="Footer">
       <a href="https://github.com/melhive/ZED">GitHub</a>
       <a href="https://github.com/melhive/ZED/releases">Releases</a>
