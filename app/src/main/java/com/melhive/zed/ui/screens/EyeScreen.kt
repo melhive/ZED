@@ -28,6 +28,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Group
+import androidx.compose.material.icons.outlined.Cameraswitch
+import androidx.compose.material.icons.outlined.Pets
 import androidx.compose.material.icons.outlined.ScreenRotation
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Close
@@ -108,7 +110,7 @@ fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long?) -> Unit, onOpenLive: () -
     val art = remember { EyeArt() }
     val frame = remember { EyeFrame() }
     val camera = remember { EyeCamera(context.applicationContext) }
-    val voiceId = remember { com.melhive.zed.eyes.VoiceId(context.applicationContext) }
+    val voiceId = c.voiceId
     val people = remember { com.melhive.zed.eyes.EyePeople(c.people, voiceId) }
     var cameraAllowed by remember { mutableStateOf(PermissionCatalog.isGranted(context, PermissionCatalog.CAMERA)) }
     var cameraOn by remember { mutableStateOf(true) }
@@ -144,11 +146,11 @@ fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long?) -> Unit, onOpenLive: () -
     // Microphone for the conversation, camera for the eyes. Without the camera the eyes still work; they just can't see.
     val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
         if (granted[Manifest.permission.CAMERA] == true) cameraAllowed = true
-        if (granted[Manifest.permission.RECORD_AUDIO] == true || PermissionCatalog.isGranted(context, PermissionCatalog.MICROPHONE)) live.start()
+        if (granted[Manifest.permission.RECORD_AUDIO] == true || PermissionCatalog.isGranted(context, PermissionCatalog.MICROPHONE)) live.start(greet = true)
     }
     LaunchedEffect(Unit) {
         val mic = PermissionCatalog.isGranted(context, PermissionCatalog.MICROPHONE)
-        if (mic) live.start()
+        if (mic) live.start(greet = true)
         val missing = buildList { if (!mic) add(Manifest.permission.RECORD_AUDIO); if (!cameraAllowed) add(Manifest.permission.CAMERA) }
         if (missing.isNotEmpty()) permissions.launch(missing.toTypedArray())
     }
@@ -156,57 +158,29 @@ fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long?) -> Unit, onOpenLive: () -
     LaunchedEffect(state.active) {
         if (!state.active && !closing) {
             delay(700)
-            if (!live.state.value.active && !closing && PermissionCatalog.isGranted(context, PermissionCatalog.MICROPHONE)) live.start()
+            if (!live.state.value.active && !closing && PermissionCatalog.isGranted(context, PermissionCatalog.MICROPHONE)) live.start(greet = true)
         }
     }
     // The same session as LIVE: it ends when the last voice screen closes, not when switching between them.
     DisposableEffect(Unit) { c.voiceScreens.incrementAndGet(); onDispose { if (c.voiceScreens.decrementAndGet() <= 0) live.end() } }
 
     // The camera runs only while Eye mode is on screen.
-    LifecycleStartEffect(cameraAllowed, cameraOn) {
+    val lookBack = settings?.eyeLookBack == true
+    LifecycleStartEffect(cameraAllowed, cameraOn, lookBack) {
+        // The front camera follows you; "what is this?" looks through whichever camera you chose.
+        val look: suspend () -> com.melhive.zed.intelligence.ImageInput? = { camera.snap(front = !lookBack, resume = true) }
         if (cameraAllowed && cameraOn) {
-            camera.start()
-            live.frameSource = { camera.capture() }
+            camera.start(preferFront = true)
+            live.frameSource = look
         }
         onStopOrDispose {
-            live.frameSource = null
+            if (live.frameSource === look) live.frameSource = null
             camera.stop()
         }
     }
 
     // The recognition experiment: who is in view, and whether the voice is yours.
-    DisposableEffect(recognising) {
-        if (recognising) {
-            camera.onFaceCrop = { people.onFace(it) }
-            live.onUtterance = { people.onUtterance(it) }
-            live.intercept = { said -> people.nameAnswer(said) }
-        }
-        onDispose { camera.onFaceCrop = null; live.onUtterance = null; live.intercept = null; voiceId.release() }
-    }
-    LaunchedEffect(recognising) {
-        if (!recognising) { testLine = ""; return@LaunchedEffect }
-        var goneFor = 0
-        while (true) {
-            delay(500)
-            if (camera.faceSeen) goneFor = 0 else if (++goneFor == 4) people.onNoFace()
-            testLine = if (!c.people.hasOwner() && people.teaching < 0) "Open the people button and tap “Teach my face” to start" else "Sees: " + (if (!camera.running) "camera off" else if (people.teaching >= 0) "learning your face ${people.teaching}/${com.melhive.zed.eyes.EyePeople.TEACH}" else people.seenLabel) +
-                (people.heardLabel.takeIf { it.isNotEmpty() }?.let { "   Hears: $it" } ?: "")
-            val now = live.state.value
-            // Only speak up when nobody is in the middle of saying something.
-            val free = now.active && now.partial.isEmpty() && (now.orb == OrbState.LISTENING || now.orb == OrbState.IDLE) && !now.micMuted
-            if (!free || people.teaching >= 0) continue
-            val who = people.seen
-            if (who != null && people.greeted.add(who.id)) {
-                if (who.owner) mind.mood = EyeMood.HAPPY
-                live.announce(if (who.owner) "Hello, ${who.name}." else "Hello again, ${who.name}.")
-            } else if (people.strangerStable && !people.asked && c.people.hasOwner()) {
-                // Someone it doesn't know has stayed: ask once, and remember them if they answer.
-                mind.mood = EyeMood.CURIOUS
-                people.askedName()
-                live.announce("I don't think we've met. What's your name?")
-            }
-        }
-    }
+    com.melhive.zed.ui.components.PeopleWatch(recognising, camera, people, onMood = { mind.mood = it }) { testLine = it }
 
     fun close() { closing = true; onClose() }
     BackHandler { close() }
@@ -238,7 +212,8 @@ fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long?) -> Unit, onOpenLive: () -
     LaunchedEffect(state.speechPulse) { if (state.speechPulse > 0) mind.speechPulse() }
     LaunchedEffect(state.looking) { mind.attending = state.looking }
     // The iris colour you chose.
-    LaunchedEffect(settings?.eyeColor) { mind.baseTint = com.melhive.zed.core.eyes.EyeColors.of(settings?.eyeColor) }
+    val eyeStyle = com.melhive.zed.core.eyes.EyeStyle.parse(settings?.eyeStyle)
+    LaunchedEffect(settings?.eyeColor, eyeStyle) { art.style = eyeStyle; mind.baseTint = com.melhive.zed.core.eyes.EyeColors.of(settings?.eyeColor, eyeStyle) }
     // "Thank you", "good night": a slow, contented closing of the eyes.
     LaunchedEffect(state.transcript.size) {
         val last = state.transcript.lastOrNull()
@@ -359,6 +334,8 @@ fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long?) -> Unit, onOpenLive: () -
             )
         }
 
+        if (state.voiceGuest) com.melhive.zed.ui.components.GuestPill(Modifier.align(Alignment.TopCenter).padding(top = 12.dp))
+
         // The experiment's test line: who ZED thinks it sees and hears, and how sure it is.
         if (recognising && testLine.isNotEmpty() && !asleep) Text(
             testLine, color = ZedColors.Muted.copy(alpha = 0.75f), style = MaterialTheme.typography.labelSmall, maxLines = 2,
@@ -399,6 +376,9 @@ fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long?) -> Unit, onOpenLive: () -
                             touched++
                             if (!cameraAllowed) permissions.launch(arrayOf(Manifest.permission.CAMERA)) else cameraOn = !cameraOn
                         }
+                        EyeButton(Icons.Outlined.Cameraswitch, if (lookBack) "“What is this?” looks through the back camera" else "“What is this?” looks through the front camera", lookBack) {
+                            touched++; scope.launch { c.settings.setEyeLookBack(!lookBack) }
+                        }
                         EyeButton(Icons.Outlined.ScreenRotation, "Turn the screen", true) {
                             touched++
                             turned = if (sideways) ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT else ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
@@ -406,8 +386,11 @@ fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long?) -> Unit, onOpenLive: () -
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
                         EyeButton(Icons.Outlined.History, "Conversation so far", true) { controls = false; history = true }
+                        EyeButton(Icons.Outlined.Pets, "Whose eyes: ${eyeStyle.label}", true) {
+                            touched++; scope.launch { c.settings.setEyeStyle(com.melhive.zed.core.eyes.EyeStyle.next(settings?.eyeStyle).id) }
+                        }
                         EyeButton(Icons.Outlined.Palette, "Eye colour", true) {
-                            touched++; scope.launch { c.settings.setEyeColor(com.melhive.zed.core.eyes.EyeColors.next(settings?.eyeColor ?: "cyan")) }
+                            touched++; scope.launch { c.settings.setEyeColor(com.melhive.zed.core.eyes.EyeColors.next(settings?.eyeColor ?: "natural")) }
                         }
                         EyeButton(Icons.Outlined.Group, "People ZED recognises", recognising) { controls = false; peopleDialog = true }
                         EyeButton(Icons.Outlined.Close, "Close Eye mode", true) { close() }

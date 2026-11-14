@@ -72,6 +72,7 @@ fun MoreScreen(onNavigate: (String) -> Unit) {
         "Your data" to listOf(
             Entry(Routes.SCHEDULE, Icons.Outlined.Memory, "Schedule", "Calendar events and reminders"),
             Entry(Routes.MEMORY, Icons.Outlined.Memory, "Memory", "Facts, task list, reminders and documents"),
+            Entry(Routes.PEOPLE, Icons.Outlined.RecordVoiceOver, "Who ZED knows", "Your face and voice, “only my voice”, and people ZED has met"),
             Entry(Routes.BRAIN, Icons.Outlined.Hub, "Live Brain", "Everything ZED knows as a living, connected network"),
             Entry(Routes.FILES, Icons.Outlined.Folder, "Files", "Granted folders, browse and organize"),
             Entry(Routes.BACKUP, Icons.Outlined.SettingsBackupRestore, "Backup & restore", "Save everything to a file, or move ZED to another phone"),

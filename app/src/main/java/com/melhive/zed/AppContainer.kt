@@ -85,6 +85,10 @@ class AppContainer(val context: Context) {
     val privateStore by lazy { com.melhive.zed.security.PrivateStore(context) }
     /** "Private mode" / "lock private mode" by voice: true asks the Live Brain to unlock, false to lock. */
     val brainPrivate = kotlinx.coroutines.flow.MutableStateFlow<Boolean?>(null)
+    /** Turns speech into a voiceprint (the owner's voice for "only my voice" and for recognising who is talking). */
+    val voiceId by lazy { com.melhive.zed.eyes.VoiceId(context) }
+    /** The owner's name, for "That's only for …" (read once; the guest gate can't wait for the database). */
+    @Volatile var ownerName: String? = null
     /** People ZED has learned to recognise in Eye mode. Kept on the phone only. */
     val people by lazy { com.melhive.zed.eyes.PeopleStore(context) }
     /** How many voice screens (LIVE, Eye mode) are showing: the session ends when the last one closes, not when switching between them. */
@@ -95,6 +99,7 @@ class AppContainer(val context: Context) {
     val toolManager: ToolManager by lazy {
         ToolManager(catalog, skills, settings, AndroidCapabilityChecker(context, this), confirmations, audit, DefaultConfirmationText).also { tm ->
             tm.locked = { phoneLocked() }
+            tm.guestMessage = { if (live.state.value.voiceGuest) com.melhive.zed.core.security.LockPolicy.guestOnly(ownerName) else null }
             tm.onLockedRequest = { unlockRequest.value = orchestrator.currentUserText }
             registerExecutors(tm, this, context)
             tm.afterSuccess = { tool -> if (tool.startsWith("calendar.") || tool == "app.undo") appScope.launch { runCatching { com.melhive.zed.agents.Announcer.planEvents(context) } } }
@@ -107,7 +112,7 @@ class AppContainer(val context: Context) {
             o.routineMatcher = { text -> routines.matchPhrase(text)?.name }
             o.aliases = { teaching.aliases }
             o.awareness = { com.melhive.zed.agents.AwarenessCollector(context, this).collect() }
-            o.guest = { settings.current().lockGuard && phoneLocked() }
+            o.guest = { (settings.current().lockGuard && phoneLocked()) || live.state.value.voiceGuest }
         }
     }
 
@@ -135,6 +140,12 @@ class AppContainer(val context: Context) {
             .also { it.userName = { memory.userName() } }
             .also { live ->
                 live.lockedNow = { settings.current().lockGuard && phoneLocked() }
+                // "Only my voice": compare what was heard with the owner's recorded voice (needs the voice model and at least three samples).
+                live.voiceCheck = { audio ->
+                    if (!settings.current().ownerVoiceOnly || people.ownerVoices() < 3 || audio.size < com.melhive.zed.eyes.VoiceId.RATE * 3 / 2) null
+                    else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { voiceId.print(audio)?.let { people.ownerVoice(it) } }
+                }
+                appScope.launch { runCatching { ownerName = memory.userName() } }
                 live.onCallEnded = { conv ->
                     // Written a little later and only while ZED is idle, so it never delays the next thing you ask.
                     appScope.launch {

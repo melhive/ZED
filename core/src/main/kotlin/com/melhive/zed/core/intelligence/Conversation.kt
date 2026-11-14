@@ -14,6 +14,7 @@ object PromptBuilder {
     private const val BASE_RULES = """- Use the conversation so far and refer back to what the user said.
 - Give direct, specific answers and real opinions or recommendations when asked. If unsure, say so briefly.
 - Don't list your features unless asked, don't say "As an AI", and don't repeat the question back.
+- When the user says they finished or achieved something, congratulate them in a few warm words before anything else.
 Never claim a device action happened unless a tool result confirms it. If a tool fails, explain plainly and suggest what to do."""
 
     /** The assistant's identity for a [persona]; [title] is how to address the user ("sir", a name…), if set. */

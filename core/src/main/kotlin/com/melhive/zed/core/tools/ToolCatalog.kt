@@ -41,11 +41,11 @@ class ToolCatalog(specs: List<ToolSpec>) {
             "voice_responses", "speech_rate", "speech_pitch", "voice", "wake_word", "wake_sensitivity", "barge_in", "auto_index", "use_knowledge",
             "theme_glow", "animation", "auto_learning", "web_research", "think_twice", "proactive_hints", "brain_sounds", "ask_before",
             "user_title", "weather_city", "briefing", "briefing_time", "check_updates", "persona", "greeting", "headset_audio",
-            "live_sound", "hide_beep", "eye_captions", "eye_color", "stop_word", "listening_time", "caption_size", "live_haptics", "lock_guard", "eye_recognition", "speech_recognition", "announce_reminders", "event_announce", "alarm_briefing", "ai_model", "model_backend",
+            "live_sound", "hide_beep", "eye_captions", "eye_color", "stop_word", "listening_time", "caption_size", "live_haptics", "lock_guard", "eye_recognition", "eye_style", "compliments", "owner_voice", "speech_recognition", "announce_reminders", "event_announce", "alarm_briefing", "ai_model", "model_backend",
         )
 
         /** Screens of the ZED app that [app.show] can open. */
-        val SCREENS = listOf("home", "chat", "live", "eye", "private", "private_exit", "tasks", "more", "facts", "task_list", "reminders", "knowledge", "schedule", "taught", "brain",
+        val SCREENS = listOf("home", "chat", "live", "eye", "private", "private_exit", "people", "tasks", "more", "facts", "task_list", "reminders", "knowledge", "schedule", "taught", "brain",
             "settings", "voice", "models", "files", "skills", "routines", "diagnostics", "backup", "whats_new")
 
         val DEFAULT = ToolCatalog(

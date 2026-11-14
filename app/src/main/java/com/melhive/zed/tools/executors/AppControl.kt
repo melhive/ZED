@@ -226,6 +226,7 @@ fun registerAppControl(tm: ToolManager, c: AppContainer, context: Context) {
             "schedule" -> Routes.SCHEDULE to "your schedule"
             "taught" -> Routes.memoryTab(5) to "what you've taught me"
             "brain" -> Routes.BRAIN to "the Live Brain"
+            "people" -> Routes.PEOPLE to "who I know"
             "settings" -> Routes.SETTINGS to "Settings"
             "voice" -> Routes.VOICE to "Voice settings"
             "models" -> Routes.MODELS to "Model Manager"
@@ -273,9 +274,21 @@ fun registerAppControl(tm: ToolManager, c: AppContainer, context: Context) {
                 ok(if (style == com.melhive.zed.core.voice.SoundSynth.Style.OFF) "LIVE sounds off." else "LIVE sound set to ${style.label}.")
             }
             "eye_color" -> {
-                val colour = com.melhive.zed.core.eyes.EyeColors.parse(value) ?: return@register fail("Eye colours: cyan, amber, green or violet.")
+                val colour = com.melhive.zed.core.eyes.EyeColors.parse(value) ?: return@register fail("Eye colours: natural, cyan, amber, green or violet.")
                 c.settings.setEyeColor(colour)
-                ok("My eyes are $colour now.")
+                ok(if (colour == "natural") "My eyes have their natural colour now." else "My eyes are $colour now.")
+            }
+            "eye_style" -> {
+                val style = com.melhive.zed.core.eyes.EyeStyle.entries.firstOrNull { it.id == value } ?: return@register fail("I can wear owl, human, cat, lion, wolf or leopard eyes.")
+                c.settings.setEyeStyle(style.id)
+                ok("${style.label} eyes it is.")
+            }
+            "compliments" -> toggle("Compliments when you finish something", { c.settings.setCompliments(it) })
+            "owner_voice" -> {
+                val on = bool() ?: return@register fail("Say on or off.")
+                if (on && c.people.ownerVoices() < 3) return@register fail("Record your voice first: More → Who ZED knows → Record my voice.")
+                c.settings.setOwnerVoiceOnly(on)
+                ok(if (on) "From now on only your voice gets full access; other voices are answered as a guest." else "Any voice gets full access again.")
             }
             "caption_size" -> { val large = value.startsWith("large") || value.startsWith("big"); c.settings.setCaptionSize(if (large) "large" else "normal"); ok(if (large) "Captions are larger now." else "Captions are back to normal size.") }
             "live_haptics" -> toggle("Vibration with my sounds", { c.settings.setLiveHaptics(it) })

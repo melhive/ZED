@@ -475,7 +475,8 @@ fun registerExecutors(tm: ToolManager, c: AppContainer, context: Context) {
     }
     tm.register("todo.complete") { a, _ ->
         when (val r = c.todos.complete(a.string("item"))) {
-            is TodoRepository.CompleteResult.Done -> ok("Marked “${r.item.title}” as done.")
+            is TodoRepository.CompleteResult.Done -> ok("Marked “${r.item.title}” as done." +
+                if (c.settings.current().compliments) " " + com.melhive.zed.core.conversation.Praise.pick(System.currentTimeMillis() / 1000, runCatching { c.memory.userName() }.getOrNull()) else "")
             is TodoRepository.CompleteResult.Ambiguous -> fail("Several tasks match: " + r.matches.joinToString { "#${it.id} ${it.title}" } + ". Say which number.")
             TodoRepository.CompleteResult.NotFound -> fail("No open task matches “${a.string("item")}”.")
         }

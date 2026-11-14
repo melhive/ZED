@@ -94,6 +94,7 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         "home", "home screen", "dashboard" -> "home"
         "chat" -> "chat"
         "eyes", "eye", "eye mode", "eyes mode" -> "eye"
+        "who you know", "people you know", "known people", "voice setup", "face setup", "who zed knows" -> "people"
         "live", "zed live" -> "live"
         "background tasks", "tasks screen" -> "tasks"
         else -> null
@@ -110,6 +111,8 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         "haptics", "vibration", "vibrations", "live vibration", "live haptics" -> "live_haptics"
         "lock screen protection", "lock protection", "guest mode", "locked guest mode", "lock screen guest" -> "lock_guard"
         "face recognition", "people recognition", "recognition", "recognizing people", "recognising people" -> "eye_recognition"
+        "compliments", "praise", "compliment", "congratulations" -> "compliments"
+        "only my voice", "my voice only", "voice lock", "owner voice", "voice recognition" -> "owner_voice"
         "brain sounds", "brain sound" -> "brain_sounds"
         "think twice", "thinking twice", "double checking" -> "think_twice"
         "barge in", "barge-in", "interruptions", "interrupting" -> "barge_in"
@@ -293,6 +296,10 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         },
         Rule(rx("forget (?:that |about )?(.+)")) { m -> tool("memory.forget", "query" to m.groupValues[1]) },
 
+        // Whose eyes ZED wears in Eye mode.
+        Rule(rx("(?:use|show|switch to|change to|give me|wear|put on|have|make them|make your eyes)(?: the| your)? (owl|human|cat|lion|wolf|leopard)(?:'s)? eyes?|(owl|human|cat|lion|wolf|leopard) eyes?(?: please)?|(?:change|set) (?:your |the )?eyes? (?:style )?to (owl|human|cat|lion|wolf|leopard)")) { m ->
+            tool("settings.set", "key" to "eye_style", "value" to m.groupValues.drop(1).first { it.isNotEmpty() }.lowercase())
+        },
         // Private Connections in the Live Brain.
         Rule(rx("(?:exit|close|leave|lock|end|quit|turn off|hide) (?:the |my )?private (?:mode|brain|connections)")) { tool("app.show", "screen" to "private_exit") },
         Rule(rx("(?:(?:open|start|show|enter|go (?:in)?to|switch to|unlock|turn on)(?: me)? )?(?:the |my )?private (?:mode|brain|connections)")) { tool("app.show", "screen" to "private") },

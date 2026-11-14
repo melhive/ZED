@@ -575,7 +575,7 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
                     synapse(ax, ay, bx, by, k, color.copy(alpha = alpha.coerceIn(0f, 1f)), wide, thin, segments)
                     // Named relationships ("sister", "works at") are written along the connection when it is in focus or close up.
                     edge.label?.let { lbl ->
-                        if (hot || (focusSet == null && scale * (persp[lo] + persp[hi]) / 2f > 1.1f)) {
+                        if (textFade < 0.97f && (hot || (focusSet == null && scale * (persp[lo] + persp[hi]) / 2f > 1.1f))) {
                             val text = labels.getOrPut("rel:$lbl") { measurer.measure(lbl, TextStyle(fontSize = 10.sp, color = ZedColors.Amber), maxLines = 1) }
                             val mid = curve(ax, ay, bx, by, k, 0.5f)
                             drawText(text, color = ZedColors.Amber.copy(alpha = if (hot) 0.95f else 0.6f * depth), topLeft = Offset(mid.x - text.size.width / 2f, mid.y - text.size.height - 2f * unit))
@@ -697,15 +697,22 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
                     val hub = node.type == BrainNodeType.CORE || node.type == BrainNodeType.CATEGORY
                     val apparent = scale * persp[i]
                     // Display → Text fade threshold: how far you must zoom in before names appear.
-                    val nameAt = 0.35f + 2.75f * textFade
-                    val threshold = when { hub -> if (textFade > 0.6f) nameAt * 0.35f else 0f; node.type == BrainNodeType.CONCEPT -> nameAt * 0.48f; else -> nameAt }
-                    val fadeIn = if (threshold <= 0f || isSelected || focusSet != null) 1f else ((apparent - threshold) / (0.25f * threshold)).coerceIn(0f, 1f)
+                    // 0: names always show. Up the slider you must zoom in further and further. At the very top: no names at all.
+                    val noNames = textFade >= 0.97f
+                    val nameAt = 0.3f * Math.pow(60.0, textFade.toDouble()).toFloat()
+                    val threshold = when { hub -> if (textFade > 0.3f) nameAt * 0.3f else 0f; node.type == BrainNodeType.CONCEPT -> nameAt * 0.48f; else -> nameAt }
+                    val fadeIn = when {
+                        noNames -> 0f
+                        threshold <= 0f || isSelected -> 1f
+                        else -> ((apparent - threshold) / (0.25f * threshold)).coerceIn(0f, 1f)
+                    }
                     val show = grown > 0.9f && when {
                         !lit -> false
-                        isSelected -> true
-                        hub -> (near[i] > 0.2f && fadeIn > 0f) || focusSet != null
-                        node.type == BrainNodeType.CONCEPT -> (fadeIn > 0f && near[i] > 0.45f) || focusSet != null
-                        else -> (fadeIn > 0f && near[i] > 0.5f) || focusSet != null
+                        isSelected -> !noNames
+                        noNames -> false
+                        hub -> near[i] > 0.2f && fadeIn > 0f
+                        node.type == BrainNodeType.CONCEPT -> fadeIn > 0f && near[i] > 0.45f
+                        else -> fadeIn > 0f && near[i] > 0.5f
                     }
                     if (show) {
                         val text = labels.getOrPut(node.key) {
@@ -737,7 +744,7 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
                     val w = r * 0.8f; val h = r * 0.6f
                     drawRect(Color.White.copy(alpha = 0.85f * depth), Offset(px - w / 2f, py - h * 0.25f), androidx.compose.ui.geometry.Size(w, h))
                     drawArc(Color.White.copy(alpha = 0.85f * depth), 180f, 180f, false, Offset(px - w * 0.3f, py - h * 0.85f), androidx.compose.ui.geometry.Size(w * 0.6f, h * 1.2f), style = Stroke(1.3f * unit))
-                    if (scale > 0.5f) {
+                    if (scale > 0.5f && textFade < 0.97f) {
                         val text = labels.getOrPut("private-group") { measurer.measure("PRIVATE", hubStyle, maxLines = 1) }
                         drawText(text, color = Color.White.copy(alpha = 0.6f * depth), topLeft = Offset(px - text.size.width / 2f, py + r + 4f * unit))
                     }
@@ -755,7 +762,7 @@ fun BrainScreen(onBack: () -> Unit, onOpenChat: (Long) -> Unit) {
                     IconButton(onClick = { showDisplay = false }) { Icon(Icons.Outlined.Close, "Close display options", tint = ZedColors.Muted) }
                 }
                 Text("Text fade threshold", style = MaterialTheme.typography.labelMedium)
-                Text(if (fade < 0.05f) "Names always show" else if (fade > 0.6f) "Names only when zoomed in close" else "Names appear as you zoom in", style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted)
+                Text(if (fade < 0.05f) "Names always show" else if (fade >= 0.97f) "No names at all" else if (fade > 0.6f) "Names only when zoomed in very close" else "Names appear as you zoom in", style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted)
                 androidx.compose.material3.Slider(value = fade, onValueChange = { fade = it }, onValueChangeFinished = { save() }, valueRange = 0f..1f)
                 Text("Node size", style = MaterialTheme.typography.labelMedium)
                 androidx.compose.material3.Slider(value = size, onValueChange = { size = it }, onValueChangeFinished = { save() }, valueRange = 0.5f..2.5f)

@@ -84,7 +84,7 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit, onOpenEye: () -> Un
     val tasks by c.taskEngine.tasks.collectAsStateWithLifecycle(initialValue = emptyList())
     val activeTasks = tasks.count { !it.statusEnum().terminal }
 
-    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> if (granted) live.start() }
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> if (granted) live.start(greet = true) }
     // Fallback: the phone's own voice-typing popup (works even when background recognition fails).
     val systemVoice = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let { live.submitText(it) }
@@ -111,7 +111,7 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit, onOpenEye: () -> Un
         runCatching { systemVoice.launch(intent) }.onFailure { typing = true }
     }
     LaunchedEffect(Unit) {
-        if (PermissionCatalog.isGranted(context, PermissionCatalog.MICROPHONE)) live.start() else permission.launch(Manifest.permission.RECORD_AUDIO)
+        if (PermissionCatalog.isGranted(context, PermissionCatalog.MICROPHONE)) live.start(greet = true) else permission.launch(Manifest.permission.RECORD_AUDIO)
     }
     // A request handed over by a notification or shortcut ("brief me") is sent once LIVE is ready.
     val pendingPrompt by c.livePrompt.collectAsStateWithLifecycle()
@@ -128,6 +128,27 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit, onOpenEye: () -> Un
     DisposableEffect(Unit) { c.voiceScreens.incrementAndGet(); onDispose { if (c.voiceScreens.decrementAndGet() <= 0) live.end() } }
 
     var history by remember { mutableStateOf(false) }
+
+    // "What is this?": ZED looks through the camera you chose (back by default here, since the phone is in your hand).
+    // The camera opens only for the moment of the picture, unless recognising people is on (then the front one watches).
+    var cameraAllowed by remember { mutableStateOf(PermissionCatalog.isGranted(context, PermissionCatalog.CAMERA)) }
+    val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> if (granted) cameraAllowed = true }
+    val lookCamera = remember { com.melhive.zed.eyes.EyeCamera(context.applicationContext) }
+    val recognising = settings?.eyeRecognition == true && cameraAllowed
+    val lookBack = settings?.liveLookBack ?: true
+    val people = remember { com.melhive.zed.eyes.EyePeople(c.people, c.voiceId) }
+    var peopleLine by remember { mutableStateOf("") }
+    androidx.lifecycle.compose.LifecycleStartEffect(cameraAllowed, recognising, lookBack) {
+        val look: suspend () -> com.melhive.zed.intelligence.ImageInput? = { lookCamera.snap(front = !lookBack, resume = recognising) }
+        if (cameraAllowed) live.frameSource = look
+        if (recognising) lookCamera.start(preferFront = true)
+        onStopOrDispose {
+            // Only if it is still ours: Eye mode may have taken over the same session.
+            if (live.frameSource === look) live.frameSource = null
+            lookCamera.stop()
+        }
+    }
+    com.melhive.zed.ui.components.PeopleWatch(recognising, lookCamera, people) { peopleLine = it }
 
     Box(
         Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF070B16), ZedColors.Background, Color(0xFF02030A))))
@@ -148,6 +169,8 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit, onOpenEye: () -> Un
                 }
             }
 
+            if (state.voiceGuest) com.melhive.zed.ui.components.GuestPill(Modifier.padding(top = 4.dp))
+            if (peopleLine.isNotEmpty()) Text(peopleLine, style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted.copy(alpha = 0.75f), maxLines = 2, textAlign = TextAlign.Center)
             // Orb, eyes or chat: the same conversation in three forms.
             com.melhive.zed.ui.components.VoiceModeSwitch("orb", onSelect = { if (it == "eyes") onOpenEye() else onOpenChat(live.conversation) }, modifier = Modifier.padding(top = 6.dp))
 
@@ -221,6 +244,15 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit, onOpenEye: () -> Un
                             photoMenu = false
                             runCatching { com.melhive.zed.intelligence.ImageInput.newCaptureUri(context) }.onSuccess { liveCapture = it; liveCamera.launch(it) }
                         })
+                        // Which camera "what is this?" looks through when you just ask by voice.
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text(if (!cameraAllowed) "Let ZED look when I ask “what is this?”" else if (lookBack) "“What is this?” uses the back camera" else "“What is this?” uses the front camera") },
+                            leadingIcon = { Icon(Icons.Outlined.PhotoCamera, null) },
+                            onClick = {
+                                photoMenu = false
+                                if (!cameraAllowed) cameraPermission.launch(Manifest.permission.CAMERA) else liveScope.launch { c.settings.setLiveLookBack(!lookBack) }
+                            },
+                        )
                         androidx.compose.material3.DropdownMenuItem(text = { Text("Choose from gallery") }, leadingIcon = { Icon(Icons.Outlined.PhotoLibrary, null) }, onClick = {
                             photoMenu = false
                             liveGallery.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))

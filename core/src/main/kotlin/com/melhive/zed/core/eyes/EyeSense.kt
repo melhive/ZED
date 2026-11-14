@@ -71,10 +71,12 @@ object VoiceInterrupt {
 
 /** Iris colours the user can choose. */
 object EyeColors {
-    val all = listOf("cyan" to 0x5CE1FF, "amber" to 0xFFB547, "green" to 0x4CFFA0, "violet" to 0x9B8CFF)
-    fun of(name: String?): Int = all.firstOrNull { it.first == name?.lowercase() }?.second ?: all[0].second
+    /** "natural" is each eye style's own colour (a cat's green, a lion's amber; cyan for the owl). */
+    val all = listOf("natural" to 0, "cyan" to 0x5CE1FF, "amber" to 0xFFB547, "green" to 0x4CFFA0, "violet" to 0x9B8CFF)
+    fun of(name: String?, style: EyeStyle = EyeStyle.OWL): Int = all.firstOrNull { it.first == name?.lowercase() }?.second?.takeIf { it != 0 } ?: style.tint
     fun parse(said: String): String? = when (said.lowercase().trim()) {
-        "cyan", "blue", "default", "normal", "aqua" -> "cyan"
+        "natural", "default", "normal", "real", "own" -> "natural"
+        "cyan", "blue", "aqua" -> "cyan"
         "amber", "orange", "yellow", "gold", "golden" -> "amber"
         "green", "emerald" -> "green"
         "violet", "purple", "lilac" -> "violet"
@@ -108,6 +110,23 @@ object VisualAsk {
     fun matches(text: String): Boolean = look.containsMatchIn(text) && !elsewhere.containsMatchIn(text)
 
     private val pointing = Regex("\\b(?:it|its|it'?s|this|that|these|those|them|they|one)\\b", RegexOption.IGNORE_CASE)
+
+    private val detail = Regex(
+        "\\b(?:tell me more|more (?:details?|info|information)|how much|what(?:'s| is) the price|price|cost|where (?:can i|to|do i) (?:buy|get|find)|who (?:made|makes|invented|created|sells)" +
+            "|history|specs?|specifications|reviews?|is it (?:good|worth|safe|healthy|expensive|rare)|search|look it up|google|online|latest|release date|how old|where is it from|what(?:'s| is) it worth|nutrition|calories|side effects)\\b",
+        RegexOption.IGNORE_CASE,
+    )
+
+    /** A follow-up that the picture alone can't answer: it needs facts from the web about what was identified. */
+    fun wantsDetail(text: String): Boolean = detail.containsMatchIn(text) && !elsewhere.containsMatchIn(text)
+
+    private val opener = Regex("^(?:this|that|it|the (?:object|item|thing|picture|image|photo))?\\s*(?:is|'s|looks like|appears to be|seems to be|shows|could be|might be|is probably|is likely)?\\s*(?:a |an |the |some |your )?", RegexOption.IGNORE_CASE)
+
+    /** What ZED said it was looking at, cut down to the thing itself ("That looks like a Casio F-91W watch." → "Casio F-91W watch"). */
+    fun subject(answer: String): String {
+        val first = answer.trim().split(Regex("(?<=[.!?])\\s+")).firstOrNull().orEmpty().trimEnd('.', '!', '?')
+        return opener.replace(first, "").substringBefore(",").substringBefore(" which ").substringBefore(" that ").trim().take(80)
+    }
 
     /** A question that still points at what was just shown ("how do I use it?", "is that expensive?"). */
     fun followUp(text: String): Boolean = pointing.containsMatchIn(text) && !elsewhere.containsMatchIn(text) && text.trim().split(Regex("\\s+")).size <= 16

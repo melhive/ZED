@@ -100,7 +100,7 @@ class EyesTest {
         assertFalse(VoiceInterrupt.heard("it is sunny today", "It is sunny today."))
         assertTrue(KindWords.matches("thanks Zed")); assertTrue(KindWords.matches("good night"))
         assertFalse(KindWords.matches("what time is it"))
-        assertEquals("amber", EyeColors.next("cyan")); assertEquals("cyan", EyeColors.next("violet"))
+        assertEquals("amber", EyeColors.next("cyan")); assertEquals("natural", EyeColors.next("violet"))
     }
 
     @Test fun `eyes fall asleep after a long quiet time and wake on touch`() {
@@ -133,6 +133,13 @@ class EyesTest {
         assertEquals(null, n.parse("no"))
         assertEquals(null, n.parse("why do you want to know my name"))
         assertTrue(VisualAsk.followUp("how do I use it?")); assertTrue(VisualAsk.followUp("is that expensive"))
+        assertTrue(VisualAsk.wantsDetail("how much is it")); assertTrue(VisualAsk.wantsDetail("tell me more about it")); assertTrue(VisualAsk.wantsDetail("where can I buy this"))
+        assertFalse(VisualAsk.wantsDetail("what color is it"))
+        assertEquals("Casio F-91W watch", VisualAsk.subject("That looks like a Casio F-91W watch. It has a black strap."))
+        assertEquals("ripe mango", VisualAsk.subject("This is a ripe mango, ready to eat."))
+        val praise = (0L..11L).map { com.melhive.zed.core.conversation.Praise.pick(it) }.toSet()
+        assertTrue(praise.size >= 10)
+        assertEquals(0x5CE1FF, EyeColors.of("natural")); assertEquals(0xB9E24A, EyeColors.of("natural", com.melhive.zed.core.eyes.EyeStyle.CAT)); assertEquals(0x4CFFA0, EyeColors.of("green", com.melhive.zed.core.eyes.EyeStyle.CAT))
         assertFalse(VisualAsk.followUp("what time is the meeting"))
     }
 
@@ -195,6 +202,28 @@ class EyesTest {
         assertFalse(w2.present)
     }
 
+    @Test fun `every eye style draws inside the screen, upright and sideways`() {
+        val m = EyeMind(6); run(m, 1f)
+        val art = EyeArt(); val frame = EyeFrame()
+        for (st in com.melhive.zed.core.eyes.EyeStyle.entries) for ((w, h) in listOf(2400f to 1080f, 1080f to 2400f)) {
+            art.style = st
+            art.draw(frame, w, h, m.left, m.right, m.roll)
+            assertTrue(frame.ops.size > 60, st.id)
+            var clips = 0
+            for (op in frame.ops) {
+                if (op.kind == EyeFrame.CLIP) clips++; if (op.kind == EyeFrame.UNCLIP) clips--
+                if (op.kind == EyeFrame.STROKE || (op.kind == EyeFrame.FILL && op.colors == null)) for (i in 0 until op.count) {
+                    val x = frame.pts[op.start + i * 2]
+                    assertTrue(x > -w * 0.05f && x < w * 1.05f, "${st.id} ${w.toInt()}x${h.toInt()}: x=$x")
+                }
+                op.stops?.let { s -> for (i in 1 until s.size) assertTrue(s[i] > s[i - 1]) }
+            }
+            assertEquals(0, clips)
+        }
+        assertEquals(com.melhive.zed.core.eyes.EyeStyle.CAT, com.melhive.zed.core.eyes.EyeStyle.parse("Cat"))
+        assertEquals(com.melhive.zed.core.eyes.EyeStyle.OWL, com.melhive.zed.core.eyes.EyeStyle.parse("dragon"))
+    }
+
     @Test fun `the drawing has both eyes inside the screen`() {
         val m = EyeMind(4)
         run(m, 1f)
@@ -223,6 +252,12 @@ class EyesTest {
             art.draw(frame, 1600f, 720f, m.left, m.right, m.roll)
             EyePreview.render(frame, 1600, 720, File(dir, "$name.png"))
         }
+        for (st in com.melhive.zed.core.eyes.EyeStyle.entries) {
+            art.style = st
+            shot("style-" + st.id) { it.baseTint = st.tint; it.activity = EyeActivity.LISTENING; it.faceSeen = true }
+            if (st.slit) shot("style-" + st.id + "-focus") { it.baseTint = st.tint; it.attending = true; it.objectSeen = true; it.objectX = 0.3f; it.activity = EyeActivity.THINKING }
+        }
+        art.style = com.melhive.zed.core.eyes.EyeStyle.OWL
         for (mood in EyeMood.entries) shot(mood.name.lowercase()) { it.mood = mood; it.activity = EyeActivity.SPEAKING; it.faceSeen = true }
         shot("look-right") { it.faceSeen = true; it.faceX = 0.9f; it.faceY = -0.4f; it.activity = EyeActivity.LISTENING }
         shot("object") { it.attending = true; it.objectSeen = true; it.objectX = -0.7f; it.objectY = 0.5f; it.activity = EyeActivity.THINKING }

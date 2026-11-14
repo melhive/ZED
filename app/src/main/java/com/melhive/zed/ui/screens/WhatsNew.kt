@@ -31,6 +31,18 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.43", "2026-11-14", "Steadier, friendlier sounds, new eyes, only my voice", listOf(
+            "Stability: leaving LIVE or Eye mode in the middle of an answer now cancels that answer, a new voice session always starts clean, and flicking quickly between the orb, the eyes and Home no longer starts sessions on top of each other. Crash reports now also show how each part of ZED last stopped.",
+            "Ten new LIVE sounds — Duo, Glass, Pop, Bloom, Spark, Tap, Lift, Halo, Nova and Echo: short, bright and clean, with nothing low, sliding or echoing. Tap each in More → Voice to hear it. The earlier three are gone.",
+            "ZED speaks first: opening LIVE or Eye mode greets you, like “Hey Zed” and the shortcut do, and then listens.",
+            "Live Brain → Display → Text fade threshold goes much further: the higher it is, the closer you must zoom before names appear, and at the top no names appear at all.",
+            "New eyes for Eye mode: human, cat, lion, wolf and leopard, besides the owl — each with its own shape, iris, colour and pupil (the cat's is a slit that widens). Tap the paw button in Eye mode, or say “cat eyes”. Eye colour “natural” uses each eye's own colour.",
+            "“What is this?” goes further: ask “how much is it?”, “tell me more” or “where can I buy it?” next and ZED searches the web for what it identified. It can look through the front or the back camera, in LIVE too (the camera button there; the switch-camera button in Eye mode).",
+            "More → Who ZED knows: teach ZED your face, record your voice (five sentences), see and rename the people it has met.",
+            "Only my voice (Who ZED knows): when a different voice talks to ZED it says once “I don't think you're …, so I'll answer as a guest” and then answers general questions only. Tap Guest and unlock to get full access back. It needs on-device speech recognition and is a privacy guard, not a lock.",
+            "Recognising people now works with the orb as well as the eyes (still an experiment, off by default).",
+            "A word of praise when you tick off a to-do, and ZED congratulates you when you tell it you finished something. Switch: say “turn off compliments”.",
+        )),
         Release("0.1.42", "2026-11-14", "Refinements, brain display options and Private Connections", listOf(
             "Fixed: from Eye mode, the Orb button did nothing. Orb, Eyes and Chat now switch in every direction, by tap and by voice, and “chat mode” closes the eyes instead of leaving them underneath.",
             "Home: the quick buttons are two rows of three, so “Memory” and the others no longer split across lines.",

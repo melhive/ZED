@@ -109,13 +109,15 @@ class EyeCamera(private val context: Context) {
 
     /** Opens the camera. Needs the camera permission; does nothing harmful without a camera. */
     @SuppressLint("MissingPermission")
-    fun start() {
+    fun start(preferFront: Boolean = true) {
         if (!closed) return
         closed = false
+        lastFrameAt = 0L
         try {
             val manager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
             val ids = manager.cameraIdList
-            val id = ids.firstOrNull { manager.getCameraCharacteristics(it).get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_FRONT }
+            val wanted = if (preferFront) CameraCharacteristics.LENS_FACING_FRONT else CameraCharacteristics.LENS_FACING_BACK
+            val id = ids.firstOrNull { manager.getCameraCharacteristics(it).get(CameraCharacteristics.LENS_FACING) == wanted }
                 ?: ids.firstOrNull() ?: run { closed = true; return }
             val chars = manager.getCameraCharacteristics(id)
             front = chars.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_FRONT
@@ -191,6 +193,25 @@ class EyeCamera(private val context: Context) {
         runCatching { reader?.close() }; reader = null
         runCatching { thread?.quitSafely() }; thread = null; handler = null
         runCatching { detectorBitmap?.recycle() }; detectorBitmap = null; detector = null
+    }
+
+    /**
+     * One picture through the chosen lens, for "what is this?" when the camera isn't already watching (LIVE) or is
+     * watching through the other lens (Eye mode follows you with the front one). Opens it, lets the exposure settle,
+     * takes the picture and closes it again. [resume]: start watching through the front lens again afterwards.
+     */
+    suspend fun snap(front: Boolean, resume: Boolean): ImageInput? {
+        val wasRunning = running
+        if (wasRunning && front == this.front) return capture()
+        stop()
+        kotlinx.coroutines.delay(150)
+        start(preferFront = front)
+        var waited = 0
+        while (!running && waited < 2500) { kotlinx.coroutines.delay(100); waited += 100 }
+        val shot = if (running) { kotlinx.coroutines.delay(650); capture() } else null
+        stop()
+        if (resume) { kotlinx.coroutines.delay(150); start(preferFront = true) }
+        return shot
     }
 
     /** One picture of what the camera sees now, upright, for "what is this?". Null when the camera isn't running. */

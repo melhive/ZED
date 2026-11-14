@@ -67,6 +67,7 @@ object Routes {
     const val CHAT = "chat"
     const val LIVE = "live"
     const val EYE = "eye"
+    const val PEOPLE = "people"
     const val TASKS = "tasks"
     const val TASK = "task/{id}"
     const val MORE = "more"
@@ -216,6 +217,7 @@ fun ZedRoot(requestedRoute: String?, onRouteConsumed: () -> Unit) {
                     MemoryScreen(onBack = { nav.popBackStack() }, initialTab = entry.arguments?.getInt("tab") ?: 0, onOpenBrain = { nav.navigate(Routes.BRAIN) })
                 }
                 screen(Routes.BRAIN) { com.melhive.zed.ui.screens.BrainScreen(onBack = { nav.popBackStack() }, onOpenChat = { nav.navigate(Routes.chat(it)) }) }
+                screen(Routes.PEOPLE) { com.melhive.zed.ui.screens.PeopleScreen(onBack = { nav.popBackStack() }) }
                 screen(Routes.BACKUP) { com.melhive.zed.ui.screens.BackupScreen(onBack = { nav.popBackStack() }) }
                 screen(Routes.MODELS) { ModelsScreen(onBack = { nav.popBackStack() }, onOpenTasks = { nav.navigateTab(Routes.TASKS) }) }
                 screen(Routes.FILES) { FilesScreen(onBack = { nav.popBackStack() }) }

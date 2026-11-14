@@ -36,9 +36,16 @@ class PeopleStore(context: Context) {
 
     @Synchronized fun add(name: String, owner: Boolean, faces: List<FloatArray>): Person {
         // Teaching your own face again replaces the old one.
+        val voices = if (owner) book.owner?.voices?.toList().orEmpty() else emptyList()
         if (owner) book.people.removeAll { it.owner }
-        return book.add(name, owner, faces).also { save() }
+        return book.add(name, owner, faces).also { it.voices += voices; save() }
     }
+
+    /** The owner, created without a face when only the voice has been recorded so far. */
+    @Synchronized fun ensureOwner(name: String): Person = book.owner ?: book.add(name, true, emptyList()).also { save() }
+    @Synchronized fun addOwnerVoice(name: String, voice: FloatArray) { val me = book.owner ?: book.add(name, true, emptyList()); if (me.voices.size < PeopleBook.MAX_VOICES) me.voices += voice; save() }
+    @Synchronized fun clearOwnerVoices() { book.owner?.voices?.clear(); save() }
+    @Synchronized fun ownerHasFace(): Boolean = book.owner?.faces?.isNotEmpty() == true
 
     @Synchronized fun learnFace(p: Person, face: FloatArray) { book.learn(p, face); save() }
     @Synchronized fun learnOwnerVoice(voice: FloatArray) { book.owner?.let { if (it.voices.size < PeopleBook.MAX_VOICES) { it.voices += voice; save() } } }

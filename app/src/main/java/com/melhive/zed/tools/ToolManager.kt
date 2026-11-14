@@ -67,6 +67,8 @@ class ToolManager(
 
     /** True while the phone is locked: only [com.melhive.zed.core.security.LockPolicy] tools run. */
     var locked: (() -> Boolean)? = null
+    /** Set when a voice that isn't the owner's is being answered ("only my voice"): the same tools are held back, with this message. */
+    var guestMessage: (() -> String?)? = null
     /** A request was refused because the phone is locked (the screen offers to unlock and carries on). */
     var onLockedRequest: ((String) -> Unit)? = null
 
@@ -84,10 +86,16 @@ class ToolManager(
         val s = settings.current()
 
         // A locked phone can be picked up by anyone: nothing personal is read or changed until it is unlocked.
-        if (s.lockGuard && !com.melhive.zed.core.security.LockPolicy.allows(spec.name) && locked?.invoke() == true) {
-            audit.record(spec.name, origin, request.args, "denied", "phone locked")
-            runCatching { onLockedRequest?.invoke(spec.name) }
-            return ToolOutcome.Denied(com.melhive.zed.core.security.LockPolicy.MESSAGE)
+        if (!com.melhive.zed.core.security.LockPolicy.allows(spec.name)) {
+            if (s.lockGuard && locked?.invoke() == true) {
+                audit.record(spec.name, origin, request.args, "denied", "phone locked")
+                runCatching { onLockedRequest?.invoke(spec.name) }
+                return ToolOutcome.Denied(com.melhive.zed.core.security.LockPolicy.MESSAGE)
+            }
+            guestMessage?.invoke()?.let { message ->
+                audit.record(spec.name, origin, request.args, "denied", "not the owner's voice")
+                return ToolOutcome.Denied(message)
+            }
         }
 
         val fromModel = request.origin == ToolRequest.Origin.LOCAL_MODEL || request.origin == ToolRequest.Origin.ONLINE_MODEL

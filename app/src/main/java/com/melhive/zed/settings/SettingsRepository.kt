@@ -98,7 +98,16 @@ data class AppSettings(
     val brainNodeSize: Float = 1f,
     val brainLinkWidth: Float = 1f,
     /** Iris colour in Eye mode: cyan, amber, green or violet. */
-    val eyeColor: String = "cyan",
+    val eyeColor: String = "natural",
+    /** Whose eyes ZED wears in Eye mode: owl, human, cat, lion, wolf or leopard. */
+    val eyeStyle: String = "owl",
+    /** A short word of praise when a task or to-do is finished. */
+    val compliments: Boolean = true,
+    /** Only the owner's voice gets full access; other voices are answered as a guest. */
+    val ownerVoiceOnly: Boolean = false,
+    /** Which camera "what is this?" looks through: in LIVE (held in the hand) and in Eye mode (on a stand). */
+    val liveLookBack: Boolean = true,
+    val eyeLookBack: Boolean = false,
     /** Saying "stop" cuts ZED off on the loudspeaker (needs on-device speech recognition). */
     val voiceStop: Boolean = true,
     /** How long LIVE keeps listening after silence: short, normal or long. */
@@ -175,6 +184,11 @@ class SettingsRepository(private val context: Context) {
         val brainNodeSize = floatPreferencesKey("brain_node_size")
         val brainLinkWidth = floatPreferencesKey("brain_link_width")
         val eyeColor = stringPreferencesKey("eye_color")
+        val eyeStyle = stringPreferencesKey("eye_style")
+        val compliments = booleanPreferencesKey("compliments")
+        val ownerVoiceOnly = booleanPreferencesKey("owner_voice_only")
+        val liveLookBack = booleanPreferencesKey("live_look_back")
+        val eyeLookBack = booleanPreferencesKey("eye_look_back")
         val voiceStop = booleanPreferencesKey("voice_stop")
         val listenPatience = stringPreferencesKey("listen_patience")
         val lockGuard = booleanPreferencesKey("lock_guard")
@@ -238,7 +252,12 @@ class SettingsRepository(private val context: Context) {
             brainTextFade = p[K.brainTextFade] ?: 0.33f,
             brainNodeSize = p[K.brainNodeSize] ?: 1f,
             brainLinkWidth = p[K.brainLinkWidth] ?: 1f,
-            eyeColor = p[K.eyeColor] ?: "cyan",
+            eyeColor = p[K.eyeColor] ?: "natural",
+            eyeStyle = p[K.eyeStyle] ?: "owl",
+            compliments = p[K.compliments] ?: true,
+            ownerVoiceOnly = p[K.ownerVoiceOnly] ?: false,
+            liveLookBack = p[K.liveLookBack] ?: true,
+            eyeLookBack = p[K.eyeLookBack] ?: false,
             voiceStop = p[K.voiceStop] ?: true,
             listenPatience = p[K.listenPatience] ?: "normal",
             lockGuard = p[K.lockGuard] ?: true,
@@ -295,6 +314,11 @@ class SettingsRepository(private val context: Context) {
     suspend fun setLiveHaptics(v: Boolean) = context.dataStore.edit { it[K.liveHaptics] = v }
     suspend fun setCaptionSize(v: String) = context.dataStore.edit { it[K.captionSize] = v }
     suspend fun setEyeRecognition(v: Boolean) = context.dataStore.edit { it[K.eyeRecognition] = v }
+    suspend fun setEyeStyle(v: String) = context.dataStore.edit { it[K.eyeStyle] = v }
+    suspend fun setCompliments(v: Boolean) = context.dataStore.edit { it[K.compliments] = v }
+    suspend fun setOwnerVoiceOnly(v: Boolean) = context.dataStore.edit { it[K.ownerVoiceOnly] = v }
+    suspend fun setLiveLookBack(v: Boolean) = context.dataStore.edit { it[K.liveLookBack] = v }
+    suspend fun setEyeLookBack(v: Boolean) = context.dataStore.edit { it[K.eyeLookBack] = v }
     suspend fun setEyeColor(v: String) = context.dataStore.edit { it[K.eyeColor] = v }
     suspend fun setVoiceStop(v: Boolean) = context.dataStore.edit { it[K.voiceStop] = v }
     suspend fun setListenPatience(v: String) = context.dataStore.edit { it[K.listenPatience] = v }

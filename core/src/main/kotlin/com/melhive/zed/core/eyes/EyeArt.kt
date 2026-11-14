@@ -99,6 +99,39 @@ object EyeColor {
 }
 
 /**
+ * Whose eyes ZED wears. The owl is the robotic original (feather plates, reactor rings); the others are
+ * drawn after the real animal: the shape and slant of the eye, how much of it the iris fills, the pupil
+ * (a slit for the cat), the iris's own colour and the brow above it.
+ */
+enum class EyeStyle(
+    val id: String, val label: String,
+    /** How much wider than tall the eye is. */
+    val wide: Float,
+    /** Iris radius, in eye radii. */
+    val iris: Float,
+    /** How far the outer corner is lifted, radians. */
+    val slant: Float,
+    val lidUpper: Float, val lidLower: Float,
+    val slit: Boolean,
+    /** The iris colour this eye has by nature (0xRRGGBB). */
+    val tint: Int,
+    /** The eyeball around the iris, and the skin or fur around the eye (inner and outer). */
+    val ball: Int, val skin: Int, val skinEdge: Int,
+) {
+    OWL("owl", "Owl", 1.1f, 0.8f, 0f, 0f, 0f, false, 0x5CE1FF, 0x071826, 0x12203A, 0x0A1322),
+    HUMAN("human", "Human", 1.5f, 0.6f, 0.03f, 0.10f, 0.10f, false, 0x9B7446, 0xE6ECF2, 0x2D2420, 0x120E0C),
+    CAT("cat", "Cat", 1.3f, 0.88f, 0.2f, 0.04f, 0.02f, true, 0xB9E24A, 0x1A2208, 0x211C13, 0x0B0906),
+    LION("lion", "Lion", 1.3f, 0.72f, 0.1f, 0.12f, 0.06f, false, 0xE9A53A, 0x2A1C08, 0x3B2A15, 0x160F08),
+    WOLF("wolf", "Wolf", 1.42f, 0.66f, 0.2f, 0.08f, 0.04f, false, 0xE8D25E, 0x24210F, 0x2D3034, 0x0F1012),
+    LEOPARD("leopard", "Leopard", 1.32f, 0.8f, 0.15f, 0.06f, 0.03f, false, 0xC6D86A, 0x1F2410, 0x3C3118, 0x15110A);
+
+    companion object {
+        fun parse(id: String?): EyeStyle = entries.firstOrNull { it.id == id?.lowercase()?.trim() } ?: OWL
+        fun next(id: String?): EyeStyle = entries[(parse(id).ordinal + 1) % entries.size]
+    }
+}
+
+/**
  * Draws ZED's two eyes: robotic owl eyes with a heavy feathered brow, dark lids,
  * a reactor iris and a deep pupil. All sizes are in "eye radii" and turned into
  * pixels here, so the picture is the same on every screen.
@@ -112,6 +145,10 @@ class EyeArt {
     private var cosR = 1f
     private var sinR = 0f
 
+    /** Which eyes to draw. */
+    var style = EyeStyle.OWL
+    private var wide = WIDE
+
     private val top = FloatArray(LID_STEPS + 1)
     private val bottom = FloatArray(LID_STEPS + 1)
 
@@ -120,8 +157,9 @@ class EyeArt {
         f = frame
         frame.reset()
         // Landscape is limited by the height, portrait by the width.
-        val r = min(h * 0.27f, w * 0.142f)
-        val sep = r * 1.72f
+        wide = style.wide
+        val r = min(h * 0.27f, w / (4f * wide + 2.6f))
+        val sep = r * (wide + 0.62f)
         val mx = w / 2f
         val my = if (h > w) h * 0.44f else h * 0.55f
         val c = cos(roll); val sn = sin(roll)
@@ -148,12 +186,14 @@ class EyeArt {
     private fun line(color: Int, width: Float, closed: Boolean = false) = f.stroke(color, width * s, closed)
 
     /** Half-height of the socket at [x]: the lids are arcs that all meet at the two corners. */
-    private fun arc(x: Float): Float = sqrt(max(0f, 1f - (x / WIDE) * (x / WIDE)))
+    private fun arc(x: Float): Float = sqrt(max(0f, 1f - (x / wide) * (x / wide)))
 
-    private fun lidX(i: Int): Float = -WIDE + 2f * WIDE * i / LID_STEPS
+    private fun lidX(i: Int): Float = -wide + 2f * wide * i / LID_STEPS
 
     private fun eye(pose: EyePose, ecx: Float, ecy: Float, radius: Float, side: Float, roll: Float) {
-        cx = ecx; cy = ecy; s = radius; mirror = side; cosR = cos(roll); sinR = sin(roll)
+        // Cats, wolves and leopards carry the outer corner of the eye higher than the inner one.
+        val turn = roll + style.slant * side
+        cx = ecx; cy = ecy; s = radius; mirror = side; cosR = cos(turn); sinR = sin(turn)
         val tint = pose.tint
         val glow = pose.glow.coerceIn(0f, 1f)
         val energy = pose.energy.coerceIn(0f, 1f)
@@ -165,7 +205,7 @@ class EyeArt {
 
         // 2. A hint of the feathered face disc: short lines fanning out below and beside the eye.
         val puff = pose.puff.coerceIn(-0.5f, 1f)
-        for (i in 0 until DISC_LINES) {
+        if (style == EyeStyle.OWL) for (i in 0 until DISC_LINES) {
             val t = i / (DISC_LINES - 1f)
             val a = (-18f + 216f * t) * RAD
             val edge = min(t, 1f - t) * 5f
@@ -173,24 +213,24 @@ class EyeArt {
             if (alpha <= 0.012f) continue
             val r0 = 1.24f + 0.03f * sin(i * 1.7f)
             val len = (0.15f + 0.08f * sin(i * 3.1f + 1f)) * (1f + 0.6f * puff)
-            p(cos(a) * r0 * WIDE, sin(a) * r0); p(cos(a) * (r0 + len) * WIDE, sin(a) * (r0 + len))
+            p(cos(a) * r0 * wide, sin(a) * r0); p(cos(a) * (r0 + len) * wide, sin(a) * (r0 + len))
             line(EyeColor.argb(alpha, tint), 0.016f)
             if (i % 2 == 0) {
                 val r1 = 1.56f + 0.04f * sin(i * 0.9f)
-                p(cos(a) * r1 * WIDE, sin(a) * r1); p(cos(a) * (r1 + len * 0.7f) * WIDE, sin(a) * (r1 + len * 0.7f))
+                p(cos(a) * r1 * wide, sin(a) * r1); p(cos(a) * (r1 + len * 0.7f) * wide, sin(a) * (r1 + len * 0.7f))
                 line(EyeColor.argb(alpha * 0.5f, tint), 0.012f)
             }
         }
 
         // 3. The socket: dark lid plates that the opening is cut into.
-        circle(0f, 0f, 1.07f, WIDE)
-        radial(0f, -0.25f, 1.7f, intArrayOf(EyeColor.argb(1f, 0x12203A), EyeColor.argb(1f, 0x0A1322), EyeColor.argb(1f, 0x05090F)), floatArrayOf(0f, 0.6f, 1f))
-        circle(0f, 0f, 1.07f, WIDE)
+        circle(0f, 0f, 1.07f, wide)
+        radial(0f, -0.25f, 1.7f * wide, intArrayOf(EyeColor.argb(1f, style.skin), EyeColor.argb(1f, style.skinEdge), EyeColor.argb(1f, EyeColor.scale(style.skinEdge, 0.5f))), floatArrayOf(0f, 0.6f, 1f))
+        circle(0f, 0f, 1.07f, wide)
         line(EyeColor.argb(0.16f + 0.14f * glow, tint), 0.014f, closed = true)
 
         // The opening between the lids.
-        val kLower = 1f - 0.6f * pose.lower.coerceIn(0f, 1f)
-        val kUpper = -1f + pose.upper.coerceIn(0f, 1f) * (kLower + 1f)
+        val kLower = 1f - 0.6f * (pose.lower + style.lidLower * (1f - pose.lower)).coerceIn(0f, 1f)
+        val kUpper = -1f + (pose.upper + style.lidUpper * (1f - pose.upper)).coerceIn(0f, 1f) * (kLower + 1f)
         val tilt = pose.lidTilt
         for (i in 0..LID_STEPS) {
             val x = lidX(i); val a = arc(x)
@@ -205,8 +245,8 @@ class EyeArt {
             f.clip()
 
             // The eyeball.
-            circle(0f, 0f, 1.12f, WIDE)
-            radial(0f, 0f, 1.2f, intArrayOf(EyeColor.argb(1f, 0x071826), EyeColor.argb(1f, 0x030A12), EyeColor.argb(1f, 0x010306)), floatArrayOf(0f, 0.7f, 1f))
+            circle(0f, 0f, 1.12f, wide)
+            radial(0f, 0f, 1.2f * wide, intArrayOf(EyeColor.argb(1f, style.ball), EyeColor.argb(1f, EyeColor.scale(style.ball, 0.62f)), EyeColor.argb(1f, EyeColor.scale(style.ball, 0.22f))), floatArrayOf(0f, 0.7f, 1f))
 
             iris(pose, tint, light, energy)
 
@@ -215,10 +255,10 @@ class EyeArt {
 
             // The inner lid sweeping across from the middle of the face.
             val m = pose.membrane.coerceIn(0f, 1f)
-            if (m > 0.01f) {
-                val edge = WIDE + 0.2f - (2f * WIDE + 0.4f) * m
+            if (m > 0.01f && style != EyeStyle.HUMAN) {
+                val edge = wide + 0.2f - (2f * wide + 0.4f) * m
                 for (i in 0..12) { val y = -1.1f + 2.2f * i / 12f; p(edge - 0.16f * (1f - y * y), y) }
-                p(WIDE + 0.5f, 1.1f); p(WIDE + 0.5f, -1.1f)
+                p(wide + 0.5f, 1.1f); p(wide + 0.5f, -1.1f)
                 f.fill(EyeColor.argb(0.80f, 0x244E68))
                 for (i in 0..12) { val y = -1.1f + 2.2f * i / 12f; p(edge - 0.16f * (1f - y * y), y) }
                 line(EyeColor.argb(0.9f, light), 0.03f)
@@ -250,7 +290,50 @@ class EyeArt {
         for (i in 0..LID_STEPS) p(lidX(i), bottom[i])
         line(EyeColor.argb(0.22f + 0.2f * glow, tint), 0.014f)
 
-        brow(pose, tint, glow, puff)
+        if (style == EyeStyle.OWL) brow(pose, tint, glow, puff) else furBrow(pose, tint, glow)
+    }
+
+    /** The brow of a person or an animal: one smooth ridge with short hairs, and the leopard's spots above it. */
+    private fun furBrow(pose: EyePose, tint: Int, glow: Float) {
+        val raise = pose.browRaise.coerceIn(-1f, 1f) * 0.22f
+        val bt = pose.browTilt.coerceIn(-1f, 1f)
+        val human = style == EyeStyle.HUMAN
+        val lift = if (human) 0.16f else 0f
+        val x0 = wide * 0.92f; val y0 = -0.62f + 0.28f * bt - raise - lift       // inner end
+        val x1 = -0.1f; val y1 = -1.06f - raise - 0.04f * bt - lift             // bend
+        val x2 = -(wide + 0.22f); val y2 = -0.74f - 0.16f * bt - raise - lift    // outer end
+        val thick = if (human) 0.11f else 0.17f
+        val fill = EyeColor.mix(style.skin, 0xFFFFFF, if (human) 0.10f else 0.16f)
+        fun bx(t: Float) = (1 - t) * (1 - t) * x0 + 2 * (1 - t) * t * x1 + t * t * x2
+        fun by(t: Float) = (1 - t) * (1 - t) * y0 + 2 * (1 - t) * t * y1 + t * t * y2
+        // Thickest a third of the way out, thin at both ends.
+        fun half(t: Float) = thick * (0.25f + 0.75f * sin((PI * (0.12 + 0.88 * t)).toFloat()).coerceAtLeast(0f)) * (if (t < 0.3f) 0.75f + 0.8f * t else 1f)
+        val steps = 20
+        for (i in 0..steps) { val t = i / steps.toFloat(); p(bx(t), by(t) - half(t)) }
+        for (i in steps downTo 0) { val t = i / steps.toFloat(); p(bx(t), by(t) + half(t)) }
+        f.fill(EyeColor.argb(1f, fill))
+        // Short hairs lying outward along it.
+        for (i in 1 until 16) {
+            val t = i / 16f
+            val h = half(t)
+            p(bx(t) + 0.03f, by(t) + h * 0.7f); p(bx(t) - 0.07f, by(t) - h * 0.8f)
+            line(EyeColor.argb(0.55f, EyeColor.mix(fill, 0xFFFFFF, 0.22f)), 0.011f)
+        }
+        // Its lower edge catches the eye's light.
+        for (i in 0..steps) { val t = i / steps.toFloat(); p(bx(t), by(t) + half(t)) }
+        line(EyeColor.argb(0.16f + 0.26f * glow, tint), 0.014f)
+        if (style == EyeStyle.LEOPARD) {
+            // Rosettes: dark spots ringed in tawny fur.
+            for (k in 0 until 6) {
+                val t = 0.12f + 0.15f * k
+                val sx = bx(t) + 0.05f * sin(k * 2.3f); val sy = by(t) - 0.26f - 0.06f * cos(k * 1.7f)
+                val r = 0.075f + 0.02f * sin(k * 3.1f)
+                circle(sx, sy, r, rx = 1.25f, n = 14)
+                f.fill(EyeColor.argb(1f, EyeColor.mix(style.skin, 0xD8A35A, 0.45f)))
+                circle(sx + 0.01f, sy, r * 0.55f, rx = 1.2f, n = 12)
+                f.fill(EyeColor.argb(1f, 0x120D07))
+            }
+        }
     }
 
     private fun shadowBand(depth: Float, alpha: Float) {
@@ -260,7 +343,8 @@ class EyeArt {
     }
 
     private fun iris(pose: EyePose, tint: Int, light: Int, energy: Float) {
-        val ri = IRIS
+        val ri = style.iris
+        val natural = style != EyeStyle.OWL
         val ix = pose.gazeX.coerceIn(-1f, 1f) * mirror * 0.25f
         val iy = pose.gazeY.coerceIn(-1f, 1f) * 0.2f
         val rp = ri * (0.26f + 0.32f * pose.pupil.coerceIn(0f, 1f))
@@ -271,10 +355,12 @@ class EyeArt {
         radial(ix, iy, ri, intArrayOf(
             EyeColor.argb(1f, EyeColor.scale(EyeColor.mix(tint, 0xFFFFFF, 0.3f), bright)),
             EyeColor.argb(1f, EyeColor.scale(tint, 0.62f * bright)),
-            EyeColor.argb(1f, EyeColor.mix(EyeColor.scale(tint, 0.26f), 0x06243C, 0.5f)),
+            EyeColor.argb(1f, if (natural) EyeColor.scale(tint, 0.36f) else EyeColor.mix(EyeColor.scale(tint, 0.26f), 0x06243C, 0.5f)),
             EyeColor.argb(1f, 0x020A12),
         ), floatArrayOf(0.28f, 0.58f, 0.88f, 1f))
 
+        if (natural) naturalIris(ix, iy, ri, rp, tint, light, bright, pose.spin)
+        else {
         // Fine fibres running outward.
         val drift = pose.spin * 0.15f
         for (i in 0 until FIBRES) {
@@ -313,17 +399,36 @@ class EyeArt {
             line(EyeColor.argb(if (i % 4 == 0) 0.7f else 0.35f, light), 0.012f)
         }
 
+        }
+
         // The dark rim of the iris.
         circle(ix, iy, ri, n = 56)
         line(EyeColor.argb(0.9f, 0x01050A), 0.05f, closed = true)
 
         // Pupil with its bright core ring.
-        circle(ix, iy, rp, n = 48)
-        f.fill(EyeColor.argb(1f, 0x000204))
-        circle(ix, iy, rp * 1.07f, n = 48)
-        line(EyeColor.argb(0.95f, EyeColor.mix(tint, 0xFFFFFF, 0.65f)), 0.024f, closed = true)
-        circle(ix, iy, rp * 0.72f, n = 36)
-        line(EyeColor.argb(0.16f + 0.14f * energy, tint), 0.008f, closed = true)
+        if (style.slit) {
+            // A cat's pupil: a tall slit in the light that rounds out as it widens.
+            val open = pose.pupil.coerceIn(0f, 1f)
+            // Upright on the face, whatever the slant of the eye around it.
+            val back = -style.slant * mirror
+            val cb = cos(back); val sb = sin(back)
+            val ry = ri * 0.8f; val rx = ry * (0.09f + 0.8f * open * open)
+            for (k in 0 until 48) {
+                val a = (2.0 * PI * k / 48).toFloat()
+                val dx = cos(a) * rx * mirror; val dy = sin(a) * ry
+                p(ix + (dx * cb - dy * sb) * mirror, iy + dx * sb + dy * cb)
+            }
+            f.fill(EyeColor.argb(1f, 0x000204))
+        } else {
+            circle(ix, iy, rp, n = 48)
+            f.fill(EyeColor.argb(1f, 0x000204))
+        }
+        if (!natural) {
+            circle(ix, iy, rp * 1.07f, n = 48)
+            line(EyeColor.argb(0.95f, EyeColor.mix(tint, 0xFFFFFF, 0.65f)), 0.024f, closed = true)
+            circle(ix, iy, rp * 0.72f, n = 36)
+            line(EyeColor.argb(0.16f + 0.14f * energy, tint), 0.008f, closed = true)
+        }
 
         // Light reflected in the eye: it stays toward the same side of the screen and lags the gaze a little.
         val hx = ix - 0.25f * mirror - pose.gazeX * mirror * 0.05f
@@ -334,6 +439,25 @@ class EyeArt {
         f.fill(EyeColor.argb(0.86f, 0xF4FCFF))
         circle(ix + 0.21f * mirror, iy + 0.29f, 0.045f, n = 16)
         f.fill(EyeColor.argb(0.32f, 0xF4FCFF))
+    }
+
+    /** A living iris: lighter around the pupil, darker toward the rim, threaded with fine fibres. */
+    private fun naturalIris(ix: Float, iy: Float, ri: Float, rp: Float, tint: Int, light: Int, bright: Float, spin: Float) {
+        // Fibres of two kinds: pale ones and dark furrows between them. They barely drift, so the eye feels alive.
+        val drift = spin * 0.03f
+        for (i in 0 until 72) {
+            val a = (2.0 * PI * i / 72).toFloat() + drift + 0.03f * sin(i * 7.1f)
+            val r0 = rp * (1.05f + 0.1f * sin(i * 1.3f))
+            val r1 = ri * (0.86f + 0.11f * sin(i * 2.9f))
+            p(ix + cos(a) * r0, iy + sin(a) * r0); p(ix + cos(a) * r1, iy + sin(a) * r1)
+            if (i % 3 == 0) line(EyeColor.argb(0.30f, 0x000000), 0.014f) else line(EyeColor.argb(0.12f + 0.14f * (0.5f + 0.5f * sin(i * 1.9f)), light), 0.011f)
+        }
+        // The paler ring around the pupil.
+        circle(ix, iy, min(ri * 0.92f, rp * 1.9f))
+        radial(ix, iy, min(ri * 0.92f, rp * 1.9f), intArrayOf(EyeColor.argb(0.5f * bright, EyeColor.mix(tint, 0xFFF2C0, 0.55f)), EyeColor.argb(0.32f * bright, EyeColor.mix(tint, 0xFFF2C0, 0.4f)), EyeColor.argb(0f, tint)), floatArrayOf(0f, 0.55f, 1f))
+        // Shade toward the rim.
+        circle(ix, iy, ri, n = 56)
+        radial(ix, iy, ri, intArrayOf(EyeColor.argb(0f, 0x000000), EyeColor.argb(0f, 0x000000), EyeColor.argb(0.55f, 0x000000)), floatArrayOf(0f, 0.72f, 1f))
     }
 
     /** The brow ridge: overlapping feather-shaped plates, lower toward the middle of the face. */
