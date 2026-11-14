@@ -31,6 +31,14 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.44", "2026-11-14", "Everything in its place", listOf(
+            "Settings is one page of sections with a search box: You and ZED, Voice and sounds, Eye mode, Who ZED knows, Privacy and lock screen, AI model, Appearance, Backup, Help and reports. Every switch now sits under the section it belongs to; nothing was removed.",
+            "More is short: Your things (Memory, Live Brain, Files, Routines, Schedule, Background tasks), ZED (Settings, Models, Skills) and Help.",
+            "Home is calmer: the battery, memory, network and Gemma readings are one line under the greeting, there is one row of four buttons (Live, Eyes, Chat, Memory), and Today sits right below them.",
+            "The bottom bar is Home, Chat, Live, Brain, More. Background tasks are under More and behind the tasks indicator.",
+            "Eye mode's controls are a labelled panel — Look, Camera, Screen, Conversation — where each control shows what it is set to.",
+            "LIVE: the Orb · Eyes · Chat switch sits beside the title, one status row shows tasks, the microphone and guest access, and the bottom buttons have names.",
+        )),
         Release("0.1.43", "2026-11-14", "Steadier, friendlier sounds, new eyes, only my voice", listOf(
             "Stability: leaving LIVE or Eye mode in the middle of an answer now cancels that answer, a new voice session always starts clean, and flicking quickly between the orb, the eyes and Home no longer starts sessions on top of each other. Crash reports now also show how each part of ZED last stopped.",
             "Ten new LIVE sounds — Duo, Glass, Pop, Bloom, Spark, Tap, Lift, Halo, Nova and Echo: short, bright and clean, with nothing low, sliding or echoing. Tap each in More → Voice to hear it. The earlier three are gone.",

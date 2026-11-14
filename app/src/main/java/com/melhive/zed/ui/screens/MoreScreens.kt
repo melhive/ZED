@@ -23,6 +23,9 @@ import androidx.compose.material.icons.outlined.NewReleases
 import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Group
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -64,26 +67,22 @@ import kotlinx.coroutines.launch
 fun MoreScreen(onNavigate: (String) -> Unit) {
     data class Entry(val route: String, val icon: ImageVector, val title: String, val subtitle: String)
     val groups = listOf(
-        "Assistant" to listOf(
-            Entry(Routes.VOICE, Icons.Outlined.RecordVoiceOver, "Voice", "Voices, Hey Zed, real-time voice, speed and sounds"),
-            Entry(Routes.ROUTINES, Icons.Outlined.AutoAwesome, "Routines & briefing", "Good morning, Good night, Focus, Driving"),
-            Entry(Routes.SKILLS, Icons.Outlined.AutoAwesome, "Skills", "What ZED is allowed to do"),
-        ),
-        "Your data" to listOf(
-            Entry(Routes.SCHEDULE, Icons.Outlined.Memory, "Schedule", "Calendar events and reminders"),
+        "Your things" to listOf(
             Entry(Routes.MEMORY, Icons.Outlined.Memory, "Memory", "Facts, task list, reminders and documents"),
-            Entry(Routes.PEOPLE, Icons.Outlined.RecordVoiceOver, "Who ZED knows", "Your face and voice, “only my voice”, and people ZED has met"),
             Entry(Routes.BRAIN, Icons.Outlined.Hub, "Live Brain", "Everything ZED knows as a living, connected network"),
             Entry(Routes.FILES, Icons.Outlined.Folder, "Files", "Granted folders, browse and organize"),
-            Entry(Routes.BACKUP, Icons.Outlined.SettingsBackupRestore, "Backup & restore", "Save everything to a file, or move ZED to another phone"),
+            Entry(Routes.ROUTINES, Icons.Outlined.AutoAwesome, "Routines & briefing", "Good morning, Good night, Focus, Driving"),
+            Entry(Routes.SCHEDULE, Icons.Outlined.Memory, "Schedule", "Calendar events and reminders"),
+            Entry(Routes.TASKS, Icons.Outlined.AutoAwesome, "Background tasks", "Downloads and longer jobs ZED is working on"),
         ),
-        "Intelligence" to listOf(
+        "ZED" to listOf(
+            Entry(Routes.SETTINGS, Icons.Outlined.Settings, "Settings", "Voice, Eye mode, who ZED knows, privacy, AI, backup"),
             Entry(Routes.MODELS, Icons.Outlined.Psychology, "Models & AI", "Gemma and other on-device models matched to your phone"),
+            Entry(Routes.SKILLS, Icons.Outlined.AutoAwesome, "Skills", "What ZED is allowed to do"),
         ),
-        "System" to listOf(
-            Entry(Routes.SETTINGS, Icons.Outlined.Settings, "Settings", "Personality, actions, smart home, updates"),
-            Entry(Routes.DIAGNOSTICS, Icons.Outlined.Security, "Permissions & Diagnostics", "Permissions, engines, problem reports"),
+        "Help" to listOf(
             Entry(Routes.WHATS_NEW, Icons.Outlined.NewReleases, "What's new", "Every version's changes"),
+            Entry(Routes.DIAGNOSTICS, Icons.Outlined.Security, "Report a problem", "Problem reports, permissions and diagnostics"),
         ),
     )
     ListScreen("More", onBack = null) {
@@ -150,15 +149,104 @@ private fun SwitchRow(title: String, subtitle: String, checked: Boolean, onChang
     }
 }
 
+/** One section of Settings: where it leads and what it holds. */
+private class SettingsSection(val id: String, val title: String, val subtitle: String, val icon: ImageVector, val route: String)
+
+private val SETTINGS_SECTIONS = listOf(
+    SettingsSection("you", "You and ZED", "Your name, ZED's personality, shortcuts, smart home", Icons.Outlined.AutoAwesome, Routes.settings("you")),
+    SettingsSection("voice", "Voice and sounds", "Voices, Hey Zed, LIVE sounds, captions, listening", Icons.Outlined.RecordVoiceOver, Routes.settings("voice")),
+    SettingsSection("eye", "Eye mode", "Whose eyes, their colour, captions, the camera", Icons.Outlined.Visibility, Routes.settings("eye")),
+    SettingsSection("people", "Who ZED knows", "Your face and voice, only my voice, known people", Icons.Outlined.Group, Routes.PEOPLE),
+    SettingsSection("privacy", "Privacy and lock screen", "Guest mode while locked, asking before actions, permissions", Icons.Outlined.Security, Routes.settings("privacy")),
+    SettingsSection("ai", "AI model", "The model, web search, learning, documents", Icons.Outlined.Psychology, Routes.settings("ai")),
+    SettingsSection("appearance", "Appearance", "Glow, animation, Live Brain", Icons.Outlined.Palette, Routes.settings("appearance")),
+    SettingsSection("backup", "Backup", "Save everything to a file, or move ZED to another phone", Icons.Outlined.SettingsBackupRestore, Routes.BACKUP),
+    SettingsSection("help", "Help and reports", "Updates, what's new, report a problem", Icons.Outlined.NewReleases, Routes.settings("help")),
+)
+
+/** Every setting by name, for the search box: what it is called and which section holds it. */
+private val SETTINGS_INDEX = listOf(
+    "Your name" to "you", "Personality" to "you", "How ZED addresses you" to "you", "Compliments" to "you", "Open ZED from anywhere (shortcut, tile, widget)" to "you", "Smart home (Home Assistant)" to "you",
+    "Voice responses" to "voice", "Voices, speed and pitch" to "voice", "Hey Zed wake word" to "voice", "LIVE sounds" to "voice", "Vibrate with LIVE sounds" to "voice",
+    "Speech recognition" to "voice", "Interrupt by talking" to "voice", "Say “stop” to interrupt" to "voice", "Keep listening" to "voice", "Large captions" to "voice",
+    "Eye style (owl, human, cat, lion, wolf, leopard)" to "eye", "Eye colour" to "eye", "Captions in Eye mode" to "eye", "Camera for “what is this?”" to "eye",
+    "Your face" to "people", "Your voice" to "people", "Only my voice" to "people", "Recognise people" to "people", "People ZED knows" to "people",
+    "Guest mode while locked" to "privacy", "Ask before actions" to "privacy", "Permissions" to "privacy", "Allow everything" to "privacy",
+    "Models" to "ai", "Learn from conversations" to "ai", "Search the web" to "ai", "Proactive hints" to "ai", "Think twice on hard questions" to "ai", "Use local documents as context" to "ai",
+    "Glow effects" to "appearance", "Animation" to "appearance", "Live Brain sounds" to "appearance", "Live Brain display" to "appearance",
+    "Backup and restore" to "backup", "Automatic backup" to "backup",
+    "Check for updates" to "help", "What's new" to "help", "Report a problem" to "help", "Diagnostics" to "help", "Terms and privacy" to "help",
+)
+
+/**
+ * Settings. With no [section] it is the list of sections with a search box; with one, it shows that section's settings.
+ */
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
+fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit, section: String? = null) {
     val c = rememberContainer()
     val scope = rememberCoroutineScope()
     val s by c.settings.settings.collectAsStateWithLifecycle(initialValue = null)
     var editName by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
     val settings = s ?: return
-    ListScreen("Settings", onBack = onBack) {
-        item {
+    val hub = section == null
+    fun on(id: String) = section == id
+    ListScreen(SETTINGS_SECTIONS.firstOrNull { it.id == section }?.title ?: "Settings", onBack = onBack) {
+        if (hub) {
+            item {
+                androidx.compose.material3.OutlinedTextField(
+                    value = query, onValueChange = { query = it }, singleLine = true, placeholder = { Text("Search settings") },
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (query.isBlank()) items(SETTINGS_SECTIONS, key = { it.id }) { sec -> ZedCard(onClick = { onNavigate(sec.route) }) { IconLabel(sec.icon, sec.title, sec.subtitle) } }
+            else {
+                val hits = SETTINGS_INDEX.filter { it.first.contains(query.trim(), ignoreCase = true) }
+                items(hits, key = { it.first }) { (label, id) ->
+                    val sec = SETTINGS_SECTIONS.first { it.id == id }
+                    ZedCard(onClick = { onNavigate(sec.route) }) { IconLabel(sec.icon, label, "In ${sec.title}") }
+                }
+                if (hits.isEmpty()) item { Text("No setting matches “${query.trim()}”.", color = ZedColors.Muted, style = MaterialTheme.typography.bodyMedium) }
+            }
+        }
+        if (on("voice")) item {
+            ZedCard(onClick = { onNavigate(Routes.VOICE) }, accent = ZedColors.Violet) { IconLabel(Icons.Outlined.RecordVoiceOver, "Voices, Hey Zed and sounds", "Choose the voice, the wake word, LIVE sounds and speech recognition") }
+        }
+        if (on("eye")) item {
+            ZedCard {
+                SectionTitle("Whose eyes")
+                WrapRow {
+                    com.melhive.zed.core.eyes.EyeStyle.entries.forEach { st ->
+                        androidx.compose.material3.FilterChip(selected = settings.eyeStyle == st.id, onClick = { scope.launch { c.settings.setEyeStyle(st.id) } }, label = { Text(st.label) })
+                    }
+                }
+                SectionTitle("Colour")
+                WrapRow {
+                    com.melhive.zed.core.eyes.EyeColors.all.forEach { (name, _) ->
+                        androidx.compose.material3.FilterChip(selected = settings.eyeColor == name, onClick = { scope.launch { c.settings.setEyeColor(name) } }, label = { Text(name.replaceFirstChar { it.uppercase() }) })
+                    }
+                }
+                Text("Natural is each eye's own colour: a cat's green, a lion's amber.", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
+            }
+        }
+        if (on("eye")) item {
+            ZedCard {
+                SwitchRow("Captions in Eye mode", "A line under the eyes with what is heard and said", settings.eyeCaptions) { scope.launch { c.settings.setEyeCaptions(it) } }
+                SwitchRow("Back camera for “what is this?” in Eye mode", "Off: ZED looks through the front camera, the one that follows you", settings.eyeLookBack) { scope.launch { c.settings.setEyeLookBack(it) } }
+                SwitchRow("Back camera for “what is this?” in LIVE", "Off: ZED looks through the front camera", settings.liveLookBack) { scope.launch { c.settings.setLiveLookBack(it) } }
+            }
+        }
+        if (on("eye")) item { ZedCard(onClick = { onNavigate(Routes.PEOPLE) }) { IconLabel(Icons.Outlined.Group, "Who ZED knows", "Your face and voice, and recognising people") } }
+        if (on("you")) item {
+            ZedCard {
+                SwitchRow("Compliments", "A word of praise when you tick off a to-do", settings.compliments) { scope.launch { c.settings.setCompliments(it) } }
+            }
+        }
+        if (on("privacy")) item { ZedCard(onClick = { onNavigate(Routes.DIAGNOSTICS) }) { IconLabel(Icons.Outlined.Security, "Permissions", "What ZED is allowed to use on this phone") } }
+        if (on("appearance")) item { ZedCard(onClick = { onNavigate(Routes.BRAIN) }) { IconLabel(Icons.Outlined.Hub, "Live Brain display", "Text fade, node size and link thickness: the sliders button inside the Live Brain") } }
+        if (on("help")) item { ZedCard(onClick = { onNavigate(Routes.WHATS_NEW) }) { IconLabel(Icons.Outlined.NewReleases, "What's new", "Every version's changes") } }
+        if (on("help")) item { ZedCard(onClick = { onNavigate(Routes.DIAGNOSTICS) }) { IconLabel(Icons.Outlined.Security, "Report a problem", "Problem reports and diagnostics") } }
+        if (on("you")) item {
             val facts by c.memory.facts.collectAsStateWithLifecycle(initialValue = emptyList())
             val name = facts.firstNotNullOfOrNull { Regex("^my name is (.+)$", RegexOption.IGNORE_CASE).find(it.text.trim())?.groupValues?.get(1) }
             ZedCard {
@@ -170,21 +258,20 @@ fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
             }
             if (editName) NameDialog(initial = name ?: "", onDismiss = { editName = false }) { n -> scope.launch { c.memory.setUserName(n); editName = false } }
         }
-        item {
+        if (on("you")) item {
             val facts by c.memory.facts.collectAsStateWithLifecycle(initialValue = emptyList())
             val userName = facts.firstNotNullOfOrNull { Regex("^my name is (.+)$", RegexOption.IGNORE_CASE).find(it.text.trim())?.groupValues?.get(1) }
             PersonalityCard(settings.persona, settings.userTitle, userName) { persona, title -> scope.launch { c.settings.setPersona(persona); c.settings.setUserTitle(title) } }
         }
-        if (!settings.permissionsCardHidden) item { AllowEverythingCard(onHide = { scope.launch { c.settings.setPermissionsCardHidden(true) } }) }
-        item { AssistantShortcutsCard() }
-        item { SmartHomeCard(settings.homeAssistantUrl) }
-        item {
+        if (on("privacy") && !settings.permissionsCardHidden) item { AllowEverythingCard(onHide = { scope.launch { c.settings.setPermissionsCardHidden(true) } }) }
+        if (on("you")) item { AssistantShortcutsCard() }
+        if (on("you")) item { SmartHomeCard(settings.homeAssistantUrl) }
+        if (on("voice")) item {
             ZedCard {
-                SectionTitle("Voice")
+                SectionTitle("Speaking and listening")
                 SwitchRow("Voice responses", "Speak replies in ZED LIVE and after voice input", settings.voiceResponses) { scope.launch { c.settings.setVoiceResponses(it) } }
                 SwitchRow("Interrupt by talking", "With headphones or earbuds, start talking to cut ZED off. On the loudspeaker, tap the orb instead.", settings.bargeIn) { scope.launch { c.settings.setBargeIn(it) } }
                 SwitchRow("Say “stop” to interrupt", "On the loudspeaker, say “stop”, “wait” or “enough” to cut ZED off. Needs on-device speech recognition (More → Voice). Turn it off if answers feel slower.", settings.voiceStop) { scope.launch { c.settings.setVoiceStop(it) } }
-                SwitchRow("Guest mode while locked", "On a locked phone ZED still answers general questions, the time, the weather and web searches, and sets timers, alarms, the flashlight and volume. Anything personal waits until you unlock.", settings.lockGuard) { scope.launch { c.settings.setLockGuard(it) } }
                 SwitchRow("Vibrate with LIVE sounds", "A short pulse when ZED wakes, hears you and ends a call", settings.liveHaptics) { scope.launch { c.settings.setLiveHaptics(it) } }
                 SwitchRow("Large captions", "Bigger caption text in LIVE and Eye mode", settings.captionSize == "large") { scope.launch { c.settings.setCaptionSize(if (it) "large" else "normal") } }
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
@@ -196,17 +283,15 @@ fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
                         androidx.compose.material3.FilterChip(selected = settings.listenPatience == id, onClick = { scope.launch { c.settings.setListenPatience(id) } }, label = { Text(label) }, modifier = Modifier.padding(start = 4.dp))
                     }
                 }
-                val voiceLabel = when (val sel = com.melhive.zed.core.voice.VoiceSelection.parse(settings.voiceId)) {
-                    com.melhive.zed.core.voice.VoiceSelection.SystemDefault -> "Phone default voice"
-                    is com.melhive.zed.core.voice.VoiceSelection.System -> "Phone voice"
-                    is com.melhive.zed.core.voice.VoiceSelection.Neural -> "${sel.voice.name} (${sel.pack.name})"
-                }
-                ZedCard(onClick = { onNavigate(Routes.VOICE) }, accent = ZedColors.Violet, modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
-                    IconLabel(Icons.Outlined.RecordVoiceOver, "Voice: $voiceLabel", "Speed ${"%.2f".format(settings.speechRate)}× · pitch ${"%.2f".format(settings.speechPitch)}× · tap to choose natural offline voices")
-                }
             }
         }
-        item {
+        if (on("privacy")) item {
+            ZedCard {
+                SectionTitle("Lock screen")
+                SwitchRow("Guest mode while locked", "On a locked phone ZED still answers general questions, the time, the weather and web searches, and sets timers, alarms, the flashlight and volume. Anything personal waits until you unlock.", settings.lockGuard) { scope.launch { c.settings.setLockGuard(it) } }
+            }
+        }
+        if (on("privacy")) item {
             ZedCard {
                 SectionTitle("Safety")
                 Text("Ask before actions", style = MaterialTheme.typography.titleSmall)
@@ -219,7 +304,8 @@ fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
                 Text(mode.description, style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
             }
         }
-        item {
+        if (on("ai")) item { ZedCard(onClick = { onNavigate(Routes.MODELS) }) { IconLabel(Icons.Outlined.Psychology, "Models", "Download and choose the on-device model") } }
+        if (on("ai")) item {
             val ctx = LocalContext.current
             ZedCard(accent = ZedColors.Teal) {
                 SectionTitle("Intelligence")
@@ -231,6 +317,19 @@ fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
                     scope.launch { c.settings.setProactiveHints(it); com.melhive.zed.learning.Dreamer.scheduleHints(ctx.applicationContext, it) }
                 }
                 SwitchRow("Think twice on hard questions", "Plans, answers, then checks itself on planning, comparing and multi-step questions. Slower, more careful. Everyday questions are never slowed down.", settings.thinkTwice) { scope.launch { c.settings.setThinkTwice(it) } }
+            }
+        }
+        if (on("ai")) item {
+            ZedCard {
+                SectionTitle("Knowledge")
+                SwitchRow("Use local documents as context", "Include matching excerpts from indexed documents in AI prompts", settings.useKnowledge) { scope.launch { c.settings.setUseKnowledge(it) } }
+            }
+        }
+        if (on("appearance")) item {
+            ZedCard {
+                SectionTitle("Appearance")
+                SwitchRow("Glow effects", "Orb and card glow (turn off to save battery)", settings.glow) { scope.launch { c.settings.setGlow(it) } }
+                SwitchRow("Live Brain sounds", "Soft synapse ticks and a light vibration when you touch the brain", settings.brainSounds) { scope.launch { c.settings.setBrainSounds(it) } }
                 Text("Animation", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 6.dp))
                 WrapRow {
                     listOf("full" to "Full", "balanced" to "Balanced", "light" to "Light").forEach { (id, label) ->
@@ -244,20 +343,7 @@ fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
                 }, style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
             }
         }
-        item {
-            ZedCard {
-                SectionTitle("Knowledge")
-                SwitchRow("Use local documents as context", "Include matching excerpts from indexed documents in AI prompts", settings.useKnowledge) { scope.launch { c.settings.setUseKnowledge(it) } }
-            }
-        }
-        item {
-            ZedCard {
-                SectionTitle("Appearance")
-                SwitchRow("Glow effects", "Orb and card glow (turn off to save battery)", settings.glow) { scope.launch { c.settings.setGlow(it) } }
-                SwitchRow("Live Brain sounds", "Soft synapse ticks and a light vibration when you touch the brain", settings.brainSounds) { scope.launch { c.settings.setBrainSounds(it) } }
-            }
-        }
-        item {
+        if (on("help")) item {
             val update by c.updates.state.collectAsStateWithLifecycle()
             val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
             ZedCard {
@@ -288,13 +374,7 @@ fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
                 }
             }
         }
-        item {
-            ZedCard(onClick = { onNavigate(Routes.MODELS) }) { IconLabel(Icons.Outlined.Psychology, "Models & providers", "Configure intelligence layers in Model Manager") }
-        }
-        item {
-            ZedCard(onClick = { onNavigate(Routes.BACKUP) }) { IconLabel(Icons.Outlined.SettingsBackupRestore, "Backup & restore", "Save your data, models, voices and settings to one file") }
-        }
-        item { ZedFooter(onNavigate) }
+        if (hub || on("help")) item { ZedFooter(onNavigate) }
     }
 }
 

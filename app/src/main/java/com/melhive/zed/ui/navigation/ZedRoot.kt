@@ -14,7 +14,7 @@ import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.Chat
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.TaskAlt
+import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -87,6 +87,8 @@ object Routes {
     const val BACKUP = "backup"
     const val MEMORY_TAB = "memory/{tab}"
     fun memoryTab(tab: Int) = "memory/$tab"
+    const val SETTINGS_SECTION = "settings/{section}"
+    fun settings(section: String) = "settings/$section"
     fun task(id: Long) = "task/$id"
     fun chat(conversationId: Long?) = if (conversationId == null) CHAT else "$CHAT?id=$conversationId"
 }
@@ -100,7 +102,7 @@ private val tabs = listOf(
     Tab(Routes.HOME, "Home", Icons.Outlined.Home),
     Tab(Routes.CHAT, "Chat", Icons.Outlined.Chat),
     Tab(Routes.LIVE, "Live", Icons.Outlined.GraphicEq),
-    Tab(Routes.TASKS, "Tasks", Icons.Outlined.TaskAlt),
+    Tab(Routes.BRAIN, "Brain", Icons.Outlined.Hub),
     Tab(Routes.MORE, "More", Icons.Outlined.Apps),
 )
 
@@ -223,6 +225,9 @@ fun ZedRoot(requestedRoute: String?, onRouteConsumed: () -> Unit) {
                 screen(Routes.FILES) { FilesScreen(onBack = { nav.popBackStack() }) }
                 screen(Routes.SKILLS) { SkillsScreen(onBack = { nav.popBackStack() }) }
                 screen(Routes.SETTINGS) { SettingsScreen(onBack = { nav.popBackStack() }, onNavigate = { nav.navigate(it) }) }
+                screen(Routes.SETTINGS_SECTION, arguments = listOf(navArgument("section") { type = NavType.StringType })) { entry ->
+                    SettingsScreen(onBack = { nav.popBackStack() }, onNavigate = { nav.navigate(it) }, section = entry.arguments?.getString("section"))
+                }
                 screen(Routes.DIAGNOSTICS) { DiagnosticsScreen(onBack = { nav.popBackStack() }) }
                 screen(Routes.TERMS) { com.melhive.zed.ui.screens.TermsScreen(onBack = { nav.popBackStack() }) }
                 screen(Routes.PRIVACY) { com.melhive.zed.ui.screens.PrivacyScreen(onBack = { nav.popBackStack() }) }
@@ -285,7 +290,7 @@ private object NavMotion {
     private val emphasized = androidx.compose.animation.core.CubicBezierEasing(0.2f, 0f, 0f, 1f)
     private fun <T> spec() = androidx.compose.animation.core.tween<T>(durationMillis = 420, easing = emphasized)
     private fun specOffset() = androidx.compose.animation.core.tween<androidx.compose.ui.unit.IntOffset>(durationMillis = 420, easing = emphasized)
-    private val tabOrder = listOf(Routes.HOME, Routes.CHAT, Routes.LIVE, Routes.TASKS, Routes.MORE)
+    private val tabOrder = listOf(Routes.HOME, Routes.CHAT, Routes.LIVE, Routes.BRAIN, Routes.MORE)
     private fun tab(route: String?) = tabOrder.indexOf(route?.substringBefore('?'))
     private fun isLive(route: String?) = route == Routes.LIVE || route == Routes.EYE
 

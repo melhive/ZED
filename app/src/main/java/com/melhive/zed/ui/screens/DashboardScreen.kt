@@ -179,6 +179,8 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
             }
             TaskIndicator(active.size) { onTab(Routes.TASKS) }
         }
+        // Battery, memory, network and Gemma as one quiet line, and a countdown to what's next.
+        com.melhive.zed.ui.components.HomeConsole(c, upcoming.firstOrNull()?.let { it.text to it.triggerAt }, slim = true)
 
         // Orb: tap to talk.
         val interaction = remember { MutableInteractionSource() }
@@ -191,8 +193,6 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
         Text(nextLine, Modifier.fillMaxWidth(), textAlign = TextAlign.Center, color = if (activity.busy) ZedColors.Cyan else ZedColors.Muted,
             style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
 
-        // The console: battery, memory, network and Gemma at a glance, and a live countdown to what's next.
-        com.melhive.zed.ui.components.HomeConsole(c, upcoming.firstOrNull()?.let { it.text to it.triggerAt })
 
         // Ask box
         OutlinedTextField(
@@ -209,6 +209,23 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
             },
             colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ZedColors.Cyan, unfocusedBorderColor = ZedColors.Outline),
         )
+
+        // The four you use most; everything else is under More.
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            QuickAction(Icons.Outlined.GraphicEq, "Live", ZedColors.Cyan, Modifier.weight(1f)) { onTab(Routes.LIVE) }
+            QuickAction(Icons.Outlined.Visibility, "Eyes", ZedColors.Cyan, Modifier.weight(1f)) { onNavigate(Routes.EYE) }
+            QuickAction(Icons.Outlined.Chat, "Chat", ZedColors.Violet, Modifier.weight(1f)) { onTab(Routes.CHAT) }
+            QuickAction(Icons.Outlined.Memory, "Memory", ZedColors.Amber, Modifier.weight(1f)) { onNavigate(Routes.MEMORY) }
+        }
+
+        // Today
+        ZedCard(onClick = { onNavigate(Routes.MEMORY) }, accent = ZedColors.Teal) {
+            SectionTitle("Today")
+            if (upcoming.isEmpty() && openTodos.isEmpty()) Text("Nothing scheduled. Try “remind me to stretch in 30 minutes”.", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
+            upcoming.take(3).forEach { r -> Text("⏰ ${formatTime(r.triggerAt)} — ${r.text}", style = MaterialTheme.typography.bodyMedium) }
+            openTodos.take(3).forEach { t -> Text("○ ${t.title}", style = MaterialTheme.typography.bodyMedium) }
+            if (openTodos.size > 3) Text("+${openTodos.size - 3} more tasks", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
+        }
 
         (update as? UpdateState.Available)?.let { u ->
             ZedCard(accent = ZedColors.Green, onClick = { uriHandler.openUri(u.info.apkUrl) }) {
@@ -256,9 +273,9 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
         // The Live Brain in miniature: it flashes when ZED uses a memory.
         val brain by c.brain.snapshot.collectAsStateWithLifecycle()
         val recalls by c.brain.recalls.collectAsStateWithLifecycle()
-        ZedCard(onClick = { onNavigate(Routes.BRAIN) }, accent = ZedColors.Violet) {
+        ZedCard(onClick = { onTab(Routes.BRAIN) }, accent = ZedColors.Violet) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                MiniBrain(Modifier.padding(end = 14.dp).height(92.dp).fillMaxWidth(0.3f), glow = settings?.glow ?: true)
+                MiniBrain(Modifier.padding(end = 14.dp).height(64.dp).fillMaxWidth(0.22f), glow = settings?.glow ?: true)
                 Column(Modifier.weight(1f)) {
                     Text("LIVE BRAIN", style = MaterialTheme.typography.titleMedium, color = ZedColors.Cyan, letterSpacing = androidx.compose.ui.unit.TextUnit(2f, androidx.compose.ui.unit.TextUnitType.Sp))
                     val g = brain?.graph
@@ -281,26 +298,7 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
             Text("$waitingOnline request${if (waitingOnline == 1) "" else "s"} will run as soon as you're back online — I'll notify you with the answer${if (waitingOnline == 1) "" else "s"}.", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
         }
 
-        // Today
-        ZedCard(onClick = { onNavigate(Routes.MEMORY) }, accent = ZedColors.Teal) {
-            SectionTitle("Today")
-            if (upcoming.isEmpty() && openTodos.isEmpty()) Text("Nothing scheduled. Try “remind me to stretch in 30 minutes”.", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
-            upcoming.take(3).forEach { r -> Text("⏰ ${formatTime(r.triggerAt)} — ${r.text}", style = MaterialTheme.typography.bodyMedium) }
-            openTodos.take(3).forEach { t -> Text("○ ${t.title}", style = MaterialTheme.typography.bodyMedium) }
-            if (openTodos.size > 3) Text("+${openTodos.size - 3} more tasks", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
-        }
 
-        // Two rows of three, so every label fits on one line on any phone.
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            QuickAction(Icons.Outlined.GraphicEq, "Live", ZedColors.Cyan, Modifier.weight(1f)) { onTab(Routes.LIVE) }
-            QuickAction(Icons.Outlined.Visibility, "Eyes", ZedColors.Cyan, Modifier.weight(1f)) { onNavigate(Routes.EYE) }
-            QuickAction(Icons.Outlined.Chat, "Chat", ZedColors.Violet, Modifier.weight(1f)) { onTab(Routes.CHAT) }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            QuickAction(Icons.Outlined.Folder, "Files", ZedColors.Teal, Modifier.weight(1f)) { onNavigate(Routes.FILES) }
-            QuickAction(Icons.Outlined.Memory, "Memory", ZedColors.Amber, Modifier.weight(1f)) { onNavigate(Routes.MEMORY) }
-            QuickAction(Icons.Outlined.Schedule, "Routines", ZedColors.Violet, Modifier.weight(1f)) { onNavigate(Routes.ROUTINES) }
-        }
 
         if (active.isNotEmpty()) {
             ZedCard(onClick = { onTab(Routes.TASKS) }, accent = ZedColors.Amber) {

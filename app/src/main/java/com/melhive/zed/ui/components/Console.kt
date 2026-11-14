@@ -19,6 +19,8 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -105,7 +107,7 @@ private fun readStatus(context: Context, c: AppContainer, withCalendar: Boolean,
  * a live countdown to whatever comes next (an event or a timer ZED set).
  */
 @Composable
-fun HomeConsole(c: AppContainer, nextReminder: Pair<String, Long>?, modifier: Modifier = Modifier) {
+fun HomeConsole(c: AppContainer, nextReminder: Pair<String, Long>?, modifier: Modifier = Modifier, slim: Boolean = false) {
     val context = LocalContext.current
     val runtime by c.providers.localRuntime.state.collectAsStateWithLifecycle()
     val status by produceState<ConsoleStatus?>(null) {
@@ -123,6 +125,20 @@ fun HomeConsole(c: AppContainer, nextReminder: Pair<String, Long>?, modifier: Mo
     LaunchedEffect(Unit) { while (true) { delay(1000); now = System.currentTimeMillis() } }
 
     Column(modifier.fillMaxWidth()) {
+        // Slim: the same four readings as one quiet line of text.
+        if (slim) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            val s = status
+            @Composable fun reading(label: String, value: String, color: Color) = Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(6.dp).clip(androidx.compose.foundation.shape.CircleShape).background(color))
+                Text(" $label ", style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted)
+                Text(value, style = MaterialTheme.typography.labelMedium, color = ZedColors.Text)
+            }
+            reading(if (s?.charging == true) "Charging" else "Battery", "${s?.battery ?: 0}%", when { (s?.battery ?: 100) <= 15 -> ZedColors.Red; s?.charging == true -> ZedColors.Green; else -> ZedColors.Cyan })
+            reading("Memory", "${((s?.ramUsed ?: 0f) * 100).toInt()}%", if ((s?.ramUsed ?: 0f) > 0.88f) ZedColors.Amber else ZedColors.Violet)
+            reading("Net", if (s?.online == true) (if (s.unmetered) "Wi-Fi" else "Data") else "Off", if (s?.online == true) ZedColors.Teal else ZedColors.Muted)
+            reading("Gemma", when (runtime) { is LocalModelRuntime.State.Ready -> "On"; is LocalModelRuntime.State.Loading -> "…"; is LocalModelRuntime.State.Failed -> "!"; else -> "Zz" },
+                when (runtime) { is LocalModelRuntime.State.Ready -> ZedColors.Green; is LocalModelRuntime.State.Loading -> ZedColors.Amber; is LocalModelRuntime.State.Failed -> ZedColors.Red; else -> ZedColors.Muted })
+        } else
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
             val s = status
             StatusRing((s?.battery ?: 0) / 100f, "${animatedInt(s?.battery ?: 0)}%", if (s?.charging == true) "Charging" else "Battery",

@@ -158,21 +158,21 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit, onOpenEye: () -> Un
         val wide = androidx.compose.ui.platform.LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
         val large = settings?.captionSize == "large"
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            // Top: the title and the Orb · Eyes · Chat switch (the same conversation in three forms).
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("ZED LIVE", style = MaterialTheme.typography.titleMedium, color = ZedColors.Muted, modifier = Modifier.weight(1f))
-                TaskIndicator(activeTasks, onOpenTasks)
-                // ZED's memory at work: a memory flashes when it is used to answer.
-                MiniBrain(Modifier.padding(start = 8.dp).size(52.dp), glow = settings?.glow ?: true)
-                if (state.orb == OrbState.LISTENING) {
-                    Spacer(Modifier.size(8.dp))
-                    StatusPill("Mic on", ZedColors.Red)
-                }
+                com.melhive.zed.ui.components.VoiceModeSwitch("orb", onSelect = { if (it == "eyes") onOpenEye() else onOpenChat(live.conversation) })
             }
-
-            if (state.voiceGuest) com.melhive.zed.ui.components.GuestPill(Modifier.padding(top = 4.dp))
+            // One status row: background tasks, the microphone, guest access, and the brain at work.
+            Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                TaskIndicator(activeTasks, onOpenTasks)
+                if (state.orb == OrbState.LISTENING) StatusPill("Mic on", ZedColors.Red)
+                if (state.voiceGuest) com.melhive.zed.ui.components.GuestPill()
+                Spacer(Modifier.weight(1f))
+                // ZED's memory at work: a memory flashes when it is used to answer.
+                MiniBrain(Modifier.size(40.dp), glow = settings?.glow ?: true)
+            }
             if (peopleLine.isNotEmpty()) Text(peopleLine, style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted.copy(alpha = 0.75f), maxLines = 2, textAlign = TextAlign.Center)
-            // Orb, eyes or chat: the same conversation in three forms.
-            com.melhive.zed.ui.components.VoiceModeSwitch("orb", onSelect = { if (it == "eyes") onOpenEye() else onOpenChat(live.conversation) }, modifier = Modifier.padding(top = 6.dp))
 
             // Upright: the orb above the conversation. Sideways: the orb on the left, the conversation and controls on the right.
             val orbPart: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit = {
@@ -228,15 +228,20 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit, onOpenEye: () -> Un
                     trailingIcon = { IconButton(onClick = { live.submitText(typed); typed = "" }) { Icon(Icons.AutoMirrored.Outlined.Send, "Send") } },
                 )
             }
-            Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                FilledTonalIconButton(onClick = live::toggleMute, modifier = Modifier.size(56.dp)) {
+            Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.Top) {
+                Labelled(if (state.micMuted) "Muted" else "Mic") {
+                FilledTonalIconButton(onClick = live::toggleMute, modifier = Modifier.size(52.dp)) {
                     Icon(if (state.micMuted) Icons.Outlined.MicOff else Icons.Outlined.Mic, if (state.micMuted) "Unmute microphone" else "Mute microphone")
                 }
-                FilledTonalIconButton(onClick = live::toggleSpeaker, modifier = Modifier.size(56.dp)) {
+                }
+                Labelled(if (state.speakerOn) "Voice" else "Silent") {
+                FilledTonalIconButton(onClick = live::toggleSpeaker, modifier = Modifier.size(52.dp)) {
                     Icon(if (state.speakerOn) Icons.AutoMirrored.Outlined.VolumeUp else Icons.AutoMirrored.Outlined.VolumeOff, if (state.speakerOn) "Mute voice replies" else "Enable voice replies")
                 }
+                }
+                Labelled("Camera") {
                 androidx.compose.foundation.layout.Box {
-                    FilledTonalIconButton(onClick = { photoMenu = true }, modifier = Modifier.size(56.dp)) {
+                    FilledTonalIconButton(onClick = { photoMenu = true }, modifier = Modifier.size(52.dp)) {
                         Icon(Icons.Outlined.PhotoCamera, "Ask about a photo")
                     }
                     androidx.compose.material3.DropdownMenu(expanded = photoMenu, onDismissRequest = { photoMenu = false }) {
@@ -259,14 +264,19 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit, onOpenEye: () -> Un
                         })
                     }
                 }
-                FilledTonalIconButton(onClick = live::cancelRequest, modifier = Modifier.size(56.dp)) {
+                }
+                Labelled("Stop") {
+                FilledTonalIconButton(onClick = live::cancelRequest, modifier = Modifier.size(52.dp)) {
                     Icon(Icons.Outlined.StopCircle, "Cancel current request")
                 }
+                }
+                Labelled("End") {
                 IconButton(
                     onClick = { live.end(); onClose() },
-                    modifier = Modifier.size(64.dp),
+                    modifier = Modifier.size(52.dp),
                     colors = IconButtonDefaults.iconButtonColors(containerColor = ZedColors.Red.copy(alpha = 0.85f), contentColor = Color.White),
                 ) { Icon(Icons.Outlined.Close, "End voice session") }
+                }
             }
             Text(
                 buildString {
@@ -305,4 +315,13 @@ private fun hintFor(o: OrbState) = when (o) {
 private fun Modifier.swipeUp(onSwipe: () -> Unit): Modifier = pointerInput(Unit) {
     var moved = 0f
     detectVerticalDragGestures(onDragStart = { moved = 0f }, onDragEnd = { if (moved < -40f) onSwipe() }) { _, dy -> moved += dy }
+}
+
+/** A button with its name under it. */
+@Composable
+private fun Labelled(label: String, content: @Composable () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        content()
+        Text(label, style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted, modifier = Modifier.padding(top = 3.dp))
+    }
 }

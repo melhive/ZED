@@ -11,6 +11,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.border
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.draw.clip
@@ -362,46 +364,47 @@ fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long?) -> Unit, onOpenLive: () -
                 .pointerInput(Unit) { detectTapGestures(onTap = { history = true }) },
         )
 
+        // The controls: one labelled panel instead of a strip of icons.
         AnimatedVisibility(controls, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.TopEnd)) {
-            Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(12.dp)) {
-                Column(Modifier.background(Color(0xCC0B111E), RoundedCornerShape(24.dp)).padding(horizontal = 6.dp, vertical = 2.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
-                        EyeButton(Icons.Outlined.ClosedCaption, if (captions) "Hide captions" else "Show captions", captions) {
-                            touched++; scope.launch { c.settings.setEyeCaptions(!captions) }
-                        }
-                        EyeButton(if (state.micMuted) Icons.Outlined.MicOff else Icons.Outlined.Mic, if (state.micMuted) "Unmute microphone" else "Mute microphone", !state.micMuted) {
-                            touched++; live.toggleMute()
-                        }
-                        EyeButton(if (cameraOn && cameraAllowed) Icons.Outlined.Videocam else Icons.Outlined.VideocamOff, if (cameraOn) "Turn the camera off" else "Turn the camera on", cameraOn && cameraAllowed) {
-                            touched++
-                            if (!cameraAllowed) permissions.launch(arrayOf(Manifest.permission.CAMERA)) else cameraOn = !cameraOn
-                        }
-                        EyeButton(Icons.Outlined.Cameraswitch, if (lookBack) "“What is this?” looks through the back camera" else "“What is this?” looks through the front camera", lookBack) {
-                            touched++; scope.launch { c.settings.setEyeLookBack(!lookBack) }
-                        }
-                        EyeButton(Icons.Outlined.ScreenRotation, "Turn the screen", true) {
-                            touched++
-                            turned = if (sideways) ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT else ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                        }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
-                        EyeButton(Icons.Outlined.History, "Conversation so far", true) { controls = false; history = true }
-                        EyeButton(Icons.Outlined.Pets, "Whose eyes: ${eyeStyle.label}", true) {
-                            touched++; scope.launch { c.settings.setEyeStyle(com.melhive.zed.core.eyes.EyeStyle.next(settings?.eyeStyle).id) }
-                        }
-                        EyeButton(Icons.Outlined.Palette, "Eye colour", true) {
-                            touched++; scope.launch { c.settings.setEyeColor(com.melhive.zed.core.eyes.EyeColors.next(settings?.eyeColor ?: "natural")) }
-                        }
-                        EyeButton(Icons.Outlined.Group, "People ZED recognises", recognising) { controls = false; peopleDialog = true }
-                        EyeButton(Icons.Outlined.Close, "Close Eye mode", true) { close() }
+            Column(
+                Modifier.padding(10.dp).widthIn(max = 330.dp).background(Color(0xE60B111E), RoundedCornerShape(22.dp)).padding(horizontal = 12.dp, vertical = 8.dp)
+                    .verticalScroll(androidx.compose.foundation.rememberScrollState()),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    com.melhive.zed.ui.components.VoiceModeSwitch("eyes", onSelect = {
+                        if (it == "orb") onOpenLive() else { closing = true; onOpenChat(live.conversation) }
+                    })
+                    androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+                    IconButton(onClick = { close() }) { Icon(Icons.Outlined.Close, "Close Eye mode", tint = ZedColors.Text) }
+                }
+                EyeRow("LOOK") {
+                    EyeChip("Eyes", eyeStyle.label) { touched++; scope.launch { c.settings.setEyeStyle(com.melhive.zed.core.eyes.EyeStyle.next(settings?.eyeStyle).id) } }
+                    EyeChip("Colour", (settings?.eyeColor ?: "natural").replaceFirstChar { it.uppercase() }) {
+                        touched++; scope.launch { c.settings.setEyeColor(com.melhive.zed.core.eyes.EyeColors.next(settings?.eyeColor ?: "natural")) }
                     }
                 }
-                com.melhive.zed.ui.components.VoiceModeSwitch("eyes", onSelect = {
-                    if (it == "orb") onOpenLive() else { closing = true; onOpenChat(live.conversation) }
-                }, modifier = Modifier.padding(top = 8.dp))
+                EyeRow("CAMERA") {
+                    EyeChip("Camera", if (!cameraAllowed) "Allow" else if (cameraOn) "On" else "Off", lit = cameraOn && cameraAllowed) {
+                        touched++
+                        if (!cameraAllowed) permissions.launch(arrayOf(Manifest.permission.CAMERA)) else cameraOn = !cameraOn
+                    }
+                    EyeChip("“What is this?”", if (lookBack) "Back camera" else "Front camera") { touched++; scope.launch { c.settings.setEyeLookBack(!lookBack) } }
+                }
+                EyeRow("SCREEN") {
+                    EyeChip("Turn", if (sideways) "Upright" else "Sideways") {
+                        touched++
+                        turned = if (sideways) ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT else ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                    }
+                    EyeChip("Captions", if (captions) "On" else "Off", lit = captions) { touched++; scope.launch { c.settings.setEyeCaptions(!captions) } }
+                }
+                EyeRow("CONVERSATION") {
+                    EyeChip("Mic", if (state.micMuted) "Muted" else "On", lit = !state.micMuted) { touched++; live.toggleMute() }
+                    EyeChip("History", "Open") { controls = false; history = true }
+                    EyeChip("People", if (recognising) "On" else "Off", lit = recognising) { controls = false; peopleDialog = true }
+                }
                 Text(
-                    "Double-tap to interrupt or talk", color = ZedColors.Muted.copy(alpha = 0.8f),
-                    style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 6.dp, end = 10.dp),
+                    "Double-tap the eyes to interrupt or talk", color = ZedColors.Muted.copy(alpha = 0.8f),
+                    style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 6.dp, bottom = 2.dp),
                 )
             }
         }
@@ -472,6 +475,24 @@ private fun PeopleDialog(recognising: Boolean, people: com.melhive.zed.eyes.EyeP
             }
         },
     )
+}
+
+/** One labelled row of the Eye mode controls. */
+@Composable
+private fun EyeRow(label: String, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
+    Text(label, style = MaterialTheme.typography.labelSmall, color = ZedColors.Cyan.copy(alpha = 0.8f), modifier = Modifier.padding(top = 8.dp, bottom = 3.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically, content = content)
+}
+
+/** A control that says what it is and what it is set to; tapping it changes it. */
+@Composable
+private fun EyeChip(name: String, value: String, lit: Boolean = true, onClick: () -> Unit) {
+    Column(
+        Modifier.clip(RoundedCornerShape(12.dp)).background(Color(0xFF111A2D)).clickable(onClick = onClick).padding(horizontal = 10.dp, vertical = 6.dp),
+    ) {
+        Text(name, style = MaterialTheme.typography.labelSmall, color = ZedColors.Muted, maxLines = 1)
+        Text(value, style = MaterialTheme.typography.labelLarge, color = if (lit) ZedColors.Cyan else ZedColors.Text.copy(alpha = 0.7f), maxLines = 1)
+    }
 }
 
 @Composable
