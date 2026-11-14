@@ -77,6 +77,12 @@ class AppContainer(val context: Context) {
         return com.melhive.zed.android.HomeAssistant(url, token)
     }
 
+    /** True when the phone is locked with a PIN, pattern or fingerprint. */
+    fun phoneLocked(): Boolean = runCatching { context.getSystemService(android.app.KeyguardManager::class.java)?.isDeviceLocked == true }.getOrDefault(false)
+    /** What the user asked for while the phone was locked; the screen unlocks and asks again. */
+    val unlockRequest = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+    /** People ZED has learned to recognise in Eye mode. Kept on the phone only. */
+    val people by lazy { com.melhive.zed.eyes.PeopleStore(context) }
     /** How many voice screens (LIVE, Eye mode) are showing: the session ends when the last one closes, not when switching between them. */
     val voiceScreens = java.util.concurrent.atomic.AtomicInteger(0)
     /** A request LIVE should send as soon as it opens (from a notification or shortcut). */
@@ -84,6 +90,8 @@ class AppContainer(val context: Context) {
 
     val toolManager: ToolManager by lazy {
         ToolManager(catalog, skills, settings, AndroidCapabilityChecker(context, this), confirmations, audit, DefaultConfirmationText).also { tm ->
+            tm.locked = { phoneLocked() }
+            tm.onLockedRequest = { unlockRequest.value = orchestrator.currentUserText }
             registerExecutors(tm, this, context)
             tm.afterSuccess = { tool -> if (tool.startsWith("calendar.") || tool == "app.undo") appScope.launch { runCatching { com.melhive.zed.agents.Announcer.planEvents(context) } } }
             workflows.toolManager = tm
@@ -95,6 +103,7 @@ class AppContainer(val context: Context) {
             o.routineMatcher = { text -> routines.matchPhrase(text)?.name }
             o.aliases = { teaching.aliases }
             o.awareness = { com.melhive.zed.agents.AwarenessCollector(context, this).collect() }
+            o.guest = { settings.current().lockGuard && phoneLocked() }
         }
     }
 
@@ -120,6 +129,12 @@ class AppContainer(val context: Context) {
     val live by lazy {
         LiveSessionController(context, orchestrator, conversations, settings, { newSpeechToText() }, { voice.sessionHandle() })
             .also { it.userName = { memory.userName() } }
+            .also { live ->
+                live.lockedNow = { settings.current().lockGuard && phoneLocked() }
+                live.onCallEnded = { conv ->
+                    appScope.launch { runCatching { orchestrator.summarize(conv)?.let { conversations.setSummary(conv, it) } } }
+                }
+            }
     }
 
     val updates = com.melhive.zed.android.UpdateChecker()

@@ -37,6 +37,16 @@ class ConversationRepository(private val db: ZedDatabase) {
         return id
     }
 
+    /** Puts a short summary at the top of a conversation (replacing an earlier one). */
+    suspend fun setSummary(conversationId: Long, summary: String) {
+        val all = db.messages().all(conversationId)
+        val text = "Call summary: $summary"
+        val old = all.firstOrNull { it.source == "summary" }
+        if (old != null) { db.messages().updateContent(old.id, text, "complete"); return }
+        val first = all.minOfOrNull { it.createdAt } ?: return
+        db.messages().insert(MessageEntity(conversationId = conversationId, role = "assistant", content = text, createdAt = first - 1, source = "summary"))
+    }
+
     suspend fun updateMessage(id: Long, content: String, status: String) = db.messages().updateContent(id, content, status)
     suspend fun setTiming(id: Long, firstTokenMs: Long?, totalMs: Long, chars: Int) = db.messages().setTiming(id, firstTokenMs, totalMs, chars)
     suspend fun setTotalOnLastReply(conversationId: Long, totalMs: Long) = db.messages().setTotalOnLastReply(conversationId, totalMs)
@@ -52,7 +62,8 @@ class ConversationRepository(private val db: ZedDatabase) {
         db.messages().recent(conversationId, limit)
             .let { newestFirst -> if (sessionGapMs == null) newestFirst else currentSitting(newestFirst, sessionGapMs) }
             .asReversed()
-            .filter { it.status == "complete" && it.content.isNotBlank() }
+            // A call's summary is for the reader, not part of what was said.
+            .filter { it.status == "complete" && it.content.isNotBlank() && it.source != "summary" }
             .map {
                 ChatTurn(
                     when (it.role) { "user" -> Role.USER; "tool" -> Role.TOOL; "system" -> Role.SYSTEM; else -> Role.ASSISTANT },

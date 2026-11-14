@@ -11,6 +11,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +27,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Group
+import androidx.compose.material.icons.outlined.ScreenRotation
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ClosedCaption
@@ -81,10 +87,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Eye mode: ZED's two eyes on a black landscape screen. It is the LIVE voice
- * session with a different face, so everything said is saved to the same
- * conversation. The camera lets the eyes follow the user and look at what is
- * shown; it runs only while this screen is visible.
+ * Eye mode: ZED's two eyes on a black screen, upright or sideways. It is the
+ * LIVE voice session with a different face, so everything said is saved to the
+ * same conversation. The camera lets the eyes follow the user and look at what
+ * is shown; it runs only while this screen is visible.
  *
  * Tap: show the controls. Double-tap: interrupt ZED or start talking.
  */
@@ -102,6 +108,8 @@ fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long?) -> Unit, onOpenLive: () -
     val art = remember { EyeArt() }
     val frame = remember { EyeFrame() }
     val camera = remember { EyeCamera(context.applicationContext) }
+    val voiceId = remember { com.melhive.zed.eyes.VoiceId(context.applicationContext) }
+    val people = remember { com.melhive.zed.eyes.EyePeople(c.people, voiceId) }
     var cameraAllowed by remember { mutableStateOf(PermissionCatalog.isGranted(context, PermissionCatalog.CAMERA)) }
     var cameraOn by remember { mutableStateOf(true) }
     var controls by remember { mutableStateOf(false) }
@@ -109,12 +117,18 @@ fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long?) -> Unit, onOpenLive: () -
     var closing by remember { mutableStateOf(false) }
     var history by remember { mutableStateOf(false) }
     var asleep by remember { mutableStateOf(false) }
+    var peopleDialog by remember { mutableStateOf(false) }
+    var testLine by remember { mutableStateOf("") }
+    val recognising = settings?.eyeRecognition == true
+    val large = settings?.captionSize == "large"
+    val sideways = androidx.compose.ui.platform.LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
-    // Landscape, nothing but the eyes, and the screen stays on.
+    // Nothing but the eyes, and the screen stays on. The screen turns with the phone (Android's own rotate button works);
+    // the rotate button in the controls turns it by hand.
+    var turned by remember { mutableStateOf<Int?>(null) }
     DisposableEffect(Unit) {
         val activity = context as? Activity
         val before = activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         val bars = activity?.window?.let { WindowCompat.getInsetsController(it, view) }
         bars?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         bars?.hide(WindowInsetsCompat.Type.systemBars())
@@ -125,6 +139,7 @@ fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long?) -> Unit, onOpenLive: () -
             activity?.requestedOrientation = before
         }
     }
+    LaunchedEffect(turned) { turned?.let { (context as? Activity)?.requestedOrientation = it } }
 
     // Microphone for the conversation, camera for the eyes. Without the camera the eyes still work; they just can't see.
     val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
@@ -156,6 +171,40 @@ fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long?) -> Unit, onOpenLive: () -
         onStopOrDispose {
             live.frameSource = null
             camera.stop()
+        }
+    }
+
+    // The recognition experiment: who is in view, and whether the voice is yours.
+    DisposableEffect(recognising) {
+        if (recognising) {
+            camera.onFaceCrop = { people.onFace(it) }
+            live.onUtterance = { people.onUtterance(it) }
+            live.intercept = { said -> people.nameAnswer(said) }
+        }
+        onDispose { camera.onFaceCrop = null; live.onUtterance = null; live.intercept = null; voiceId.release() }
+    }
+    LaunchedEffect(recognising) {
+        if (!recognising) { testLine = ""; return@LaunchedEffect }
+        var goneFor = 0
+        while (true) {
+            delay(500)
+            if (camera.faceSeen) goneFor = 0 else if (++goneFor == 4) people.onNoFace()
+            testLine = "Sees: " + (if (!camera.running) "camera off" else if (people.teaching >= 0) "learning your face ${people.teaching}/${com.melhive.zed.eyes.EyePeople.TEACH}" else people.seenLabel) +
+                (people.heardLabel.takeIf { it.isNotEmpty() }?.let { "   Hears: $it" } ?: "")
+            val now = live.state.value
+            // Only speak up when nobody is in the middle of saying something.
+            val free = now.active && now.partial.isEmpty() && (now.orb == OrbState.LISTENING || now.orb == OrbState.IDLE) && !now.micMuted
+            if (!free || people.teaching >= 0) continue
+            val who = people.seen
+            if (who != null && people.greeted.add(who.id)) {
+                if (who.owner) mind.mood = EyeMood.HAPPY
+                live.announce(if (who.owner) "Hello, ${who.name}." else "Hello again, ${who.name}.")
+            } else if (people.strangerStable && !people.asked && c.people.hasOwner()) {
+                // Someone it doesn't know has stayed: ask once, and remember them if they answer.
+                mind.mood = EyeMood.CURIOUS
+                people.askedName()
+                live.announce("I don't think we've met. What's your name?")
+            }
         }
     }
 
@@ -195,11 +244,54 @@ fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long?) -> Unit, onOpenLive: () -
         val last = state.transcript.lastOrNull()
         if (last != null && last.fromUser && com.melhive.zed.core.eyes.KindWords.matches(last.text)) { mind.mood = EyeMood.HAPPY; mind.contentBlink() }
     }
-    // Asleep: the screen itself dims until you come back or touch it.
+    // Asleep: the screen itself dims until you come back, touch it or say "Zed".
     DisposableEffect(asleep) {
         val window = (context as? Activity)?.window
-        window?.attributes = window?.attributes?.apply { screenBrightness = if (asleep) 0.02f else android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE }
+        window?.attributes = window?.attributes?.apply { screenBrightness = if (asleep) 0.03f else android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE }
         onDispose { window?.attributes = window?.attributes?.apply { screenBrightness = android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE } }
+    }
+    DisposableEffect(asleep, state.active) {
+        val wake = com.melhive.zed.voice.WakeWordService
+        if (asleep && state.active) {
+            // While the eyes sleep the microphone is free: the "Hey Zed" listener (when it is on) wakes them.
+            wake.onWakeOverride = {
+                view.post {
+                    wake.paused.value = true
+                    mind.wake()
+                    if (live.state.value.orb == OrbState.IDLE) live.tapOrb()
+                }
+            }
+            wake.paused.value = false
+        }
+        onDispose {
+            wake.onWakeOverride = null
+            if (live.state.value.active) wake.paused.value = true
+        }
+    }
+    // While asleep: the time, and when the next reminder is due.
+    var clock by remember { mutableStateOf("") }
+    LaunchedEffect(asleep) {
+        while (asleep) {
+            val now = System.currentTimeMillis()
+            val time = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("h:mm"))
+            val next = runCatching { c.db.reminders().scheduled().filter { it.triggerAt > now }.minOfOrNull { it.triggerAt } }.getOrNull()
+            clock = time + (next?.let { "\nReminder at " + java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).format(java.time.format.DateTimeFormatter.ofPattern("h:mm a")) } ?: "")
+            delay(20_000)
+        }
+        clock = ""
+    }
+
+    // The picture ZED just looked at, shown for a moment so you know what the answer is about.
+    var picture by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    LaunchedEffect(state.shownTick) {
+        val shown = state.shown
+        if (state.shownTick == 0 || shown == null) return@LaunchedEffect
+        picture = runCatching {
+            val bytes = android.util.Base64.decode(shown.base64, android.util.Base64.NO_WRAP)
+            android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, android.graphics.BitmapFactory.Options().apply { inSampleSize = 2 })?.asImageBitmap()
+        }.getOrNull()
+        delay(5000)
+        picture = null
     }
 
     // When the conversation has gone quiet and you are in view, ZED listens again by itself.
@@ -237,7 +329,7 @@ fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long?) -> Unit, onOpenLive: () -
     }
 
     // The controls fade away a few seconds after the last touch.
-    LaunchedEffect(controls, touched) { if (controls) { delay(4500); controls = false } }
+    LaunchedEffect(controls, touched) { if (controls) { delay(5500); controls = false } }
 
     val path = remember { Path() }
     Box(
@@ -254,6 +346,25 @@ fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long?) -> Unit, onOpenLive: () -
             drawEyes(frame, path)
         }
 
+        if (asleep && clock.isNotEmpty()) Text(
+            clock, color = Color.White.copy(alpha = 0.55f), textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.displaySmall, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = if (sideways) 18.dp else 120.dp),
+        )
+
+        picture?.let { shown ->
+            androidx.compose.foundation.Image(
+                shown, "What ZED is looking at", contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.align(Alignment.BottomStart).padding(14.dp).size(if (sideways) 120.dp else 104.dp)
+                    .clip(RoundedCornerShape(14.dp)).border(1.dp, ZedColors.Cyan.copy(alpha = 0.5f), RoundedCornerShape(14.dp)),
+            )
+        }
+
+        // The experiment's test line: who ZED thinks it sees and hears, and how sure it is.
+        if (recognising && testLine.isNotEmpty() && !asleep) Text(
+            testLine, color = ZedColors.Muted.copy(alpha = 0.75f), style = MaterialTheme.typography.labelSmall, maxLines = 2,
+            modifier = Modifier.align(Alignment.TopStart).padding(start = 14.dp, top = 12.dp).fillMaxWidth(0.6f),
+        )
+
         // Captions: what is being heard or said, one quiet line under the eyes.
         val captions = settings?.eyeCaptions == true
         val line = when {
@@ -268,32 +379,39 @@ fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long?) -> Unit, onOpenLive: () -
         }
         if (line.isNotEmpty()) Text(
             line, color = (if (state.orb == OrbState.ERROR) ZedColors.Red else ZedColors.Cyan).copy(alpha = 0.78f),
-            style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(0.72f).padding(bottom = 14.dp)
+            style = if (large) MaterialTheme.typography.titleLarge else MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center, maxLines = if (sideways) 2 else 4, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(if (sideways) 0.72f else 0.9f).padding(bottom = if (sideways) 14.dp else 48.dp)
                 .pointerInput(Unit) { detectTapGestures(onTap = { history = true }) },
         )
 
         AnimatedVisibility(controls, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.TopEnd)) {
             Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(12.dp)) {
-                Row(
-                    Modifier.background(Color(0xCC0B111E), RoundedCornerShape(28.dp)).padding(horizontal = 6.dp, vertical = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    EyeButton(Icons.Outlined.ClosedCaption, if (captions) "Hide captions" else "Show captions", captions) {
-                        touched++; scope.launch { c.settings.setEyeCaptions(!captions) }
+                Column(Modifier.background(Color(0xCC0B111E), RoundedCornerShape(24.dp)).padding(horizontal = 6.dp, vertical = 2.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+                        EyeButton(Icons.Outlined.ClosedCaption, if (captions) "Hide captions" else "Show captions", captions) {
+                            touched++; scope.launch { c.settings.setEyeCaptions(!captions) }
+                        }
+                        EyeButton(if (state.micMuted) Icons.Outlined.MicOff else Icons.Outlined.Mic, if (state.micMuted) "Unmute microphone" else "Mute microphone", !state.micMuted) {
+                            touched++; live.toggleMute()
+                        }
+                        EyeButton(if (cameraOn && cameraAllowed) Icons.Outlined.Videocam else Icons.Outlined.VideocamOff, if (cameraOn) "Turn the camera off" else "Turn the camera on", cameraOn && cameraAllowed) {
+                            touched++
+                            if (!cameraAllowed) permissions.launch(arrayOf(Manifest.permission.CAMERA)) else cameraOn = !cameraOn
+                        }
+                        EyeButton(Icons.Outlined.ScreenRotation, "Turn the screen", true) {
+                            touched++
+                            turned = if (sideways) ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT else ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                        }
                     }
-                    EyeButton(if (state.micMuted) Icons.Outlined.MicOff else Icons.Outlined.Mic, if (state.micMuted) "Unmute microphone" else "Mute microphone", !state.micMuted) {
-                        touched++; live.toggleMute()
+                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+                        EyeButton(Icons.Outlined.History, "Conversation so far", true) { controls = false; history = true }
+                        EyeButton(Icons.Outlined.Palette, "Eye colour", true) {
+                            touched++; scope.launch { c.settings.setEyeColor(com.melhive.zed.core.eyes.EyeColors.next(settings?.eyeColor ?: "cyan")) }
+                        }
+                        EyeButton(Icons.Outlined.Group, "People ZED recognises", recognising) { controls = false; peopleDialog = true }
+                        EyeButton(Icons.Outlined.Close, "Close Eye mode", true) { close() }
                     }
-                    EyeButton(if (cameraOn && cameraAllowed) Icons.Outlined.Videocam else Icons.Outlined.VideocamOff, if (cameraOn) "Turn the camera off" else "Turn the camera on", cameraOn && cameraAllowed) {
-                        touched++
-                        if (!cameraAllowed) permissions.launch(arrayOf(Manifest.permission.CAMERA)) else cameraOn = !cameraOn
-                    }
-                    EyeButton(Icons.Outlined.History, "Conversation so far", true) { controls = false; history = true }
-                    EyeButton(Icons.Outlined.Palette, "Eye colour", true) {
-                        touched++; scope.launch { c.settings.setEyeColor(com.melhive.zed.core.eyes.EyeColors.next(settings?.eyeColor ?: "cyan")) }
-                    }
-                    EyeButton(Icons.Outlined.Close, "Close Eye mode", true) { close() }
                 }
                 com.melhive.zed.ui.components.VoiceModeSwitch("eyes", onSelect = {
                     if (it == "orb") onOpenLive() else { closing = true; onOpenChat(live.conversation) }
@@ -306,6 +424,71 @@ fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long?) -> Unit, onOpenLive: () -
         }
         if (history) com.melhive.zed.ui.components.VoiceHistoryPanel(state.conversationId, state.transcript) { history = false }
     }
+
+    if (peopleDialog) PeopleDialog(
+        recognising = recognising, people = people, voiceId = voiceId, faceInView = { camera.faceSeen && camera.running },
+        onDismiss = { peopleDialog = false },
+    )
+}
+
+/** The recognition experiment's settings: switch it on, teach your face, get the voice model, and manage who ZED knows. */
+@Composable
+private fun PeopleDialog(recognising: Boolean, people: com.melhive.zed.eyes.EyePeople, voiceId: com.melhive.zed.eyes.VoiceId, faceInView: () -> Boolean, onDismiss: () -> Unit) {
+    val c = rememberContainer()
+    val scope = rememberCoroutineScope()
+    val version by c.people.version.collectAsStateWithLifecycle()
+    val known = remember(version) { c.people.names() }
+    var note by remember { mutableStateOf("") }
+    var voiceReady by remember { mutableStateOf(voiceId.installed()) }
+    var downloading by remember { mutableStateOf<String?>(null) }
+    var teaching by remember { mutableIntStateOf(-1) }
+    LaunchedEffect(Unit) { while (true) { teaching = people.teaching; delay(300) } }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = ZedColors.SurfaceHigh,
+        title = { Text("People ZED recognises") },
+        confirmButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Done") } },
+        text = {
+            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Recognise people", style = MaterialTheme.typography.titleSmall)
+                        Text("An experiment. ZED learns your face and voice, asks people it doesn't know for their name and greets them next time. It changes nothing about what ZED will do or say. Faces and voices stay on this phone.", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
+                    }
+                    androidx.compose.material3.Switch(checked = recognising, onCheckedChange = { on -> scope.launch { c.settings.setEyeRecognition(on) } })
+                }
+                if (recognising) {
+                    androidx.compose.material3.TextButton(enabled = teaching < 0, onClick = {
+                        if (!faceInView()) note = "Look at the screen with the camera on, then try again."
+                        else scope.launch { note = "Keep looking at the eyes and turn your head a little…"; people.teach(runCatching { c.memory.userName() }.getOrNull() ?: "You") }
+                    }) { Text(if (teaching >= 0) "Learning your face $teaching/${com.melhive.zed.eyes.EyePeople.TEACH}…" else if (c.people.hasOwner()) "Teach my face again" else "Teach my face") }
+                    if (voiceReady) Text("Your voice: ${c.people.ownerVoices()} of ${com.melhive.zed.core.eyes.PeopleBook.MAX_VOICES} samples. ZED learns it from what you say while it sees your face (needs on-device speech recognition).", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
+                    else androidx.compose.material3.TextButton(enabled = downloading == null, onClick = {
+                        scope.launch {
+                            downloading = "Starting…"
+                            runCatching { voiceId.download { done, total -> downloading = "Downloading ${done * 100 / total.coerceAtLeast(1)}%" } }
+                                .onSuccess { voiceReady = true; note = "" }
+                                .onFailure { note = "The download didn't finish: ${it.message ?: "no connection"}" }
+                            downloading = null
+                        }
+                    }) { Text(downloading ?: "Download voice recognition (30 MB)") }
+                    if (note.isNotEmpty()) Text(note, style = MaterialTheme.typography.bodySmall, color = ZedColors.Amber)
+                }
+                if (known.isNotEmpty()) Text("KNOWN", style = MaterialTheme.typography.labelSmall, color = ZedColors.Cyan, modifier = Modifier.padding(top = 10.dp))
+                known.forEach { (id, name, owner) ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        var edited by remember(id) { mutableStateOf(name) }
+                        androidx.compose.material3.OutlinedTextField(
+                            value = edited, onValueChange = { edited = it; if (it.isNotBlank()) c.people.rename(id, it.trim()) }, singleLine = true,
+                            label = { Text(if (owner) "You" else "Name") }, modifier = Modifier.weight(1f),
+                        )
+                        IconButton(onClick = { c.people.remove(id) }) { Icon(Icons.Outlined.Close, "Forget $name", tint = ZedColors.Red) }
+                    }
+                }
+                if (known.size > 1) androidx.compose.material3.TextButton(onClick = { c.people.clear() }) { Text("Forget everyone", color = ZedColors.Red) }
+            }
+        },
+    )
 }
 
 @Composable

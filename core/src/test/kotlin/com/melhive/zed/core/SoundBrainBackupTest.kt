@@ -71,15 +71,15 @@ class SoundSynthTest {
         }
     }
 
-    @Test fun acknowledgementIsAShortLowThunk() {
+    @Test fun acknowledgementIsAShortLowTick() {
         val ack = SoundSynth.ack()
         assertTrue(ack.size.toDouble() / SoundSynth.RATE < 0.2)
         assertEquals(0, ack.first().toInt()); assertEquals(0, ack.last().toInt())
         assertTrue(ack.maxOf { abs(it.toInt()) } in 10_000..13_000)
     }
 
-    @Test fun retiredSoundsFallBackToHologram() {
-        listOf("arc", "droid", "retro", "turbine", "mech", null).forEach { assertEquals(SoundSynth.Style.HOLO, SoundSynth.Style.parse(it)) }
+    @Test fun retiredSoundsFallBackToAura() {
+        listOf("arc", "droid", "retro", "turbine", "mech", "holo", "reactor", "neural", "scan", "armor", "sonar", "core", "command", null).forEach { assertEquals(SoundSynth.Style.AURA, SoundSynth.Style.parse(it)) }
     }
 
     @Test fun startAndStopDifferAndRenderingIsDeterministic() {
@@ -100,7 +100,7 @@ class SoundSynthTest {
 
     @Test fun offIsSilentAndIdsAreUnique() {
         assertEquals(0, SoundSynth.render(SoundSynth.Style.OFF, true).size)
-        assertEquals(SoundSynth.Style.SONAR, SoundSynth.Style.parse("sonar"))
+        assertEquals(SoundSynth.Style.HORIZON, SoundSynth.Style.parse("horizon"))
         assertEquals(SoundSynth.Style.entries.size, SoundSynth.Style.entries.map { it.id }.toSet().size)
     }
 }

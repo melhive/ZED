@@ -100,6 +100,10 @@ class AssistantOrchestrator(
     /** The user's own shortcuts ("lights out" → what it means), applied before anything else. */
     var aliases: (() -> Map<String, String>)? = null
 
+    /** True while the phone is locked: ZED answers as a guest, with nothing personal in what the model sees. */
+    var guest: (suspend () -> Boolean)? = null
+    @Volatile private var guestTurn = false
+
     /** The phone's side of the awareness brief (time, place, battery, what's coming up). */
     var awareness: (suspend () -> com.melhive.zed.core.understanding.Awareness)? = null
 
@@ -109,7 +113,8 @@ class AssistantOrchestrator(
     private val dialogues = java.util.concurrent.ConcurrentHashMap<Long, com.melhive.zed.core.understanding.DialogueState>()
     private val lastTurnAt = java.util.concurrent.ConcurrentHashMap<Long, Long>()
     /** What the user said in the turn being answered (dates and durations in it beat the model's). */
-    @Volatile private var currentUserText: String? = null
+    @Volatile var currentUserText: String? = null
+        private set
     /** The conversation being answered (requests queued for the internet go back to it). */
     @Volatile var currentConversation: Long? = null
         private set
@@ -124,6 +129,7 @@ class AssistantOrchestrator(
      * fact when it states one), so recall brings it back next time the topic comes up.
      */
     suspend fun recordCorrection(conversationId: Long, question: String, wrong: String, fix: String): String {
+        if (guestTurn) return com.melhive.zed.core.security.LockPolicy.MESSAGE
         val lesson = com.melhive.zed.core.learning.Corrections.lesson(question, wrong, fix)
         memory.remember(lesson, "correction")
         com.melhive.zed.core.learning.FactPatterns.extract(fix).forEach { memory.remember(it.text, "correction") }
@@ -191,6 +197,7 @@ class AssistantOrchestrator(
         val userContent = if (attachmentText != null) "$trimmed\n\n[Attached file: $attachmentName]\n$attachmentText" else trimmed
         conversations.addMessage(conversationId, "user", userContent, attachmentName = attachmentName ?: if (image != null) "📷 Photo" else null)
         currentImage = image
+        guestTurn = runCatching { guest?.invoke() }.getOrNull() == true
         turnStartedAt = System.nanoTime()
         setPhase(AssistantPhase.THINKING, conv = conversationId)
         _streamingText.value = ""
@@ -236,7 +243,7 @@ class AssistantOrchestrator(
      * the message should go on to the native parser's normal path or the model.
      */
     private suspend fun understood(conversationId: Long, text: String, modelAvailable: Boolean): AssistantReply? {
-        com.melhive.zed.core.understanding.QuickReplies.reply(text, runCatching { memory.userName() }.getOrNull())?.let { r ->
+        com.melhive.zed.core.understanding.QuickReplies.reply(text, if (guestTurn) null else runCatching { memory.userName() }.getOrNull())?.let { r ->
             conversations.addMessage(conversationId, "assistant", r, source = "native")
             return AssistantReply(r, true, "native")
         }
@@ -269,7 +276,7 @@ class AssistantOrchestrator(
         lastTurnAt[conversationId] = now
         val state = dialogue(conversationId).heard(text)
         dialogues[conversationId] = state
-        val facts = runCatching { memory.list(200).map { it.text } }.getOrDefault(emptyList())
+        val facts = if (guestTurn) emptyList() else runCatching { memory.list(200).map { it.text } }.getOrDefault(emptyList())
         return when (val r = tracker.resolve(text, state, facts)) {
             is com.melhive.zed.core.understanding.Resolution.Act -> {
                 val outcome = runTool(conversationId, r.request)
@@ -350,7 +357,7 @@ class AssistantOrchestrator(
     /** No model available: social replies or an honest, helpful explanation. */
     private suspend fun nativeConversation(conversationId: Long, text: String): AssistantReply {
         val ctx = SmallTalk.Context(
-            userName = memory.userName(),
+            userName = if (guestTurn) null else memory.userName(),
             addressAs = settings.current().userTitle.ifBlank { null },
             modelConfiguredButUnavailable = providers.anyConfigured(),
             hourOfDay = LocalTime.now().hour,
@@ -385,10 +392,11 @@ class AssistantOrchestrator(
             }
             else -> enabled
         }
-        val userName = memory.userName()
+        val userName = if (guestTurn) null else memory.userName()
         // Memories connected to the question (through shared names and ideas), not just the newest ones.
         val now0 = System.currentTimeMillis()
-        val allFacts = memory.list(1000)
+        // Locked phone: no memories, no surroundings, no documents reach the model.
+        val allFacts = if (guestTurn) emptyList() else memory.list(1000)
         val ranked = com.melhive.zed.core.understanding.MemoryRanker.rank(
             userText,
             allFacts.map { com.melhive.zed.core.understanding.MemoryFact(it.id, it.text, it.pinned, com.melhive.zed.core.brain.BrainStrength.of(it.uses, it.lastUsedAt, it.createdAt, it.pinned, now0)) },
@@ -415,7 +423,7 @@ class AssistantOrchestrator(
         val memories = rules + if (isLocal) ranked.filter { sourceOf[it.fact.id] != "preference" }.map { label(it.fact) } else (ranked.map { it.fact.text } + allFacts.filter { it.pinned }.map { it.text } + allFacts.take(12).map { it.text }).distinct().take(30)
         // The memories this question touches grow stronger and light up in the Live Brain (off the reply path).
         if (ranked.isNotEmpty()) appScope.launch { runCatching { memory.markUsed(ranked.map { it.fact.id }) } }
-        val environment = runCatching { awareness?.invoke() }.getOrNull()
+        val environment = if (guestTurn) null else runCatching { awareness?.invoke() }.getOrNull()
         val computed = buildList {
             addAll(com.melhive.zed.core.understanding.Computations.find(userText, java.time.LocalDate.now()))
             com.melhive.zed.core.understanding.TimeHints.moment(userText, java.time.LocalDateTime.now())?.let { at ->
@@ -459,7 +467,7 @@ class AssistantOrchestrator(
         for (round in 1..MAX_ROUNDS) {
             val history = conversations.history(conversationId, 40, SESSION_GAP_MS)
             val lastUser = history.lastOrNull { it.role == Role.USER }?.content.orEmpty()
-            val knowledgeSnippets = if (s.useKnowledge && round == 1) {
+            val knowledgeSnippets = if (s.useKnowledge && round == 1 && !guestTurn) {
                 setPhase(AssistantPhase.SEARCHING, "documents", conversationId)
                 runCatching { knowledge.search(lastUser, 3) }.getOrDefault(emptyList()).map { "${it.docPath}: ${it.text.take(if (isLocal) 400 else 700)}" }
             } else emptyList()
@@ -539,6 +547,16 @@ class AssistantOrchestrator(
     }
 
     /** A short side generation (a plan, a check) that isn't shown as a chat message. Null when it fails. */
+    /** Two short lines on what a call was about, or null when no model is available. */
+    suspend fun summarize(conversationId: Long): String? {
+        val provider = providers.active() ?: return null
+        val turns = conversations.allMessages(conversationId).filter { (it.role == "user" || it.role == "assistant") && it.status == "complete" && it.source != "summary" && it.content.isNotBlank() }
+        if (turns.count { it.role == "user" } < 3) return null
+        val text = turns.takeLast(24).joinToString("\n") { (if (it.role == "user") "User: " else "ZED: ") + it.content.take(240) }.takeLast(3000)
+        return generateText(provider, "You summarize conversations. Reply with at most two short lines saying what the conversation was about and anything that was decided. No greeting, no bullet points.", text, 90, "summary-$conversationId")
+            ?.trim()?.lineSequence()?.filter { it.isNotBlank() }?.take(2)?.joinToString(" ")?.take(280)?.takeIf { it.length >= 12 }
+    }
+
     private suspend fun generateText(provider: IntelligenceProvider, system: String, prompt: String, maxTokens: Int, session: String): String? {
         val out = StringBuilder()
         var failed = false

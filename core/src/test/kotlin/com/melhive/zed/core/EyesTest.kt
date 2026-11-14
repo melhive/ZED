@@ -114,6 +114,52 @@ class EyesTest {
         assertTrue(m.left.upper < 0.6f)
     }
 
+    @Test fun `only safe actions run on a locked phone`() {
+        val lock = com.melhive.zed.core.security.LockPolicy
+        for (t in listOf("time.now", "timer.set", "alarm.set", "flashlight.set", "volume.set", "weather.get", "web.research")) assertTrue(lock.allows(t), t)
+        for (t in listOf("memory.list", "messages.read", "contacts.find", "phone.call", "sms.compose", "calendar.today", "reminder.list", "file.read",
+            "notifications.recent", "history.search", "settings.set", "screen.read", "app.open", "location.get", "time.left", "people.forget")) assertFalse(lock.allows(t), t)
+        // Every allowed name is a real tool.
+        for (t in lock.allowed) assertTrue(com.melhive.zed.core.tools.ToolCatalog.DEFAULT.find(t) != null, t)
+    }
+
+    @Test fun `names are picked out of an introduction`() {
+        val n = com.melhive.zed.core.eyes.NameAnswer
+        assertEquals("Ana", n.parse("my name is Ana"))
+        assertEquals("Ana", n.parse("I'm Ana."))
+        assertEquals("Juan Cruz", n.parse("it's juan cruz"))
+        assertEquals("Mika", n.parse("Mika"))
+        assertEquals(null, n.parse("what time is it"))
+        assertEquals(null, n.parse("no"))
+        assertEquals(null, n.parse("why do you want to know my name"))
+        assertTrue(VisualAsk.followUp("how do I use it?")); assertTrue(VisualAsk.followUp("is that expensive"))
+        assertFalse(VisualAsk.followUp("what time is the meeting"))
+    }
+
+    @Test fun `faces and voices are matched to people`() {
+        val rnd = kotlin.random.Random(9)
+        fun face(seed: Int, noise: Int): FloatArray {
+            val r = kotlin.random.Random(seed)
+            val base = IntArray(64 * 64) { r.nextInt(256) }
+            // Smooth blobs, so it looks more like a face than like static.
+            val smooth = IntArray(64 * 64) { i -> val x = i % 64; val y = i / 64; (base[(y / 6) * 64 + x / 6] * 2 + base[(y / 12) * 64 + x / 12]) / 3 }
+            return com.melhive.zed.core.eyes.FacePrint.describe(IntArray(64 * 64) { (smooth[it] + rnd.nextInt(-noise, noise + 1)).coerceIn(0, 255) })
+        }
+        val book = com.melhive.zed.core.eyes.PeopleBook()
+        assertTrue(book.whose(face(1, 2)).stranger, "nobody is known yet")
+        val me = book.add("Rommel", true, List(4) { face(1, 3) })
+        book.add("Ana", false, List(4) { face(2, 3) })
+        val seen = book.whose(face(1, 3))
+        assertTrue(seen.known && seen.person === me, "distance ${seen.distance}")
+        assertEquals("Ana", book.whose(face(2, 3)).person?.name)
+        assertTrue(book.whose(face(3, 3)).stranger)
+        assertEquals(null, book.ownerVoice(floatArrayOf(1f, 0f)))
+        me.voices += floatArrayOf(1f, 0f, 0f)
+        assertTrue(book.ownerVoice(floatArrayOf(0.9f, 0.1f, 0f))!! > 0.9f)
+        assertTrue(book.ownerVoice(floatArrayOf(0f, 1f, 0f))!! < 0.1f)
+        assertTrue(book.forget("ana")); assertEquals(1, book.people.size)
+    }
+
     @Test fun `questions that need the camera`() {
         for (q in listOf("what is this", "What's this?", "what is that thing", "look at this", "can you see me", "what am I holding", "what do you see",
             "read this", "what does this say", "what color is this", "how do I look", "is this ripe", "what kind of plant is this", "do you see this")) {
@@ -188,5 +234,41 @@ class EyesTest {
         art.draw(frame, 1600f, 720f, m.left, m.right, m.roll); EyePreview.render(frame, 1600, 720, File(dir, "membrane.png"))
         for (i in 0 until 3600) { m.update(1f / 60f); best = m.left.upper; if (best > 0.93f) break }
         art.draw(frame, 1600f, 720f, m.left, m.right, m.roll); EyePreview.render(frame, 1600, 720, File(dir, "blink.png"))
+    }
+
+    /** Set ZED_FACE_SET to a folder of person folders (ORL layout) to measure the face recogniser. */
+    @Test fun `face recogniser on a real face set`() {
+        val dir = System.getenv("ZED_FACE_SET") ?: return
+        System.setProperty("java.awt.headless", "true")
+        fun load(f: File): FloatArray {
+            val img = javax.imageio.ImageIO.read(f)
+            // The middle of the picture, roughly eyes-to-chin like the phone's crop.
+            val side = (minOf(img.width, img.height) * 0.86).toInt()
+            val x0 = (img.width - side) / 2; val y0 = ((img.height - side) * 0.55).toInt()
+            val grey = IntArray(64 * 64) { i ->
+                val x = x0 + (i % 64) * side / 64; val y = y0 + (i / 64) * side / 64
+                val rgb = img.getRGB(x, y); ((rgb shr 16 and 255) * 3 + (rgb shr 8 and 255) * 6 + (rgb and 255)) / 10
+            }
+            return com.melhive.zed.core.eyes.FacePrint.describe(grey)
+        }
+        val folders = File(dir).listFiles()!!.filter { it.isDirectory }.sortedBy { it.name.toInt() }
+        val book = com.melhive.zed.core.eyes.PeopleBook()
+        val known = folders.take(20); val strangers = folders.drop(20)
+        val probes = ArrayList<Pair<String, FloatArray>>()
+        for (f in known) {
+            val pics = f.listFiles()!!.sortedBy { it.nameWithoutExtension.toInt() }.map { load(it) }
+            book.add(f.name, false, pics.take(5))
+            pics.drop(5).forEach { probes += f.name to it }
+        }
+        val right = ArrayList<Float>(); var wrong = 0
+        for ((name, face) in probes) { val m = book.whose(face); if (m.person?.name == name) right += m.distance else wrong++ }
+        val strange = strangers.flatMap { f -> f.listFiles()!!.map { book.whose(load(it)).distance } }.sorted()
+        right.sort()
+        fun pct(l: List<Float>, p: Double) = l[((l.size - 1) * p).toInt()]
+        println("FACES known probes=${probes.size} wrong-person=$wrong  right distance p10=${pct(right, .1)} p50=${pct(right, .5)} p90=${pct(right, .9)} max=${right.last()}")
+        println("FACES strangers=${strange.size} nearest distance min=${strange.first()} p05=${pct(strange, .05)} p10=${pct(strange, .1)} p50=${pct(strange, .5)}")
+        for (t in listOf(0.14f, 0.16f, 0.18f, 0.20f, 0.22f, 0.24f, 0.26f, 0.28f, 0.30f)) {
+            println("FACES threshold $t: known accepted ${right.count { it <= t } * 100 / probes.size}%  strangers mistaken ${strange.count { it <= t } * 100 / strange.size}%")
+        }
     }
 }

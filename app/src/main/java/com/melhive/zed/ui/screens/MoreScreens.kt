@@ -183,6 +183,9 @@ fun SettingsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit) {
                 SwitchRow("Voice responses", "Speak replies in ZED LIVE and after voice input", settings.voiceResponses) { scope.launch { c.settings.setVoiceResponses(it) } }
                 SwitchRow("Interrupt by talking", "With headphones or earbuds, start talking to cut ZED off. On the loudspeaker, tap the orb instead.", settings.bargeIn) { scope.launch { c.settings.setBargeIn(it) } }
                 SwitchRow("Say “stop” to interrupt", "On the loudspeaker, say “stop”, “wait” or “enough” to cut ZED off. Needs on-device speech recognition (More → Voice). Turn it off if answers feel slower.", settings.voiceStop) { scope.launch { c.settings.setVoiceStop(it) } }
+                SwitchRow("Guest mode while locked", "On a locked phone ZED still answers general questions, the time, the weather and web searches, and sets timers, alarms, the flashlight and volume. Anything personal waits until you unlock.", settings.lockGuard) { scope.launch { c.settings.setLockGuard(it) } }
+                SwitchRow("Vibrate with LIVE sounds", "A short pulse when ZED wakes, hears you and ends a call", settings.liveHaptics) { scope.launch { c.settings.setLiveHaptics(it) } }
+                SwitchRow("Large captions", "Bigger caption text in LIVE and Eye mode", settings.captionSize == "large") { scope.launch { c.settings.setCaptionSize(if (it) "large" else "normal") } }
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                     androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
                         Text("Keep listening", style = MaterialTheme.typography.titleSmall)

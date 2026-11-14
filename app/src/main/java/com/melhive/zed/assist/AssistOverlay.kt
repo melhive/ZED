@@ -110,6 +110,7 @@ class AssistOverlayActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        com.melhive.zed.android.CrashReporter.crumb("floating orb opens")
         if (Build.VERSION.SDK_INT >= 27) { setShowWhenLocked(true); setTurnScreenOn(true) }
         enableEdgeToEdge()
         val live = (application as ZedApp).container.live
@@ -158,6 +159,21 @@ class AssistOverlayActivity : ComponentActivity() {
 private fun AssistOverlay(onClose: () -> Unit, onOpenApp: () -> Unit) {
     val activity = androidx.compose.ui.platform.LocalContext.current as AssistOverlayActivity
     val c = (activity.application as ZedApp).container
+    // Asked for something personal on a locked phone: offer to unlock, then carry on with the same request.
+    val unlock by c.unlockRequest.collectAsStateWithLifecycle()
+    LaunchedEffect(unlock) {
+        val asked = unlock ?: return@LaunchedEffect
+        c.unlockRequest.value = null
+        val keyguard = activity.getSystemService(android.app.KeyguardManager::class.java)
+        if (keyguard?.isDeviceLocked != true) return@LaunchedEffect
+        kotlinx.coroutines.delay(1500) // ZED says "Unlock your phone for that" first
+        activity.keepAlive = true
+        keyguard.requestDismissKeyguard(activity, object : android.app.KeyguardManager.KeyguardDismissCallback() {
+            override fun onDismissSucceeded() { activity.keepAlive = false; c.live.submitText(asked) }
+            override fun onDismissCancelled() { activity.keepAlive = false }
+            override fun onDismissError() { activity.keepAlive = false }
+        })
+    }
     val live = c.live
     val state by live.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
@@ -252,6 +268,7 @@ private fun AssistOverlay(onClose: () -> Unit, onOpenApp: () -> Unit) {
                         ?: if (state.orb == OrbState.LISTENING && state.followUp) "Still listening" else state.orb.label).uppercase(),
                     style = MaterialTheme.typography.labelLarge, color = hudColor(state.orb), letterSpacing = 4.sp, textAlign = TextAlign.Center,
                 )
+                if (state.guest) Text("GUEST · PHONE LOCKED", style = MaterialTheme.typography.labelSmall, color = ZedColors.Amber, letterSpacing = 2.sp, modifier = Modifier.padding(top = 2.dp))
                 // Live captions: what ZED hears, and what it says while it says it.
                 val lastUser = state.partial.ifBlank { state.transcript.lastOrNull { it.fromUser }?.text.orEmpty() }
                 val answering = state.orb == OrbState.THINKING || state.orb == OrbState.SPEAKING

@@ -1,5 +1,6 @@
 package com.melhive.zed.learning
 
+import kotlinx.coroutines.flow.first
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -98,7 +99,9 @@ class Learner(private val context: Context, private val c: AppContainer, private
         if (!c.settings.current().autoLearning) return emptyList()
         if (running?.isActive == true) return emptyList()
         val after = prefs.getLong(KEY_CURSOR, 0L)
-        val messages = c.db.messages().userMessagesAfter(after, 60)
+        // Conversations held on a locked phone (anyone may have been talking) teach ZED nothing.
+        val guestTalks = c.db.conversations().observeAll().first().filter { it.title.startsWith("🔒") }.map { it.id }.toSet()
+        val messages = c.db.messages().userMessagesAfter(after, 60).filter { it.conversationId !in guestTalks }
             .filter { it.source == null || it.source == "user" }
             .filter { it.attachmentName == null || !it.content.contains("[Attached file:") }
         if (messages.isEmpty()) { dreamNow(allowModel); return emptyList() }

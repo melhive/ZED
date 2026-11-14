@@ -65,6 +65,11 @@ class ToolManager(
 
     fun registered(): Set<String> = executors.keys
 
+    /** True while the phone is locked: only [com.melhive.zed.core.security.LockPolicy] tools run. */
+    var locked: (() -> Boolean)? = null
+    /** A request was refused because the phone is locked (the screen offers to unlock and carries on). */
+    var onLockedRequest: ((String) -> Unit)? = null
+
     /** Called after a tool succeeds (e.g. calendar changes re-plan event announcements). */
     var afterSuccess: ((String) -> Unit)? = null
 
@@ -77,6 +82,13 @@ class ToolManager(
         }
         val (spec, args) = validation as ValidationResult.Valid
         val s = settings.current()
+
+        // A locked phone can be picked up by anyone: nothing personal is read or changed until it is unlocked.
+        if (s.lockGuard && !com.melhive.zed.core.security.LockPolicy.allows(spec.name) && locked?.invoke() == true) {
+            audit.record(spec.name, origin, request.args, "denied", "phone locked")
+            runCatching { onLockedRequest?.invoke(spec.name) }
+            return ToolOutcome.Denied(com.melhive.zed.core.security.LockPolicy.MESSAGE)
+        }
 
         val fromModel = request.origin == ToolRequest.Origin.LOCAL_MODEL || request.origin == ToolRequest.Origin.ONLINE_MODEL
         val skill = skills.skillForTool(spec.name)
@@ -109,6 +121,7 @@ class ToolManager(
             }
         }
 
+        com.melhive.zed.android.CrashReporter.crumb("action: ${spec.name}")
         return try {
             val result = executor.execute(args, request)
             audit.record(spec.name, origin, request.args, if (result.ok) "executed" else "failed", result.message)

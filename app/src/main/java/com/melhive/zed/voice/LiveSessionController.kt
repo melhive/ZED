@@ -59,6 +59,13 @@ data class LiveUiState(
     val looking: Boolean = false,
     /** The conversation this call is saved in (null until something is said). */
     val conversationId: Long? = null,
+    /** The phone is locked: ZED answers as a guest. */
+    val guest: Boolean = false,
+    /** The saved conversation was started on a locked phone (it is not carried on once unlocked). */
+    val guestConversation: Boolean = false,
+    /** The picture ZED just looked at; [shownTick] changes each time a new one is taken. */
+    val shown: com.melhive.zed.intelligence.ImageInput? = null,
+    val shownTick: Int = 0,
 )
 
 /**
@@ -111,6 +118,18 @@ class LiveSessionController(
     private val utteranceText = HashMap<String, String>()
     /** A chat to carry on with when the call starts (LIVE or Eye mode opened from that chat). Used once. */
     @Volatile var continueWith: Long? = null
+    /** Eye mode's people recognition: may answer an utterance itself (a stranger giving their name). */
+    @Volatile var intercept: (suspend (String) -> String?)? = null
+    /** The sound of each thing heard (on-device recognition only), for recognising the owner's voice. */
+    @Volatile var onUtterance: ((FloatArray) -> Unit)? = null
+    /** True while the phone is locked (set by the container). */
+    var lockedNow: (suspend () -> Boolean)? = null
+    /** A call with a real conversation in it has ended (the container writes its summary). */
+    var onCallEnded: ((Long) -> Unit)? = null
+    /** The last picture looked at, kept a short while for follow-up questions ("how do I use it?"). */
+    private var lastImage: com.melhive.zed.intelligence.ImageInput? = null
+    private var lastImageAt = 0L
+    private var haptics = true
     /** Listening for "stop" while ZED talks on the loudspeaker. */
     private var eavesdropping = false
     private var stopWordEnabled = true
@@ -127,7 +146,7 @@ class LiveSessionController(
     private var bargeInEnabled = true
     private var listenJob: Job? = null
 
-    private var soundStyle = com.melhive.zed.core.voice.SoundSynth.Style.CORE
+    private var soundStyle = com.melhive.zed.core.voice.SoundSynth.Style.AURA
     private var hideBeep = true
 
     /**
@@ -145,6 +164,7 @@ class LiveSessionController(
             com.melhive.zed.android.CrashReporter.recordNonFatal("live session", e)
             runCatching { setOrb(OrbState.ERROR, "Something went wrong — tap the orb to try again") }
         }
+        com.melhive.zed.android.CrashReporter.crumb("voice session starts")
         val s = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + guard)
         scope = s
         WakeWordService.paused.value = true // LIVE takes the microphone
@@ -161,14 +181,18 @@ class LiveSessionController(
             val cfg = settings.current()
             soundStyle = com.melhive.zed.core.voice.SoundSynth.Style.parse(cfg.liveSound)
             hideBeep = cfg.hideRecognizerBeep
+            haptics = cfg.liveHaptics
             val soundMs = ZedSounds.play(context, soundStyle, start = true)
+            if (haptics) ZedHaptics.wake(context)
+            val guestNow = runCatching { lockedNow?.invoke() }.getOrNull() == true
+            _state.update { it.copy(guest = guestNow) }
             bargeInEnabled = cfg.bargeIn
             stopWordEnabled = cfg.voiceStop
             quietRounds = when (cfg.listenPatience) { "short" -> 1; "long" -> 4; else -> 2 }
             _state.update { it.copy(speakerOn = cfg.voiceResponses) }
             tts?.setRate(cfg.speechRate)
             // Carry on a chat when the call was opened from one; otherwise the conversation is created with the first thing said.
-            conversationId = continueWith?.takeIf { runCatching { conversations.get(it) }.getOrNull() != null }
+            conversationId = continueWith?.takeIf { !guestNow && runCatching { conversations.get(it) }.getOrNull() != null }
             continueWith = null
             _state.update { it.copy(conversationId = conversationId) }
             if (tts?.awaitReady() != true) _state.update { it.copy(speakerOn = false, statusDetail = "Text-to-speech is unavailable; replies will be shown only") }
@@ -180,7 +204,7 @@ class LiveSessionController(
                 say(announcement)
             } else if (greet && cfg.greetOnCall && _state.value.speakerOn) {
                 // Answer like an assistant at the ready; listening starts when the greeting ends (or on a tap).
-                val name = runCatching { userName?.invoke() }.getOrNull()
+                val name = if (guestNow) null else runCatching { userName?.invoke() }.getOrNull()
                 val hello = com.melhive.zed.core.voice.Greetings.pick(java.time.LocalTime.now().hour, cfg.userTitle, name, lastGreeting)
                 lastGreeting = hello
                 _state.update { it.copy(transcript = it.transcript + LiveTurn(false, hello)) }
@@ -198,7 +222,15 @@ class LiveSessionController(
     /** Ends the voice session. Background tasks keep running. */
     fun end() {
         eavesdropping = false
-        if (_state.value.active) ZedSounds.play(context, soundStyle, start = false)
+        if (_state.value.active) {
+            com.melhive.zed.android.CrashReporter.crumb("voice session ends")
+            ZedSounds.play(context, soundStyle, start = false)
+            if (haptics) ZedHaptics.end(context)
+            // A call with a few exchanges gets a short summary at the top of its conversation.
+            val conv = conversationId
+            if (conv != null && exchanges >= 3 && !_state.value.guest) runCatching { onCallEnded?.invoke(conv) }
+        }
+        lastImage = null
         BeepSuppressor.restore(context)
         AudioRoute.endSession(context)
         WakeWordService.paused.value = false
@@ -294,6 +326,7 @@ class LiveSessionController(
     private fun startEavesdrop() {
         if (!stopWordEnabled || eavesdropping || _state.value.micMuted || stt !is OnDeviceSpeechToText) return
         eavesdropping = true
+        com.melhive.zed.android.CrashReporter.crumb("voice: listening for stop words while speaking")
         listenJob?.cancel()
         stt?.start()
     }
@@ -323,7 +356,15 @@ class LiveSessionController(
         scope?.launch { delay(200); listen() }
     }
 
-    private fun setOrb(o: OrbState, detail: String? = null) = _state.update { it.copy(orb = o, statusDetail = detail, error = if (o == OrbState.ERROR) detail else null) }
+    private fun setOrb(o: OrbState, detail: String? = null) {
+        if (o == OrbState.ERROR && _state.value.orb != OrbState.ERROR && haptics) ZedHaptics.error(context)
+        setOrbState(o, detail)
+    }
+
+    private fun setOrbState(o: OrbState, detail: String? = null) = _state.update {
+        if (it.orb != o) com.melhive.zed.android.CrashReporter.crumb("voice: ${o.name}" + (detail?.let { d -> " ($d)" } ?: ""))
+        it.copy(orb = o, statusDetail = detail, error = if (o == OrbState.ERROR) detail else null)
+    }
 
     private fun listen() {
         if (!_state.value.active || _state.value.micMuted) return
@@ -357,6 +398,7 @@ class LiveSessionController(
                 if (speechEndedAt > 0) com.melhive.zed.diagnostics.SpeedLog.record(com.melhive.zed.diagnostics.SpeedLog.Stage.HEARING, System.currentTimeMillis() - speechEndedAt)
                 speechEndedAt = 0
                 val text = e.text.trim()
+                if (text.isNotEmpty()) (stt as? OnDeviceSpeechToText)?.lastAudio?.let { audio -> runCatching { onUtterance?.invoke(audio) } }
                 _state.update { it.copy(partial = "", micLevel = 0f) }
                 if (text.isEmpty()) onNothingHeard() else { emptyResults = 0; submit(text) }
             }
@@ -405,18 +447,37 @@ class LiveSessionController(
         setOrb(OrbState.THINKING)
         // Instant acknowledgement: a low thunk the moment ZED has the request, before any answer exists.
         if (soundStyle != com.melhive.zed.core.voice.SoundSynth.Style.OFF) ZedSounds.ack(context)
+        if (haptics) ZedHaptics.heard(context)
         streamText = ""; spokenChars = 0; replyFinished = false
         // Eye mode: "what is this?" is answered from what the camera sees right now.
         val camera = frameSource?.takeIf { image == null && com.melhive.zed.core.eyes.VisualAsk.matches(text) }
         if (camera != null) _state.update { it.copy(looking = true) }
         requestJob = scope?.launch {
-            // The call is saved under its first words, marked as a voice conversation.
-            val conv = conversationId ?: conversations.create("🎙 " + text.removePrefix("📷 ").lineSequence().first().take(46).ifBlank { "Voice conversation" }).also { id ->
+            // The call is saved under its first words, marked as a voice conversation (🔒 when held on a locked phone).
+            val guestNow = runCatching { lockedNow?.invoke() }.getOrNull() == true
+            if (guestNow != _state.value.guest) _state.update { it.copy(guest = guestNow) }
+            val words = text.removePrefix("📷 ")
+            val conv = conversationId?.takeIf { !guestNow || _state.value.guestConversation } ?: conversations.create((if (guestNow) "🔒 " else "🎙 ") + words.lineSequence().first().take(46).ifBlank { "Voice conversation" }).also { id ->
                 conversationId = id
-                _state.update { it.copy(conversationId = id) }
+                _state.update { it.copy(conversationId = id, guestConversation = guestNow) }
             }
-            val seen = image ?: camera?.let { runCatching { it() }.getOrNull() }
-            val reply = try { orchestrator.respond(conv, text.removePrefix("📷 "), voice = true, image = seen) } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            // Eye mode may answer this itself (someone telling ZED their name).
+            val own = runCatching { intercept?.invoke(words) }.getOrNull()
+            if (own != null) {
+                conversations.addMessage(conv, "user", words)
+                conversations.addMessage(conv, "assistant", own, source = "native")
+                onReply(AssistantReply(own, true, "native"))
+                return@launch
+            }
+            // A new look through the camera, or the picture from a moment ago when the question still points at it.
+            val fresh = image ?: camera?.let { runCatching { it() }.getOrNull() }
+            val now = System.currentTimeMillis()
+            if (fresh != null) {
+                lastImage = fresh; lastImageAt = now
+                _state.update { it.copy(shown = fresh, shownTick = it.shownTick + 1) }
+            }
+            val seen = fresh ?: lastImage?.takeIf { now - lastImageAt < 120_000L && com.melhive.zed.core.eyes.VisualAsk.followUp(words) }?.also { lastImageAt = now }
+            val reply = try { orchestrator.respond(conv, words, voice = true, image = seen) } catch (e: kotlinx.coroutines.CancellationException) { throw e }
             onReply(reply)
         }
     }

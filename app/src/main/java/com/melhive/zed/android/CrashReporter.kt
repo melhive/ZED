@@ -18,6 +18,11 @@ import java.util.Locale
  */
 object CrashReporter {
     private const val CRASH_FILE = "last-crash.txt"
+    /** The stack trace of a real crash, written the moment it happens and never overwritten by anything else. */
+    private const val FATAL_FILE = "fatal.txt"
+    /** A short trail of what ZED was doing (screens, voice session, actions): this run and the one before. */
+    private const val CRUMBS = "crumbs.log"
+    private const val CRUMBS_BEFORE = "crumbs-before.log"
     private const val ERRORS_FILE = "errors.log"
     private lateinit var dir: File
     private lateinit var app: Context
@@ -25,15 +30,30 @@ object CrashReporter {
     fun install(context: Context) {
         app = context.applicationContext
         dir = File(context.filesDir, "diagnostics").apply { mkdirs() }
+        // Keep the trail of the previous run (it shows what led up to a crash) and start a new one.
+        runCatching {
+            if (processName().contains(':')) return@runCatching
+            val crumbs = File(dir, CRUMBS)
+            if (crumbs.exists()) { File(dir, CRUMBS_BEFORE).delete(); crumbs.renameTo(File(dir, CRUMBS_BEFORE)) }
+        }
+        crumb("ZED started (${processName()})")
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
             // An error in a background task or coroutine doesn't have to take the whole app down.
             val main = thread === android.os.Looper.getMainLooper().thread
             val fromCoroutine = Thread.currentThread().stackTrace.any { it.className.startsWith("kotlinx.coroutines") }
             if ((!main || fromCoroutine) && survivable(error)) { caught(error, thread.name); return@setDefaultUncaughtExceptionHandler }
-            val text = report("Crash on thread ${thread.name} (${processName()})", error)
-            runCatching { File(dir, CRASH_FILE).writeText(text) }
-            runCatching { saveToDownloads(text) }
+            // First, and as simply as possible, get the stack trace onto disk: nothing below may prevent that.
+            try {
+                val sw = StringWriter(); error.printStackTrace(PrintWriter(sw))
+                File(dir, FATAL_FILE).writeText("${timestamp()} thread ${thread.name} (${processName()})\n$sw")
+            } catch (_: Throwable) {}
+            try {
+                crumb("CRASH: $error")
+                val text = report("Crash on thread ${thread.name} (${processName()})", error) + "\n\n" + trail(CRUMBS)
+                File(dir, CRASH_FILE).writeText(text)
+                saveToDownloads(text)
+            } catch (_: Throwable) {}
             previous?.uncaughtException(thread, error)
         }
         // Errors thrown on the main thread outside drawing (a button's action, a callback) are caught
@@ -71,8 +91,28 @@ object CrashReporter {
 
     private fun caught(e: Throwable, where: String) {
         recordNonFatal("kept running after an error on $where", e)
-        runCatching { File(dir, CRASH_FILE).writeText(report("Recovered from an error on $where (${processName()}) — ZED kept running", e)) }
+        crumb("recovered from $e on $where")
+        // Never replaces the record of a real crash that hasn't been collected yet.
+        runCatching { if (!File(dir, FATAL_FILE).exists()) File(dir, CRASH_FILE).writeText(report("Recovered from an error on $where (${processName()}) — ZED kept running", e)) }
     }
+
+    /**
+     * Notes what ZED is doing right now (a screen opened, a voice session started, an action ran).
+     * When ZED stops unexpectedly, the last of these are in the report: they show what led up to it,
+     * even when Android gives no stack trace.
+     */
+    fun crumb(what: String) {
+        if (!::dir.isInitialized) return
+        runCatching {
+            val f = File(dir, CRUMBS)
+            if (f.length() > 24_000) f.writeText(f.readText().takeLast(12_000).substringAfter('\n'))
+            f.appendText(SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date()) + " " + SecretRedactor.redact(what.take(200)).replace('\n', ' ') + "\n")
+        }
+    }
+
+    private fun trail(file: String): String = runCatching {
+        File(dir, file).takeIf { it.exists() }?.readLines()?.takeLast(60)?.joinToString("\n")?.let { "--- What ZED was doing ---\n$it" }
+    }.getOrNull().orEmpty()
 
     private fun processName(): String = if (Build.VERSION.SDK_INT >= 28) android.app.Application.getProcessName() else "zed"
 
@@ -105,17 +145,27 @@ object CrashReporter {
                 appendLine("Time: " + SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date(worst.timestamp)))
                 appendLine("App: ${BuildConfig.APPLICATION_ID} ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
                 appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
-                appendLine("$kind in ${worst.processName}: ${worst.description ?: ""}")
+                appendLine("$kind in ${worst.processName}: ${worst.description ?: ""} (reason ${worst.reason}, status ${worst.status})")
                 appendLine("Memory: ${worst.pss / 1024} MB used, importance ${worst.importance}")
                 if (bad.size > 1) appendLine("Other recent stops: " + bad.filter { it !== worst }.joinToString { "${it.reason}@${SimpleDateFormat("HH:mm", Locale.US).format(Date(it.timestamp))}" })
                 appendLine()
                 append(trace.take(30_000))
             }
-            // A Java crash was already written up with its stack trace when it happened: keep that, add this.
-            val existing = File(dir, CRASH_FILE)
-            val fresh = existing.exists() && kotlin.math.abs(existing.lastModified() - worst.timestamp) < 5 * 60_000L && existing.readText().contains("Crash on thread")
-            if (fresh) { existing.appendText("\n\n--- Android's record ---\n$text"); saveToDownloads(existing.readText()) }
-            else { existing.writeText(text); saveToDownloads(text) }
+            // Everything known about it in one report: Android's record, the stack trace written when it happened,
+            // what ZED was doing in that run, and the errors it had survived just before.
+            val fatal = File(dir, FATAL_FILE)
+            val stack = runCatching { fatal.takeIf { it.exists() && kotlin.math.abs(it.lastModified() - worst.timestamp) < 10 * 60_000L }?.readText() }.getOrNull()
+            val errors = runCatching { File(dir, ERRORS_FILE).takeIf { it.exists() }?.readText()?.split("\n---\n")?.takeLast(8)?.joinToString("\n---\n") }.getOrNull()
+            val full = buildString {
+                append(text.trimEnd()); appendLine(); appendLine()
+                if (stack != null) { appendLine("--- Stack trace ---"); appendLine(SecretRedactor.redact(stack).take(20_000)); appendLine() }
+                else appendLine("(No stack trace: the app was stopped from outside, or before it could write one.)").also { appendLine() }
+                appendLine(trail(CRUMBS_BEFORE)); appendLine()
+                if (!errors.isNullOrBlank()) { appendLine("--- Recent errors ZED survived ---"); appendLine(errors.take(8_000)) }
+            }
+            runCatching { fatal.delete() }
+            File(dir, CRASH_FILE).writeText(full)
+            saveToDownloads(full)
         }
     }
 

@@ -32,6 +32,12 @@ object Announcer {
     private const val ACTION_PLAN = "com.melhive.zed.ANNOUNCE_PLAN"
     private const val ACTION_BRIEF = "com.melhive.zed.ANNOUNCE_BRIEF"
 
+    /** Says [text], or [locked] instead while the phone is locked (anyone nearby would hear it). */
+    private suspend fun announce(context: Context, text: String, locked: String) {
+        val c = (context.applicationContext as ZedApp).container
+        announce(context, if (c.settings.current().lockGuard && c.phoneLocked()) locked else text)
+    }
+
     fun announce(context: Context, text: String) {
         if (Settings.canDrawOverlays(context)) {
             val opened = runCatching { context.startActivity(ZedLaunch.overlayIntent(context).putExtra(EXTRA_ANNOUNCE, text)) }.isSuccess
@@ -101,7 +107,7 @@ object Announcer {
         if (key in done) return
         prefs.edit().putStringSet("events", (done + key).toList().takeLast(40).toSet()).apply()
         val whenText = when { minutes <= 1 -> "is starting now"; else -> "starts in $minutes minutes, at ${clock(e.begin)}" }
-        announce(context, "Heads up: ${e.title} $whenText" + (e.place?.let { ", at $it" } ?: "") + ".")
+        announce(context, "Heads up: ${e.title} $whenText" + (e.place?.let { ", at $it" } ?: "") + ".", com.melhive.zed.core.security.LockPolicy.EVENT)
     }
 
     // ---- alarms ----
@@ -144,14 +150,14 @@ object Announcer {
         val hour = java.time.LocalTime.now().hour
         val text = if (hour in 3..11) withTimeoutOrNull(8_000) { runCatching { BriefingComposer(context, c).compose() }.getOrNull() } ?: "Good morning. It's ${clock(now)}."
             else "It's ${clock(now)}." + (CalendarReader(context).nextEvent(now)?.takeIf { it.second - now < 3 * 3_600_000L }?.let { (t, at) -> " Next up: $t at ${clock(at)}." } ?: "")
-        announce(context, text)
+        announce(context, text, com.melhive.zed.core.security.LockPolicy.BRIEFING)
     }
 
     /** A reminder is due. */
     suspend fun onReminder(context: Context, text: String) {
         val c = (context.applicationContext as ZedApp).container
         if (!c.settings.current().announceReminders) return
-        announce(context, "Reminder: ${text.trim().trimEnd('.')}.")
+        announce(context, "Reminder: ${text.trim().trimEnd('.')}.", com.melhive.zed.core.security.LockPolicy.REMINDER)
     }
 
     class AnnounceReceiver : BroadcastReceiver() {

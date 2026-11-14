@@ -250,6 +250,7 @@ fun VoiceScreen(onBack: () -> Unit, onOpenTasks: () -> Unit) {
                         FilterChip(selected = com.melhive.zed.core.voice.SoundSynth.Style.parse(settings.liveSound) == st, onClick = {
                             safely { c.settings.setLiveSound(st.id) }
                             val ms = com.melhive.zed.voice.ZedSounds.play(context, st, start = true)
+                            if (ms > 0 && settings.liveHaptics) com.melhive.zed.voice.ZedHaptics.wake(context)
                             if (ms > 0) scope.launch { kotlinx.coroutines.delay(ms + 450); com.melhive.zed.voice.ZedSounds.play(context, st, start = false) }
                         }, label = { Text(st.label) })
                     }

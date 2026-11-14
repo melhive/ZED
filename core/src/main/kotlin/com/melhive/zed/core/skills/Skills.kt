@@ -48,7 +48,7 @@ class SkillRegistry(val catalog: ToolCatalog, skills: List<SkillDescriptor>) {
             SkillDescriptor("calendar.events", "Calendar", "Creates calendar events through your calendar app.", listOf("calendar.create", "calendar.move", "calendar.delete")),
             SkillDescriptor("reminders", "Reminders", "Schedules reminder notifications.", listOf("reminder.create", "reminder.reschedule", "reminder.list", "reminder.cancel", "reminder.delete", "reminder.snooze")),
             SkillDescriptor("tasks.list", "Task List", "Keeps your personal to-do list.", listOf("todo.add", "todo.list", "todo.complete", "todo.delete")),
-            SkillDescriptor("memory.personal", "Personal Memory", "Remembers facts only when you ask, and forgets on request.", listOf("memory.remember", "memory.list", "memory.forget", "brain.show", "memory.pin", "memory.confirm")),
+            SkillDescriptor("memory.personal", "Personal Memory", "Remembers facts only when you ask, and forgets on request.", listOf("memory.remember", "memory.list", "memory.forget", "brain.show", "memory.pin", "memory.confirm", "people.forget")),
             SkillDescriptor("history.search", "Conversation History", "Searches your past conversations.", listOf("history.search", "chats.clear")),
             SkillDescriptor("app.settings", "Settings Control", "Changes any ZED setting and opens any ZED screen by voice or chat.", listOf("settings.set", "app.show", "app.undo")),
             SkillDescriptor("learning.teach", "Learns From You", "Learns how to pronounce words, how you like answers and your own shortcuts when you tell it.", listOf("teach.pronounce", "teach.rule", "teach.alias", "teach.forget", "teach.list")),

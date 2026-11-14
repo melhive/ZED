@@ -8,56 +8,44 @@ import kotlin.math.pow
 import kotlin.math.sin
 
 /**
- * ZED's LIVE sounds, synthesized in code (no audio files): the sounds of a
- * cinematic AI assistant — holographic interfaces, a reactor core, neural
- * links, scanners, armour locking on — in a space with a short reverb.
+ * ZED's LIVE sounds, synthesized in code (no audio files): the sound of an
+ * assistant coming online — a soft low pulse, a smooth tone that rises (and
+ * falls again when it leaves) and a little air on top. Calm and modern.
  *
- * Never toy-like: no bright square bleeps, chirps or major arpeggios. Notes
- * sit low (55–500 Hz) for weight and glassy FM tones replace beeps. Every
- * sound is filtered so its energy lands above ~350 Hz, where phone speakers
- * can play it (the ear still hears the low pitch).
+ * Never toy-like: no beeps, chirps, bleeps, clanks or arpeggios. Tones are
+ * rounded (a few soft overtones, slow starts and endings), and every sound is
+ * filtered so its energy lands above ~350 Hz, where phone speakers can play it.
  */
 object SoundSynth {
     const val RATE = 44_100
 
     enum class Style(val id: String, val label: String, val description: String) {
-        HOLO("holo", "Hologram", "A holographic display shimmers up and two glass tones lock in"),
-        REACTOR("reactor", "Reactor", "An energy core hums to life with electric crackle and a power chord"),
-        NEURAL("neural", "Neural", "Synapses fire in a rising cascade that settles into a warm chord"),
-        SCAN("scan", "Scanner", "A resonant scan sweeps across and locks on target"),
-        ARMOR("armor", "Armor", "Servos drive, plates clamp shut and the suit powers up"),
-        SONAR("sonar", "Sonar", "A deep sonar ping echoing through a vast space"),
-        CORE("core", "Core", "A reactor engine spins up, a heavy lock engages and a low chord confirms"),
-        COMMAND("command", "Command", "A starship bridge console: low, warm synth chords"),
+        AURA("aura", "Aura", "A soft pulse and one smooth tone rising, with a breath of air"),
+        PULSE("pulse", "Pulse", "Two warm pulses, low then higher, settling into a held tone"),
+        HORIZON("horizon", "Horizon", "A wide, calm chord that swells in and opens up"),
         OFF("off", "Off", "No sound");
 
         companion object {
-            /** Unknown ids (including retired sounds) fall back to Hologram. */
-            fun parse(id: String?) = entries.firstOrNull { it.id == id } ?: HOLO
+            /** Unknown ids (including every retired sound) fall back to Aura. */
+            fun parse(id: String?) = entries.firstOrNull { it.id == id } ?: AURA
         }
     }
 
     /** 16-bit mono PCM at [RATE]; empty for [Style.OFF]. */
     fun render(style: Style, start: Boolean): ShortArray {
         val out = when (style) {
-            Style.HOLO -> if (start) holoUp() else holoDown()
-            Style.REACTOR -> if (start) reactorUp() else reactorDown()
-            Style.NEURAL -> if (start) neuralUp() else neuralDown()
-            Style.SCAN -> if (start) scanUp() else scanDown()
-            Style.ARMOR -> if (start) armorUp() else armorDown()
-            Style.SONAR -> if (start) sonarUp() else sonarDown()
-            Style.CORE -> reverb(if (start) coreUp() else coreDown(), 0.2)
-            Style.COMMAND -> reverb(if (start) commandUp() else commandDown(), 0.3)
+            Style.AURA -> reverb(if (start) auraUp() else auraDown(), 0.3)
+            Style.PULSE -> reverb(if (start) pulseUp() else pulseDown(), 0.25)
+            Style.HORIZON -> reverb(if (start) horizonUp() else horizonDown(), 0.35)
             Style.OFF -> return ShortArray(0)
         }
         return finish(out, 0.6)
     }
 
-    /** The instant "got it" when ZED takes a request in LIVE: one low, solid mechanical thunk. */
+    /** The instant "got it" when ZED takes a request in LIVE: one short, soft, low tick. */
     fun ack(): ShortArray {
-        val o = buffer(0.16)
-        clank(o, 0.0, 0.9, 0.8)
-        chord(o, 0.0, 0.09, doubleArrayOf(110.0, 165.0), 0.6, attack = 0.002, release = 0.05)
+        val o = buffer(0.13)
+        voice(o, 0.0, 0.09, 466.0, 392.0, 0.9, attack = 0.004, release = 0.06, bright = 0.5)
         return finish(o, 0.36)
     }
 
@@ -101,140 +89,83 @@ object SoundSynth {
 
     // ---------------------------------------------------------------- styles
 
-    private fun holoUp(): DoubleArray {
-        val o = buffer(1.0)
-        shimmer(o, 0.0, 0.46, 500.0, 3200.0, 0.55, fadeIn = 0.3, fadeOut = 0.05)
-        chord(o, 0.05, 0.75, doubleArrayOf(110.0, 165.0), 0.3, attack = 0.35, release = 0.3)
-        bell(o, 0.42, 0.5, 330.0, 1.414, 2.0, 0.6, 0.25)
-        bell(o, 0.5, 0.45, 495.0, 1.414, 1.5, 0.45, 0.22)
-        return reverb(o, 0.35)
-    }
-
-    private fun holoDown(): DoubleArray {
-        val o = buffer(0.9)
-        bell(o, 0.0, 0.4, 495.0, 1.414, 1.5, 0.45, 0.18)
-        bell(o, 0.08, 0.45, 330.0, 1.414, 2.0, 0.6, 0.22)
-        shimmer(o, 0.12, 0.5, 2200.0, 450.0, 0.38, fadeIn = 0.03, fadeOut = 0.3)
-        return reverb(o, 0.35)
-    }
-
-    private fun reactorUp(): DoubleArray {
-        val o = buffer(1.0)
-        engine(o, 0.0, 0.6, 50.0, 100.0, 0.3, 0.9, whine = 0.1, throb = 0.2)
-        crackle(o, 0.05, 0.55, 12, 0.5, seed = 11)
-        boom(o, 0.56, 0.3, 80.0, 52.0, 0.8)
-        chord(o, 0.56, 0.4, doubleArrayOf(110.0, 146.8, 164.8, 220.0), 0.75, attack = 0.03, release = 0.22)
-        return reverb(o, 0.25)
-    }
-
-    private fun reactorDown(): DoubleArray {
-        val o = buffer(0.9)
-        chord(o, 0.0, 0.18, doubleArrayOf(110.0, 146.8, 164.8, 220.0), 0.7, attack = 0.01, release = 0.08)
-        engine(o, 0.12, 0.55, 100.0, 40.0, 0.9, 0.2, whine = 0.08, throb = 0.2)
-        crackle(o, 0.15, 0.4, 6, 0.4, seed = 23)
-        clank(o, 0.66, 0.7, 0.5)
-        return reverb(o, 0.25)
-    }
-
-    private fun neuralUp(): DoubleArray {
-        val o = buffer(0.98)
-        for (k in 0 until 14) bell(o, k * 0.026, 0.07, 392.0 * (1175.0 / 392.0).pow(k / 13.0), 2.0, 1.2, 0.32, 0.03)
-        chord(o, 0.34, 0.58, doubleArrayOf(146.8, 220.0, 261.6, 329.6), 0.7, attack = 0.12, release = 0.22)
-        return reverb(o, 0.4)
-    }
-
-    private fun neuralDown(): DoubleArray {
-        val o = buffer(0.9)
-        chord(o, 0.0, 0.3, doubleArrayOf(146.8, 220.0, 261.6, 329.6), 0.65, attack = 0.02, release = 0.15)
-        for (k in 0 until 10) bell(o, 0.22 + k * 0.03, 0.07, 1047.0 * (330.0 / 1047.0).pow(k / 9.0), 2.0, 1.2, 0.3, 0.03)
-        return reverb(o, 0.4)
-    }
-
-    private fun scanUp(): DoubleArray {
-        val o = buffer(0.95)
-        shimmer(o, 0.0, 0.46, 350.0, 2900.0, 0.8, fadeIn = 0.1, fadeOut = 0.04, resonance = 0.12)
-        boom(o, 0.46, 0.25, 90.0, 55.0, 0.6)
-        bell(o, 0.46, 0.35, 247.0, 2.76, 2.5, 0.7, 0.12)
-        bell(o, 0.6, 0.32, 370.0, 2.76, 2.0, 0.55, 0.11)
-        return reverb(o, 0.3)
-    }
-
-    private fun scanDown(): DoubleArray {
-        val o = buffer(0.85)
-        shimmer(o, 0.0, 0.42, 2900.0, 350.0, 0.8, fadeIn = 0.03, fadeOut = 0.1, resonance = 0.12)
-        bell(o, 0.42, 0.35, 247.0, 2.76, 2.5, 0.65, 0.14)
-        return reverb(o, 0.3)
-    }
-
-    private fun armorUp(): DoubleArray {
-        val o = buffer(0.88)
-        hiss(o, 0.0, 0.1, 2600.0, 1800.0, 0.3, fadeIn = 0.005, fadeOut = 0.05)
-        motor(o, 0.03, 0.18, 150.0, 240.0, 38.0, 52.0, 0.7, 0.9, depth = 0.6, whine = 0.12)
-        clank(o, 0.22, 0.8, 0.7)
-        motor(o, 0.27, 0.16, 190.0, 320.0, 44.0, 66.0, 0.8, 1.0, depth = 0.6, whine = 0.12)
-        clank(o, 0.44, 0.6, 1.0)
-        boom(o, 0.44, 0.25, 90.0, 50.0, 0.7)
-        chord(o, 0.5, 0.3, doubleArrayOf(82.4, 123.5, 164.8), 0.55, attack = 0.01, release = 0.15)
-        return reverb(o, 0.12)
-    }
-
-    private fun armorDown(): DoubleArray {
-        val o = buffer(0.8)
-        clank(o, 0.0, 0.8, 0.6)
-        motor(o, 0.05, 0.2, 320.0, 190.0, 66.0, 44.0, 1.0, 0.8, depth = 0.6, whine = 0.12)
-        motor(o, 0.28, 0.18, 240.0, 140.0, 52.0, 36.0, 0.9, 0.6, depth = 0.6, whine = 0.12)
-        hiss(o, 0.46, 0.15, 1800.0, 2800.0, 0.3, fadeIn = 0.01, fadeOut = 0.1)
-        clank(o, 0.5, 0.6, 0.9)
-        return reverb(o, 0.12)
-    }
-
-    private fun sonarUp(): DoubleArray {
-        val o = buffer(1.1)
-        bell(o, 0.0, 0.7, 392.0, 0.5, 2.2, 1.0, 0.35)
-        bell(o, 0.42, 0.6, 392.0, 0.5, 1.8, 0.42, 0.3)
-        return reverb(o, 0.45)
-    }
-
-    private fun sonarDown(): DoubleArray {
-        val o = buffer(1.0)
-        bell(o, 0.0, 0.65, 329.6, 0.5, 2.0, 1.0, 0.32)
-        bell(o, 0.38, 0.55, 329.6, 0.5, 1.6, 0.35, 0.28)
-        return reverb(o, 0.45)
-    }
-
-    private fun coreUp(): DoubleArray {
-        val o = buffer(0.82)
-        clank(o, 0.0, 0.75, 0.55)
-        engine(o, 0.02, 0.52, 55.0, 110.0, 0.35, 1.0, whine = 0.14)
-        rumble(o, 0.02, 0.52, 380.0, 760.0, 0.45, fadeIn = 0.08, fadeOut = 0.04)
-        clank(o, 0.55, 1.0, 1.0)
-        chord(o, 0.6, 0.22, doubleArrayOf(110.0, 165.0, 220.0), 0.7, attack = 0.012, release = 0.09)
+    private fun auraUp(): DoubleArray {
+        val o = buffer(0.78)
+        boom(o, 0.0, 0.22, 120.0, 84.0, 0.32)
+        voice(o, 0.03, 0.5, 330.0, 494.0, 0.8, attack = 0.09, release = 0.2, bright = 0.7)
+        voice(o, 0.03, 0.5, 495.0, 741.0, 0.22, attack = 0.14, release = 0.2, bright = 0.3)
+        shimmer(o, 0.05, 0.45, 1400.0, 3200.0, 0.10, fadeIn = 0.22, fadeOut = 0.14, resonance = 0.5)
+        voice(o, 0.42, 0.3, 988.0, 988.0, 0.16, attack = 0.02, release = 0.24, bright = 0.1)
         return o
     }
 
-    private fun coreDown(): DoubleArray {
-        val o = buffer(0.74)
-        chord(o, 0.0, 0.14, doubleArrayOf(110.0, 165.0, 220.0), 0.7, attack = 0.008, release = 0.05)
-        engine(o, 0.12, 0.48, 110.0, 46.0, 1.0, 0.25, whine = 0.12)
-        rumble(o, 0.12, 0.48, 760.0, 340.0, 0.45, fadeIn = 0.02, fadeOut = 0.12)
-        clank(o, 0.6, 0.7, 0.8)
+    private fun auraDown(): DoubleArray {
+        val o = buffer(0.72)
+        voice(o, 0.0, 0.48, 494.0, 330.0, 0.8, attack = 0.03, release = 0.26, bright = 0.7)
+        voice(o, 0.0, 0.44, 741.0, 495.0, 0.2, attack = 0.03, release = 0.26, bright = 0.3)
+        shimmer(o, 0.0, 0.42, 3000.0, 1200.0, 0.09, fadeIn = 0.04, fadeOut = 0.26, resonance = 0.5)
+        boom(o, 0.36, 0.22, 110.0, 76.0, 0.28)
         return o
     }
 
-    private fun commandUp(): DoubleArray {
-        val o = buffer(0.66)
-        clank(o, 0.0, 1.1, 0.35)
-        chord(o, 0.0, 0.26, doubleArrayOf(110.0, 165.0, 220.0, 277.2), 0.7, attack = 0.03, release = 0.05)
-        chord(o, 0.26, 0.38, doubleArrayOf(146.8, 220.0, 293.7, 370.0), 0.75, attack = 0.02, release = 0.16)
+    private fun pulseUp(): DoubleArray {
+        val o = buffer(0.76)
+        boom(o, 0.0, 0.16, 130.0, 96.0, 0.3)
+        voice(o, 0.0, 0.15, 392.0, 392.0, 0.85, attack = 0.008, release = 0.1, bright = 0.8)
+        voice(o, 0.17, 0.17, 587.0, 587.0, 0.8, attack = 0.008, release = 0.11, bright = 0.7)
+        voice(o, 0.31, 0.42, 392.0, 392.0, 0.42, attack = 0.06, release = 0.3, bright = 0.6)
+        voice(o, 0.31, 0.42, 587.0, 588.5, 0.42, attack = 0.06, release = 0.3, bright = 0.5)
         return o
     }
 
-    private fun commandDown(): DoubleArray {
+    private fun pulseDown(): DoubleArray {
         val o = buffer(0.62)
-        chord(o, 0.0, 0.24, doubleArrayOf(146.8, 220.0, 293.7, 370.0), 0.7, attack = 0.015, release = 0.05)
-        chord(o, 0.24, 0.36, doubleArrayOf(110.0, 165.0, 220.0, 261.6), 0.75, attack = 0.02, release = 0.18, drop = 0.94)
-        clank(o, 0.5, 0.9, 0.3)
+        voice(o, 0.0, 0.16, 587.0, 587.0, 0.8, attack = 0.008, release = 0.11, bright = 0.7)
+        voice(o, 0.17, 0.3, 392.0, 380.0, 0.85, attack = 0.008, release = 0.22, bright = 0.8)
+        boom(o, 0.17, 0.2, 120.0, 80.0, 0.3)
         return o
+    }
+
+    private fun horizonUp(): DoubleArray {
+        val o = buffer(0.9)
+        for ((i, f) in doubleArrayOf(293.7, 440.0, 659.3).withIndex()) {
+            voice(o, 0.04 * i, 0.8 - 0.04 * i, f, f, 0.5, attack = 0.26, release = 0.32, bright = 0.75)
+            voice(o, 0.04 * i, 0.8 - 0.04 * i, f * 1.004, f * 1.004, 0.3, attack = 0.3, release = 0.32, bright = 0.4)
+        }
+        shimmer(o, 0.1, 0.6, 1600.0, 2800.0, 0.07, fadeIn = 0.3, fadeOut = 0.25, resonance = 0.5)
+        return o
+    }
+
+    private fun horizonDown(): DoubleArray {
+        val o = buffer(0.74)
+        for (f in doubleArrayOf(293.7, 440.0, 659.3)) {
+            voice(o, 0.0, 0.66, f, f * 0.93, 0.5, attack = 0.03, release = 0.42, bright = 0.75)
+            voice(o, 0.0, 0.66, f * 1.004, f * 0.934, 0.3, attack = 0.03, release = 0.42, bright = 0.4)
+        }
+        return o
+    }
+
+    /**
+     * A rounded tone gliding [f0]→[f1]: a sine with a few soft overtones ([bright] 0 pure … 1 warm and full),
+     * a smooth start and a long, gentle ending. This is what makes the sounds calm instead of beepy.
+     */
+    private fun voice(o: DoubleArray, at: Double, dur: Double, f0: Double, f1: Double, gain: Double, attack: Double, release: Double, bright: Double) {
+        val i0 = (at * RATE).toInt()
+        val n = (dur * RATE).toInt()
+        var ph = 0.0
+        for (k in 0 until n) {
+            val i = i0 + k
+            if (i >= o.size) break
+            val t = k.toDouble() / RATE
+            val x = t / dur
+            // Ease the glide so the pitch settles instead of sliding at a constant rate.
+            val e = x * x * (3 - 2 * x)
+            ph += 2 * PI * f0 * (f1 / f0).pow(e) / RATE
+            val up = min(1.0, t / attack); val down = min(1.0, (dur - t) / release)
+            val env = (up * up * (3 - 2 * up)) * (down * down * (3 - 2 * down))
+            val v = sin(ph) + bright * (0.42 * sin(2 * ph) + 0.22 * sin(3 * ph) + 0.1 * sin(4 * ph) + 0.05 * sin(5 * ph))
+            o[i] += gain * env * v
+        }
     }
 
     // ------------------------------------------------------- building blocks

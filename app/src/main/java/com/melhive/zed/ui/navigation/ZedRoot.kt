@@ -119,6 +119,7 @@ fun ZedRoot(requestedRoute: String?, onRouteConsumed: () -> Unit) {
     // Hide the bottom bar while the keyboard is open so text fields sit directly on the keyboard.
     val imeVisible = WindowInsets.isImeVisible
 
+    LaunchedEffect(route) { if (route != null) com.melhive.zed.android.CrashReporter.crumb("screen: $route") }
     LaunchedEffect(requestedRoute) {
         if (requestedRoute != null) {
             // A particular conversation ("chat mode" from Eye mode) is opened as itself, not as the last chat tab.
@@ -203,6 +204,8 @@ fun ZedRoot(requestedRoute: String?, onRouteConsumed: () -> Unit) {
                 screen(Routes.ROUTINES) { com.melhive.zed.ui.screens.RoutinesScreen(onBack = { nav.popBackStack() }) }
                 screen(Routes.VOICE) { com.melhive.zed.ui.screens.VoiceScreen(onBack = { nav.popBackStack() }, onOpenTasks = { nav.navigateTab(Routes.TASKS) }) }
             }
+            // On a stand (charging, held sideways): offer Eye mode.
+            if (route != Routes.EYE && route != Routes.LIVE && !imeVisible) StandOffer(Modifier.align(androidx.compose.ui.Alignment.TopCenter)) { nav.navigate(Routes.EYE) { launchSingleTop = true } }
             // Undo for the last delete, wherever it happened (voice, chat or a delete button).
             com.melhive.zed.ui.components.UndoBar(container, Modifier.align(androidx.compose.ui.Alignment.BottomCenter))
         }
@@ -283,5 +286,35 @@ private object NavMotion {
         isLive(from) -> androidx.compose.animation.slideOutVertically(specOffset()) { it }
         tab(from) >= 0 && tab(to) >= 0 -> exit(from, to)
         else -> androidx.compose.animation.slideOutHorizontally(specOffset()) { it }
+    }
+}
+
+/** A small offer to open Eye mode when the phone is charging and held sideways, as it would be on a stand. Shown once per charge. */
+@Composable
+private fun StandOffer(modifier: Modifier, onOpen: () -> Unit) {
+    val context = LocalContext.current
+    var charging by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var dismissed by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        charging = runCatching { context.getSystemService(android.os.BatteryManager::class.java)?.isCharging == true }.getOrDefault(false)
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: android.content.Context, intent: android.content.Intent) {
+                charging = intent.action == android.content.Intent.ACTION_POWER_CONNECTED
+                if (!charging) dismissed = false
+            }
+        }
+        val filter = android.content.IntentFilter().apply { addAction(android.content.Intent.ACTION_POWER_CONNECTED); addAction(android.content.Intent.ACTION_POWER_DISCONNECTED) }
+        runCatching { androidx.core.content.ContextCompat.registerReceiver(context, receiver, filter, androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED) }
+        onDispose { runCatching { context.unregisterReceiver(receiver) } }
+    }
+    val sideways = androidx.compose.ui.platform.LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    if (!charging || !sideways || dismissed) return
+    androidx.compose.foundation.layout.Row(
+        modifier.padding(top = 10.dp).background(ZedColors.SurfaceHigh, androidx.compose.foundation.shape.RoundedCornerShape(50)).padding(start = 16.dp, end = 4.dp),
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+    ) {
+        Text("On a stand?", color = ZedColors.Muted, style = MaterialTheme.typography.bodyMedium)
+        androidx.compose.material3.TextButton(onClick = { dismissed = true; onOpen() }) { Text("Open Eye mode") }
+        androidx.compose.material3.TextButton(onClick = { dismissed = true }) { Text("Not now", color = ZedColors.Muted) }
     }
 }

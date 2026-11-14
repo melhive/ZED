@@ -68,9 +68,13 @@ class WakeWordService : Service() {
             if (Build.VERSION.SDK_INT >= 30) startForeground(NOTIFICATION_ID, notification("Listening for “Hey Zed”"), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
             else startForeground(NOTIFICATION_ID, notification("Listening for “Hey Zed”"))
         }
+        com.melhive.zed.android.CrashReporter.crumb("hey zed service: start " + (if (intent == null) "(restarted by Android) " else "") + if (ok.isSuccess) "ok" else "refused: ${ok.exceptionOrNull()}")
         if (ok.isFailure) { com.melhive.zed.android.CrashReporter.recordNonFatal("wake word start", ok.exceptionOrNull()!!); stopSelf(); return START_NOT_STICKY }
         if (!running) start()
-        return START_STICKY
+        // Android 14+ only lets a microphone service start while ZED is on screen. If Android restarted this service by
+        // itself in the background (after stopping ZED to free memory) it could not start legally and Android would crash
+        // the app; so there it is not restarted, and listening resumes the next time ZED is opened.
+        return if (Build.VERSION.SDK_INT >= 34) START_NOT_STICKY else START_STICKY
     }
 
     private fun notification(text: String): Notification {
@@ -188,6 +192,9 @@ class WakeWordService : Service() {
 
     /** Opens LIVE when allowed; otherwise handles one request hands-free. */
     private suspend fun onWake() {
+        com.melhive.zed.android.CrashReporter.crumb("hey zed heard")
+        // Eye mode is open with its eyes asleep: "Zed" wakes them, no floating orb.
+        onWakeOverride?.let { wake -> runCatching { wake() }; delay(400); return }
         val wokeAt = System.currentTimeMillis()
         val c = (application as ZedApp).container
         // Start loading the model while the user is still speaking.
@@ -296,6 +303,8 @@ class WakeWordService : Service() {
 
         /** True while ZED LIVE is using the microphone. */
         val paused = MutableStateFlow(false)
+        /** Set by Eye mode while its eyes are asleep: called instead of opening the floating orb. */
+        @Volatile var onWakeOverride: (() -> Unit)? = null
 
         @Volatile private var startWhenVisible = false
 

@@ -20,6 +20,8 @@
 | Credentials | API keys/tokens encrypted with Android Keystore AES-256-GCM; never logged; redacted from errors and audit logs | `security/` , `core/security/SecretRedactor` |
 | Network | HTTPS required for custom endpoints (plain HTTP only for localhost) | `OpenAiProvider.status()` |
 | Prompt injection | Retrieved document excerpts are labelled untrusted in the system prompt; they cannot trigger tools without passing the pipeline | `core/intelligence/PromptBuilder` |
+| Locked phone | With a secure lock engaged, only `LockPolicy` tools run (time, timers, alarms, flashlight, volume, weather, web research); memories, surroundings and documents are withheld from the model; announcements drop their details; conversations held while locked are not learned from | `core/security/LockPolicy`, `tools/ToolManager`, `agents/AssistantOrchestrator` |
+| People recognition (experiment, off by default) | Eye mode only: face prints and the owner's voiceprint are computed and stored on the phone (`files/people.bin`), never uploaded or backed up; it does not gate any action | `eyes/PeopleStore`, `core/eyes/People` |
 | Camera | Eye mode only, while its screen is visible: face position and a small grey copy of the view are computed on the phone and discarded; one frame is sent to the chosen model on “what is this?” | `eyes/EyeCamera`, `ui/screens/EyeScreen` |
 | Microphone | Used only on the visible LIVE screen or while the mic button is active; session ends when the screen closes; "Mic on" indicator | `voice/`, `ui/screens/LiveScreen` |
 | Audit | Every tool attempt is recorded and viewable in Diagnostics; pruned after 90 days | `security/AuditLogger` |

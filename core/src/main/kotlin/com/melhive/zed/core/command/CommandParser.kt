@@ -107,6 +107,9 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         "hints", "proactive hints", "suggestions", "leave now hints", "leave-now hints" -> "proactive_hints"
         "captions", "eye captions", "eye mode captions", "subtitles" -> "eye_captions"
         "stop word", "stop words", "voice interrupt", "say stop", "stop to interrupt" -> "stop_word"
+        "haptics", "vibration", "vibrations", "live vibration", "live haptics" -> "live_haptics"
+        "lock screen protection", "lock protection", "guest mode", "locked guest mode", "lock screen guest" -> "lock_guard"
+        "face recognition", "people recognition", "recognition", "recognizing people", "recognising people" -> "eye_recognition"
         "brain sounds", "brain sound" -> "brain_sounds"
         "think twice", "thinking twice", "double checking" -> "think_twice"
         "barge in", "barge-in", "interruptions", "interrupting" -> "barge_in"
@@ -285,6 +288,9 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         Rule(rx("(?:remember|don'?t forget|do not forget|keep in mind|note|make a note|take note|save (?:this|that)?)(?: that)?[:,]? (.+)")) { m ->
             tool("memory.remember", "fact" to m.groupValues[1])
         },
+        Rule(rx("forget (.+?)(?:'s|s') face|forget (?:the )?face of (.+)|forget who (.+?) is|you don'?t know (.+?) anymore")) { m ->
+            tool("people.forget", "name" to m.groupValues.drop(1).first { it.isNotEmpty() })
+        },
         Rule(rx("forget (?:that |about )?(.+)")) { m -> tool("memory.forget", "query" to m.groupValues[1]) },
 
         // Eye mode: ZED's eyes on the whole screen; "chat mode" and "live mode" lead back.
@@ -299,6 +305,11 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         Rule(rx("(?:listen|keep listening|wait)(?: for me)? (longer|shorter|less)|(?:set|make|change) (?:the |your )?listening(?: time)? (?:to )?(short|shorter|normal|long|longer)|keep listening(?: to me)?")) { m ->
             val v = m.groupValues[1].ifEmpty { m.groupValues[2] }.lowercase()
             tool("settings.set", "key" to "listening_time", "value" to when (v) { "shorter", "less", "short" -> "short"; "normal" -> "normal"; else -> "long" })
+        },
+
+        Rule(rx("(?:make|set|change) (?:the )?captions? (?:size )?(?:to )?(bigger|larger|large|big|smaller|small|normal)|(bigger|larger|smaller) captions")) { m ->
+            val v = m.groupValues[1].ifEmpty { m.groupValues[2] }.lowercase()
+            tool("settings.set", "key" to "caption_size", "value" to if (v.startsWith("big") || v.startsWith("large")) "large" else "normal")
         },
 
         // The Live Brain, by voice: "show me everything about Ana".

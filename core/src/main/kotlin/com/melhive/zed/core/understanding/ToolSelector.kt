@@ -33,6 +33,7 @@ object ToolSelector {
         "memory.pin" to w("pin", "unpin", "always remember"),
         "memory.confirm" to w("(?:that'?s|you(?:'re| are)) right about", "confirm (?:what you learned|that)"),
         "chats.clear" to w("(?:clear|delete|erase|wipe) (?:[\\w']+ ){0,3}(?:chats?|conversations?|history)"),
+        "people.forget" to w("forget .+ face", "forget who"),
         "brain.show" to w("brain", "everything (?:you know )?about", "show me (?:what|all)"),
         "phone.call" to w("call", "phone", "ring", "dial"),
         "sms.compose" to w("text", "message", "sms", "tell .+ that"),

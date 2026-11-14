@@ -11,6 +11,8 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Earphone-mic mode: switch Bluetooth earbuds to their microphone during LIVE -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- A short vibration with the LIVE sounds (wake, heard, end) -->
+    <uses-permission android:name="android.permission.VIBRATE" />
     <!-- Task, reminder and assistant notifications (Android 13+ runtime permission). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Normal permission required by the AlarmClock intents. -->

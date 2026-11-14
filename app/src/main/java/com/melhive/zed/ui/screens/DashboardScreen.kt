@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.Chat
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.GraphicEq
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material3.Icon
@@ -290,6 +291,7 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onTab: (String) -> Unit) {
 
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             QuickAction(Icons.Outlined.GraphicEq, "Live", ZedColors.Cyan, Modifier.weight(1f)) { onTab(Routes.LIVE) }
+            QuickAction(Icons.Outlined.Visibility, "Eyes", ZedColors.Cyan, Modifier.weight(1f)) { onNavigate(Routes.EYE) }
             QuickAction(Icons.Outlined.Chat, "Chat", ZedColors.Violet, Modifier.weight(1f)) { onTab(Routes.CHAT) }
             QuickAction(Icons.Outlined.Folder, "Files", ZedColors.Teal, Modifier.weight(1f)) { onNavigate(Routes.FILES) }
             QuickAction(Icons.Outlined.Memory, "Memory", ZedColors.Amber, Modifier.weight(1f)) { onNavigate(Routes.MEMORY) }

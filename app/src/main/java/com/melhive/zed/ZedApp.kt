@@ -92,6 +92,7 @@ class ZedApp : Application() {
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         if (isVoiceProcess) return
+        CrashReporter.crumb("memory pressure level $level")
         // Never free models while ZED is answering or a voice session is open (that's when memory peaks).
         val busy = runCatching { container.orchestrator.activity.value.busy || container.live.state.value.active }.getOrDefault(true)
         if (busy) return

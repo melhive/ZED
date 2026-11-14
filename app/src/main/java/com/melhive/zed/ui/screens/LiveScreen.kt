@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -132,6 +134,8 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit, onOpenEye: () -> Un
     ) {
         // The whole panel sits above the keyboard; the orb shrinks while typing so the box stays visible.
         val compact = typing || WindowInsets.isImeVisible
+        val wide = androidx.compose.ui.platform.LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val large = settings?.captionSize == "large"
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("ZED LIVE", style = MaterialTheme.typography.titleMedium, color = ZedColors.Muted, modifier = Modifier.weight(1f))
@@ -147,10 +151,12 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit, onOpenEye: () -> Un
             // Orb, eyes or chat: the same conversation in three forms.
             com.melhive.zed.ui.components.VoiceModeSwitch("orb", onSelect = { if (it == "eyes") onOpenEye() else onOpenChat(live.conversation) }, modifier = Modifier.padding(top = 6.dp))
 
+            // Upright: the orb above the conversation. Sideways: the orb on the left, the conversation and controls on the right.
+            val orbPart: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit = {
             // The orb sits in the middle of the screen inside its HUD; the conversation lives below.
             Spacer(Modifier.weight(1f))
             androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                val hud = if (compact) minOf(maxWidth * 0.4f, 140.dp) else minOf(maxWidth * 0.86f, 340.dp)
+                val hud = if (wide) minOf(maxWidth * 0.8f, if (compact) 110.dp else 190.dp) else if (compact) minOf(maxWidth * 0.4f, 140.dp) else minOf(maxWidth * 0.86f, 340.dp)
                 val interaction = remember { MutableInteractionSource() }
                 Box(Modifier.size(hud).clickable(interactionSource = interaction, indication = null) { live.tapOrb() }, contentAlignment = Alignment.Center) {
                     com.melhive.zed.ui.components.JarvisHud(state, Modifier.fillMaxSize(), animate = settings?.animationLevel != "light")
@@ -164,6 +170,8 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit, onOpenEye: () -> Un
                 modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp).padding(top = 4.dp), maxLines = 3,
             )
             Spacer(Modifier.weight(1f))
+            }
+            val talkPart: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit = {
             // Captions: the last thing you said and what ZED is saying. Tap or swipe up for the whole conversation.
             if (state.transcript.isNotEmpty()) {
                 val lastUser = state.transcript.lastOrNull { it.fromUser }?.text?.removePrefix("📷 ")
@@ -176,8 +184,8 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit, onOpenEye: () -> Un
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    if (!lastUser.isNullOrBlank()) Text(lastUser, color = ZedColors.Muted, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, textAlign = TextAlign.Center)
-                    if (!zedLine.isNullOrBlank()) Text(zedLine, color = ZedColors.Cyan.copy(alpha = 0.9f), style = MaterialTheme.typography.bodyMedium, maxLines = if (compact) 2 else 3, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 2.dp))
+                    if (!lastUser.isNullOrBlank()) Text(lastUser, color = ZedColors.Muted, style = if (large) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodySmall, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                    if (!zedLine.isNullOrBlank()) Text(zedLine, color = ZedColors.Cyan.copy(alpha = 0.9f), style = if (large) MaterialTheme.typography.titleLarge else MaterialTheme.typography.bodyMedium, maxLines = if (compact) 2 else if (large) 4 else 3, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 2.dp))
                     Text("Tap or swipe up for the conversation", color = ZedColors.Muted.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 4.dp))
                 }
             }
@@ -239,6 +247,14 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit, onOpenEye: () -> Un
             if (state.error != null && !state.active) {
                 TextButton(onClick = { permission.launch(Manifest.permission.RECORD_AUDIO) }) { Text("Grant microphone access") }
             }
+            }
+            if (wide) Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(0.42f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) { orbPart() }
+                Column(
+                    Modifier.weight(0.58f).fillMaxHeight().verticalScroll(androidx.compose.foundation.rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
+                ) { talkPart() }
+            } else { orbPart(); talkPart() }
         }
         if (history) com.melhive.zed.ui.components.VoiceHistoryPanel(state.conversationId, state.transcript) { history = false }
     }

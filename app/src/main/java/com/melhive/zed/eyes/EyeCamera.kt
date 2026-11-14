@@ -96,6 +96,14 @@ class EyeCamera(private val context: Context) {
     private val found = arrayOfNulls<FaceDetector.Face>(1)
     private val mid = PointF()
 
+    /** Recognition experiment: receives a small grey, eye-aligned picture of the face in view (64×64), a few times a second. */
+    @Volatile var onFaceCrop: ((IntArray) -> Unit)? = null
+    private var cropAt = 0L
+    // Where Android's detector found the eyes: middle point and distance, as shares of the upright picture.
+    private var eyeMidX = 0f
+    private var eyeMidY = 0f
+    private var eyeDistX = 0f
+    private var eyeDistY = 0f
     @Volatile private var shot: CompletableDeferred<ImageInput?>? = null
     private var frameErrors = 0
 
@@ -266,6 +274,22 @@ class EyeCamera(private val context: Context) {
             }
             seen = now - softFaceAt < 900
         }
+        // A picture of the face for recognising who it is: lined up on the eyes, so the same person always lands the same way.
+        val wantsFace = onFaceCrop
+        if (wantsFace != null && seen && now - cropAt > 600 && !watcher.dark) {
+            cropAt = now
+            if (softFace(turn, ::luma)) {
+                val cx = eyeMidX; val cy = eyeMidY + 0.25f * eyeDistY
+                val hx = 1.25f * eyeDistX; val hy = 1.25f * eyeDistY
+                val size = com.melhive.zed.core.eyes.FacePrint.SIZE
+                val crop = IntArray(size * size) { i ->
+                    val a = cx + ((i % size) / (size - 1f) * 2f - 1f) * hx
+                    val b = cy + ((i / size) / (size - 1f) * 2f - 1f) * hy
+                    luma(a.coerceIn(0f, 1f), b.coerceIn(0f, 1f))
+                }
+                runCatching { wantsFace(crop) }
+            }
+        }
         watcher.update(grid, dt, if (seen) face else null)
         if (watcher.dark) seen = false
         brightness = watcher.brightness
@@ -275,7 +299,9 @@ class EyeCamera(private val context: Context) {
             // In landscape the camera sits at one end of the phone, not behind the eyes: someone straight in front of the
             // screen looks off to one side to the camera. The closer the face (the wider it appears), the bigger the shift.
             val shift = if (front) (0.93f * (face[2] - face[0])).coerceIn(0f, 0.45f) * (when (screenTurn) { 90 -> 1f; 270 -> -1f; else -> 0f }) else 0f
-            val tx = (gazeX(fx) - shift * 1.5f).coerceIn(-1f, 1f); val ty = gazeY(fy)
+            // Held upright, the camera is above the screen instead: the same shift, up and down.
+            val rise = if (front) (0.7f * (face[2] - face[0])).coerceIn(0f, 0.45f) * (when (screenTurn) { 0 -> 1f; 180 -> -1f; else -> 0f }) else 0f
+            val tx = (gazeX(fx) - shift * 1.5f).coerceIn(-1f, 1f); val ty = (gazeY(fy) - rise * 1.3f).coerceIn(-1f, 1f)
             // Smooth, so the eyes don't twitch with every small error.
             faceX = if (faceSeen) faceX + (tx - faceX) * 0.5f else tx
             faceY = if (faceSeen) faceY + (ty - faceY) * 0.5f else ty
@@ -319,6 +345,7 @@ class EyeCamera(private val context: Context) {
         val eyes = f.eyesDistance()
         face[0] = (mid.x - eyes * 1.2f) / bw; face[2] = (mid.x + eyes * 1.2f) / bw
         face[1] = (mid.y - eyes * 1.3f) / bh; face[3] = (mid.y + eyes * 1.7f) / bh
+        eyeMidX = mid.x / bw; eyeMidY = mid.y / bh; eyeDistX = eyes / bw; eyeDistY = eyes / bh
         return true
     }
 

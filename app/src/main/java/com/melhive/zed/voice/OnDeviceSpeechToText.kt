@@ -35,6 +35,9 @@ class OnDeviceSpeechToText(private val dir: File, private val context: android.c
     @Volatile private var worker: Thread? = null
     @Volatile private var finishNow = false
     @Volatile private var cancelled = false
+    /** The sound of the last finished utterance (16 kHz), for recognising whose voice it was. */
+    @Volatile var lastAudio: FloatArray? = null
+        private set
 
     override fun start(languageTag: String?) {
         stopWorker(cancel = true)
@@ -82,6 +85,7 @@ class OnDeviceSpeechToText(private val dir: File, private val context: android.c
         val stream = recognizer.createStream("")
         val buf = ShortArray(CHUNK)
         var heardSpeech = false
+        val heard = ArrayList<FloatArray>()
         var lastText = ""
         var lastChange = System.currentTimeMillis()
         val started = System.currentTimeMillis()
@@ -95,6 +99,7 @@ class OnDeviceSpeechToText(private val dir: File, private val context: android.c
                 var sum = 0.0; for (x in samples) sum += x * x
                 emit(SttEvent.Level((sqrt(sum / n) * 12).toFloat().coerceIn(0f, 1f)))
                 stream.acceptWaveform(samples, RATE)
+                if (heard.size < 200) heard += samples
                 while (recognizer.isReady(stream)) recognizer.decode(stream)
                 val text = recognizer.getResult(stream).text.trim()
                 val now = System.currentTimeMillis()
@@ -117,6 +122,7 @@ class OnDeviceSpeechToText(private val dir: File, private val context: android.c
             stream.inputFinished()
             while (recognizer.isReady(stream)) recognizer.decode(stream)
             val final = recognizer.getResult(stream).text.trim()
+            lastAudio = FloatArray(heard.sumOf { it.size }).also { all -> var at = 0; for (h in heard) { h.copyInto(all, at); at += h.size } }
             emit(SttEvent.Final(if (final.isEmpty()) "" else SpokenText.normalize(final)))
         } catch (e: Throwable) {
             com.melhive.zed.android.CrashReporter.recordNonFatal("on-device asr", e)

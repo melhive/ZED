@@ -119,10 +119,11 @@ class EyeArt {
     fun draw(frame: EyeFrame, w: Float, h: Float, left: EyePose, right: EyePose, roll: Float) {
         f = frame
         frame.reset()
-        val r = min(h * 0.27f, w * 0.135f)
+        // Landscape is limited by the height, portrait by the width.
+        val r = min(h * 0.27f, w * 0.142f)
         val sep = r * 1.72f
         val mx = w / 2f
-        val my = h * 0.55f
+        val my = if (h > w) h * 0.44f else h * 0.55f
         val c = cos(roll); val sn = sin(roll)
         // The head tilts around the point between the eyes.
         eye(left, mx - sep * c, my - sep * sn, r, 1f, roll)

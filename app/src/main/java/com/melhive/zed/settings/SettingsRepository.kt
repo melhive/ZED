@@ -98,6 +98,14 @@ data class AppSettings(
     val voiceStop: Boolean = true,
     /** How long LIVE keeps listening after silence: short, normal or long. */
     val listenPatience: String = "normal",
+    /** While the phone is locked, ZED answers as a guest: nothing personal is read or changed. */
+    val lockGuard: Boolean = true,
+    /** Vibration with the LIVE sounds. */
+    val liveHaptics: Boolean = true,
+    /** Caption text size in LIVE and Eye mode: normal or large. */
+    val captionSize: String = "normal",
+    /** Experiment: Eye mode recognises people by face (and the owner by voice). */
+    val eyeRecognition: Boolean = false,
     /** Learn lasting facts from ordinary conversation (shown for review; always editable). */
     val autoLearning: Boolean = true,
     /** Search the web (no key needed) when a question needs fresh facts. Only the search question leaves the phone. */
@@ -161,6 +169,10 @@ class SettingsRepository(private val context: Context) {
         val eyeColor = stringPreferencesKey("eye_color")
         val voiceStop = booleanPreferencesKey("voice_stop")
         val listenPatience = stringPreferencesKey("listen_patience")
+        val lockGuard = booleanPreferencesKey("lock_guard")
+        val liveHaptics = booleanPreferencesKey("live_haptics")
+        val captionSize = stringPreferencesKey("caption_size")
+        val eyeRecognition = booleanPreferencesKey("eye_recognition")
         val autoLearning = booleanPreferencesKey("auto_learning")
         val webResearch = booleanPreferencesKey("web_research")
         val thinkTwice = booleanPreferencesKey("think_twice")
@@ -218,6 +230,10 @@ class SettingsRepository(private val context: Context) {
             eyeColor = p[K.eyeColor] ?: "cyan",
             voiceStop = p[K.voiceStop] ?: true,
             listenPatience = p[K.listenPatience] ?: "normal",
+            lockGuard = p[K.lockGuard] ?: true,
+            liveHaptics = p[K.liveHaptics] ?: true,
+            captionSize = p[K.captionSize] ?: "normal",
+            eyeRecognition = p[K.eyeRecognition] ?: false,
             autoLearning = p[K.autoLearning] ?: true,
             webResearch = p[K.webResearch] ?: true,
             thinkTwice = p[K.thinkTwice] ?: true,
@@ -264,6 +280,10 @@ class SettingsRepository(private val context: Context) {
     suspend fun setCheckUpdates(v: Boolean) = context.dataStore.edit { it[K.checkUpdates] = v }
     suspend fun setAutoBackupFolder(uri: String) = context.dataStore.edit { it[K.autoBackupFolder] = uri; it.remove(K.autoBackupStatus) }
     suspend fun setAutoBackupStatus(v: String) = context.dataStore.edit { it[K.autoBackupStatus] = v }
+    suspend fun setLockGuard(v: Boolean) = context.dataStore.edit { it[K.lockGuard] = v }
+    suspend fun setLiveHaptics(v: Boolean) = context.dataStore.edit { it[K.liveHaptics] = v }
+    suspend fun setCaptionSize(v: String) = context.dataStore.edit { it[K.captionSize] = v }
+    suspend fun setEyeRecognition(v: Boolean) = context.dataStore.edit { it[K.eyeRecognition] = v }
     suspend fun setEyeColor(v: String) = context.dataStore.edit { it[K.eyeColor] = v }
     suspend fun setVoiceStop(v: Boolean) = context.dataStore.edit { it[K.voiceStop] = v }
     suspend fun setListenPatience(v: String) = context.dataStore.edit { it[K.listenPatience] = v }

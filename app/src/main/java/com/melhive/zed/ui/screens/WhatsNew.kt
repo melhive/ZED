@@ -31,6 +31,17 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.41", "2026-11-14", "Safe on the lock screen, new sounds, eyes that know you", listOf(
+            "Guest mode while the phone is locked: “Hey Zed” and the shortcut still work, and ZED answers general questions, the time, the weather and web searches, and sets timers, alarms, the flashlight and volume. Anything personal — memories, messages, contacts, calendar, reminders, files, notifications, history, settings, calls, texts, the screen — gets “Unlock your phone for that”; unlock, and ZED carries on with what you asked. Nothing personal reaches the AI while locked. Switch: Settings → Voice.",
+            "On a locked phone a due reminder is announced only as “You have a reminder”, and events and the morning briefing keep their details until you unlock.",
+            "All LIVE sounds are new: Aura, Pulse and Horizon — calm tones of an assistant coming online, no beeps or clanks — with a short vibration when ZED wakes, hears you and ends a call. Pick one in More → Voice; the old sounds are gone.",
+            "Eye mode works upright or sideways: it turns with the phone (Android's rotate button works) and has its own rotate button. LIVE now lays out properly sideways too, with the orb on the left and the conversation and keyboard on the right.",
+            "Eye mode shows the picture it just looked at for a few seconds, and follow-up questions (“how do I use it?”) keep using that picture.",
+            "Sleeping eyes wake when you say “Zed” (with Hey Zed turned on), and show the time and your next reminder while they sleep. Charging and held sideways, ZED offers to open Eye mode; Home has an Eyes button.",
+            "After a longer call ZED writes a two-line summary at the top of that conversation. Captions can be large (Settings → Voice, or “make the captions bigger”).",
+            "Stability: Android could restart the “Hey Zed” listener by itself in the background, which Android 14 and 15 don't allow and answer by closing the app. It now resumes only when you open ZED. Crash reports also keep the full error and a short trail of what ZED was doing, so a crash can actually be traced.",
+            "Experiment — recognising people in Eye mode (off by default; the people button in Eye mode's controls): teach ZED your face, and it greets you; it learns your voice from what you say while it sees you. Someone it doesn't know is asked their name once and greeted by name next time. A line on screen shows who it thinks it sees and hears. It changes nothing about what ZED will do; faces and voices stay on the phone, and “forget Ana's face” removes someone.",
+        )),
         Release("0.1.40", "2026-11-14", "Calls you can read back, and livelier eyes", listOf(
             "LIVE has captions: the last thing you said and the sentence ZED is saying, under the orb. Tap them or swipe up to read the whole conversation as chat bubbles; Eye mode has the same panel behind its history button.",
             "Calls are easy to find in your conversation history: each one is named after the first thing you said and marked with a microphone, and opening LIVE without saying anything no longer leaves an empty entry. Older calls were renamed the same way.",

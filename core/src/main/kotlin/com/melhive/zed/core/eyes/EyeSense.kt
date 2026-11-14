@@ -106,6 +106,11 @@ object VisualAsk {
     private val elsewhere = Regex("\\b(?:on (?:my|the|this) screen|this (?:page|screen|article|website|app|chat|message|song)|my screen)\\b", RegexOption.IGNORE_CASE)
 
     fun matches(text: String): Boolean = look.containsMatchIn(text) && !elsewhere.containsMatchIn(text)
+
+    private val pointing = Regex("\\b(?:it|its|it'?s|this|that|these|those|them|they|one)\\b", RegexOption.IGNORE_CASE)
+
+    /** A question that still points at what was just shown ("how do I use it?", "is that expensive?"). */
+    fun followUp(text: String): Boolean = pointing.containsMatchIn(text) && !elsewhere.containsMatchIn(text) && text.trim().split(Regex("\\s+")).size <= 16
 }
 
 /**

@@ -193,6 +193,12 @@ fun registerAppControl(tm: ToolManager, c: AppContainer, context: Context) {
         ok("Deleted ${if (gone.size == 1) "1 conversation" else "${gone.size} conversations"} (this one stays). Say “undo” to bring ${if (gone.size == 1) "it" else "them"} back.")
     }
 
+    // ---- People ZED recognises in Eye mode ----
+    tm.register("people.forget") { a, _ ->
+        val name = a.string("name").trim()
+        if (c.people.forget(name)) ok("I've forgotten ${name.replaceFirstChar { it.uppercase() }}'s face.") else ok("I don't know anyone called $name by sight.")
+    }
+
     // ---- Undo ----
     tm.register("app.undo") { _, _ -> c.undo.undo()?.let { ok(it) } ?: ok("There's nothing to undo.") }
 
@@ -264,6 +270,10 @@ fun registerAppControl(tm: ToolManager, c: AppContainer, context: Context) {
                 c.settings.setEyeColor(colour)
                 ok("My eyes are $colour now.")
             }
+            "caption_size" -> { val large = value.startsWith("large") || value.startsWith("big"); c.settings.setCaptionSize(if (large) "large" else "normal"); ok(if (large) "Captions are larger now." else "Captions are back to normal size.") }
+            "live_haptics" -> toggle("Vibration with my sounds", { c.settings.setLiveHaptics(it) })
+            "lock_guard" -> toggle("Guest mode while the phone is locked", { c.settings.setLockGuard(it) })
+            "eye_recognition" -> toggle("Recognising people in Eye mode", { c.settings.setEyeRecognition(it) })
             "stop_word" -> toggle("Saying “stop” to interrupt me", { c.settings.setVoiceStop(it) })
             "listening_time" -> {
                 val v = when { value.startsWith("short") || value == "less" -> "short"; value.startsWith("long") || value == "more" -> "long"; else -> "normal" }
