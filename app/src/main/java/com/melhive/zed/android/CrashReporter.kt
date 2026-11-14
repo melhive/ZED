@@ -38,7 +38,7 @@ object CrashReporter {
         }
         crumb("ZED started (${processName()})")
         val previous = Thread.getDefaultUncaughtExceptionHandler()
-        Thread.setDefaultUncaughtExceptionHandler { thread, error ->
+        val handler = Thread.UncaughtExceptionHandler { thread, error ->
             // An error in a background task or coroutine doesn't have to take the whole app down.
             val main = thread === android.os.Looper.getMainLooper().thread
             val fromCoroutine = Thread.currentThread().stackTrace.any { it.className.startsWith("kotlinx.coroutines") }
@@ -56,19 +56,78 @@ object CrashReporter {
             } catch (_: Throwable) {}
             previous?.uncaughtException(thread, error)
         }
+        mine = handler
+        Thread.setDefaultUncaughtExceptionHandler(handler)
+        // The main thread asks its own handler first, so nothing installed later can take crashes away unseen.
+        runCatching { android.os.Looper.getMainLooper().thread.uncaughtExceptionHandler = handler }
         // Errors thrown on the main thread outside drawing (a button's action, a callback) are caught
         // here and recorded instead of closing the app.
         if (Build.FINGERPRINT != "robolectric") android.os.Handler(android.os.Looper.getMainLooper()).post {
             while (true) {
                 try { android.os.Looper.loop() } catch (e: Throwable) {
-                    if (!survivable(e)) throw e
+                    if (!survivable(e)) {
+                        // Written here as well: whatever happens to this error on its way out, the report has it.
+                        try {
+                            val sw = StringWriter(); e.printStackTrace(PrintWriter(sw))
+                            File(dir, FATAL_FILE).writeText("${timestamp()} thread main (${processName()})\n$sw")
+                            crumb("FATAL on main: $e")
+                        } catch (_: Throwable) {}
+                        throw e
+                    }
                     caught(e, "main")
                 }
             }
         }
     }
 
-    private val recent = ArrayDeque<Long>()
+    @Volatile private var mine: Thread.UncaughtExceptionHandler? = null
+
+    /**
+     * Makes sure ZED's crash handler is still the one Android will call. If another component replaced it,
+     * a crash would close the app with no report at all; this notes who did it and takes the handler back.
+     */
+    fun guard() {
+        val ours = mine ?: return
+        val now = Thread.getDefaultUncaughtExceptionHandler()
+        if (now !== ours) {
+            crumb("crash handler was replaced by ${now?.javaClass?.name}; restored")
+            recordNonFatal("crash handler", IllegalStateException("Replaced by ${now?.javaClass?.name}"))
+            Thread.setDefaultUncaughtExceptionHandler(ours)
+        }
+        val main = android.os.Looper.getMainLooper().thread
+        if (main.uncaughtExceptionHandler !== ours) runCatching { main.uncaughtExceptionHandler = ours }
+    }
+
+    /** Android's own record of how each of ZED's processes last stopped (the app itself and the voice engine). */
+    fun exitHistory(context: Context): String {
+        if (Build.VERSION.SDK_INT < 30) return ""
+        return runCatching {
+            val am = context.getSystemService(android.app.ActivityManager::class.java)
+            val time = SimpleDateFormat("MM-dd HH:mm:ss", Locale.US)
+            am.getHistoricalProcessExitReasons(context.packageName, 0, 16).joinToString("\n") { x ->
+                val why = when (x.reason) {
+                    android.app.ApplicationExitInfo.REASON_CRASH -> "crash"
+                    android.app.ApplicationExitInfo.REASON_CRASH_NATIVE -> "native crash"
+                    android.app.ApplicationExitInfo.REASON_ANR -> "not responding"
+                    android.app.ApplicationExitInfo.REASON_LOW_MEMORY -> "low memory"
+                    android.app.ApplicationExitInfo.REASON_SIGNALED -> "killed by signal ${x.status}"
+                    android.app.ApplicationExitInfo.REASON_EXIT_SELF -> "exited by itself (${x.status})"
+                    android.app.ApplicationExitInfo.REASON_USER_REQUESTED -> "closed by the user"
+                    android.app.ApplicationExitInfo.REASON_USER_STOPPED -> "stopped by the user"
+                    android.app.ApplicationExitInfo.REASON_DEPENDENCY_DIED -> "something it depended on stopped"
+                    android.app.ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE -> "too much resource use"
+                    android.app.ApplicationExitInfo.REASON_PACKAGE_UPDATED -> "app updated"
+                    android.app.ApplicationExitInfo.REASON_OTHER -> "stopped by Android"
+                    else -> "reason ${x.reason}"
+                }
+                val trace = if (x.reason == android.app.ApplicationExitInfo.REASON_CRASH_NATIVE || x.reason == android.app.ApplicationExitInfo.REASON_ANR)
+                    runCatching { x.traceInputStream?.bufferedReader()?.use { it.readText() } }.getOrNull()?.lineSequence()?.filter { it.contains("#0") || it.contains("signal") || it.contains("Abort message") || it.contains("backtrace") }?.take(14)?.joinToString("\n      ")?.let { "\n      $it" }.orEmpty()
+                    else ""
+                "${time.format(Date(x.timestamp))} ${x.processName.removePrefix(context.packageName).ifEmpty { "app" }}: $why — ${x.description ?: ""} (importance ${x.importance}, ${x.pss / 1024} MB)$trace"
+            }
+        }.getOrDefault("")
+    }
+
 
     /**
      * Whether ZED can safely keep running after [e]: not out of memory, not a failure while drawing
@@ -161,7 +220,8 @@ object CrashReporter {
                 if (stack != null) { appendLine("--- Stack trace ---"); appendLine(SecretRedactor.redact(stack).take(20_000)); appendLine() }
                 else appendLine("(No stack trace: the app was stopped from outside, or before it could write one.)").also { appendLine() }
                 appendLine(trail(CRUMBS_BEFORE)); appendLine()
-                if (!errors.isNullOrBlank()) { appendLine("--- Recent errors ZED survived ---"); appendLine(errors.take(8_000)) }
+                if (!errors.isNullOrBlank()) { appendLine("--- Recent errors ZED survived ---"); appendLine(errors.take(8_000)); appendLine() }
+                exitHistory(context).takeIf { it.isNotBlank() }?.let { appendLine("--- How ZED's processes last stopped (newest first) ---"); appendLine(it.take(8_000)) }
             }
             runCatching { fatal.delete() }
             File(dir, CRASH_FILE).writeText(full)
@@ -208,7 +268,8 @@ object CrashReporter {
             appendLine(trail(CRUMBS).ifEmpty { "(nothing noted in this run yet)" }); appendLine()
             trail(CRUMBS_BEFORE).takeIf { it.isNotEmpty() }?.let { appendLine("Before the last restart:"); appendLine(it); appendLine() }
             lastCrash()?.let { appendLine("--- Last crash ---"); appendLine(it.take(20_000)); appendLine() }
-            errors()?.let { appendLine("--- Recent errors ZED survived ---"); appendLine(it.takeLast(10_000)) }
+            errors()?.let { appendLine("--- Recent errors ZED survived ---"); appendLine(it.takeLast(10_000)); appendLine() }
+            if (::app.isInitialized) exitHistory(app).takeIf { it.isNotBlank() }?.let { appendLine("--- How ZED's processes last stopped (newest first) ---"); appendLine(it.take(8_000)) }
         }
         runCatching { saveToDownloads(text, "zed-report-") }
         return text

@@ -8,51 +8,90 @@ import kotlin.math.pow
 import kotlin.math.sin
 
 /**
- * ZED's LIVE sounds, synthesized in code (no audio files): the sound of an
- * assistant coming online — a soft low pulse, a smooth tone that rises (and
- * falls again when it leaves) and a little air on top. Calm and modern.
+ * ZED's LIVE sounds, synthesized in code (no audio files): short, bright,
+ * friendly tones like the ones phone assistants make when they wake — soft
+ * mallet and glass notes, a pop, a light sparkle.
  *
- * Never toy-like: no beeps, chirps, bleeps, clanks or arpeggios. Tones are
- * rounded (a few soft overtones, slow starts and endings), and every sound is
- * filtered so its energy lands above ~350 Hz, where phone speakers can play it.
+ * Nothing dark or eerie: no low rumble, no sliding or sinking pitch, no long
+ * echo, no detuned chords. Notes are clear pitches that start softly and ring
+ * out quickly. Every sound is filtered so its energy lands above ~350 Hz,
+ * where phone speakers can play it.
  */
 object SoundSynth {
     const val RATE = 44_100
 
     enum class Style(val id: String, val label: String, val description: String) {
-        AURA("aura", "Aura", "A soft pulse and one smooth tone rising, with a breath of air"),
-        PULSE("pulse", "Pulse", "Two warm pulses, low then higher, settling into a held tone"),
-        HORIZON("horizon", "Horizon", "A wide, calm chord that swells in and opens up"),
+        DUO("duo", "Duo", "Two soft mallet notes, the second higher"),
+        GLASS("glass", "Glass", "Two clear glass notes a fifth apart"),
+        POP("pop", "Pop", "A soft rounded pop with a faint high ring"),
+        BLOOM("bloom", "Bloom", "A bright chord that opens quickly and fades"),
+        SPARK("spark", "Spark", "A breath of air and one bright note"),
+        TAP("tap", "Tap", "Two quick, light taps"),
+        LIFT("lift", "Lift", "Three quick notes stepping upward"),
+        HALO("halo", "Halo", "One warm note joined by its octave"),
+        NOVA("nova", "Nova", "A low note answered by a high one"),
+        ECHO("echo", "Echo", "One clear note with two soft echoes"),
         OFF("off", "Off", "No sound");
 
         companion object {
-            /** Unknown ids (including every retired sound) fall back to Aura. */
-            fun parse(id: String?) = entries.firstOrNull { it.id == id } ?: AURA
+            /** Unknown ids (including every retired sound) fall back to Duo. */
+            fun parse(id: String?) = entries.firstOrNull { it.id == id } ?: DUO
         }
     }
 
     /** 16-bit mono PCM at [RATE]; empty for [Style.OFF]. */
     fun render(style: Style, start: Boolean): ShortArray {
         val out = when (style) {
-            Style.AURA -> reverb(if (start) auraUp() else auraDown(), 0.3)
-            Style.PULSE -> reverb(if (start) pulseUp() else pulseDown(), 0.25)
-            Style.HORIZON -> reverb(if (start) horizonUp() else horizonDown(), 0.35)
+            Style.DUO -> buffer(0.5).also { o -> if (start) { mallet(o, 0.0, 392.0, 0.9); mallet(o, 0.13, 523.3, 1.0) } else { mallet(o, 0.0, 523.3, 0.9); mallet(o, 0.13, 392.0, 1.0) } }
+            Style.GLASS -> buffer(0.6).also { o -> if (start) { glass(o, 0.0, 523.3, 0.8); glass(o, 0.14, 784.0, 1.0) } else { glass(o, 0.0, 784.0, 0.8); glass(o, 0.14, 523.3, 1.0) } }
+            Style.POP -> buffer(0.36).also { o ->
+                if (start) { pop(o, 0.0, 760.0, 560.0, 1.0); mallet(o, 0.05, 1174.7, 0.22, decay = 0.09) }
+                else { pop(o, 0.0, 620.0, 440.0, 1.0); mallet(o, 0.05, 880.0, 0.16, decay = 0.08) }
+            }
+            Style.BLOOM -> buffer(0.62).also { o ->
+                val notes = if (start) doubleArrayOf(523.3, 659.3, 784.0) else doubleArrayOf(392.0, 523.3, 659.3)
+                for ((i, f) in notes.withIndex()) voice(o, 0.012 * i, 0.5, f, f, 0.6, attack = 0.05, release = 0.38, bright = 0.45)
+            }
+            Style.SPARK -> buffer(0.52).also { o ->
+                if (start) { shimmer(o, 0.0, 0.16, 2400.0, 3600.0, 0.22, fadeIn = 0.05, fadeOut = 0.08, resonance = 0.6); glass(o, 0.1, 1318.5, 0.9, decay = 0.13) }
+                else { glass(o, 0.0, 987.8, 0.9, decay = 0.13); shimmer(o, 0.08, 0.16, 3200.0, 2400.0, 0.16, fadeIn = 0.03, fadeOut = 0.1, resonance = 0.6) }
+            }
+            Style.TAP -> buffer(0.34).also { o ->
+                if (start) { mallet(o, 0.0, 880.0, 0.9, decay = 0.05); mallet(o, 0.1, 880.0, 1.0, decay = 0.06) }
+                else mallet(o, 0.0, 698.5, 1.0, decay = 0.07)
+            }
+            Style.LIFT -> buffer(0.56).also { o ->
+                val notes = if (start) doubleArrayOf(587.3, 659.3, 784.0) else doubleArrayOf(784.0, 659.3, 587.3)
+                for ((i, f) in notes.withIndex()) mallet(o, 0.09 * i, f, 0.8 + 0.1 * i, decay = 0.1)
+            }
+            Style.HALO -> buffer(0.6).also { o ->
+                if (start) { voice(o, 0.0, 0.5, 440.0, 440.0, 0.8, attack = 0.03, release = 0.4, bright = 0.4); voice(o, 0.09, 0.42, 880.0, 880.0, 0.45, attack = 0.03, release = 0.34, bright = 0.2) }
+                else { voice(o, 0.0, 0.4, 880.0, 880.0, 0.45, attack = 0.02, release = 0.32, bright = 0.2); voice(o, 0.09, 0.45, 440.0, 440.0, 0.8, attack = 0.03, release = 0.36, bright = 0.4) }
+            }
+            Style.NOVA -> buffer(0.5).also { o ->
+                if (start) { mallet(o, 0.0, 349.2, 0.9, decay = 0.09); glass(o, 0.12, 1046.5, 0.9, decay = 0.14) }
+                else { glass(o, 0.0, 1046.5, 0.8, decay = 0.1); mallet(o, 0.12, 349.2, 1.0, decay = 0.12) }
+            }
+            Style.ECHO -> buffer(0.6).also { o ->
+                val f = if (start) 659.3 else 523.3
+                glass(o, 0.0, f, 1.0, decay = 0.1); glass(o, 0.13, f, 0.42, decay = 0.1); glass(o, 0.26, f, 0.18, decay = 0.1)
+            }
             Style.OFF -> return ShortArray(0)
         }
-        return finish(out, 0.6)
+        return finish(reverb(out, 0.08), 0.6)
     }
 
-    /** The instant "got it" when ZED takes a request in LIVE: one short, soft, low tick. */
+    /** The instant "got it" when ZED takes a request in LIVE: one short, soft tick. */
     fun ack(): ShortArray {
-        val o = buffer(0.13)
-        voice(o, 0.0, 0.09, 466.0, 392.0, 0.9, attack = 0.004, release = 0.06, bright = 0.5)
+        val o = buffer(0.12)
+        mallet(o, 0.0, 587.3, 1.0, decay = 0.035)
         return finish(o, 0.36)
     }
 
     /** Band-limits to where phone speakers play (steep high-pass, dark low-pass), normalizes and fades the ends. */
     private fun finish(out: DoubleArray, level: Double): ShortArray {
         highPass(out, 330.0); highPass(out, 330.0)
-        lowPass(out, 4200.0); lowPass(out, 4200.0)
+        lowPass(out, 7000.0)
         val n = out.size
         val peak = out.maxOf { abs(it) }.takeIf { it > 0 } ?: 1.0
         val gain = level / peak
@@ -89,60 +128,47 @@ object SoundSynth {
 
     // ---------------------------------------------------------------- styles
 
-    private fun auraUp(): DoubleArray {
-        val o = buffer(0.78)
-        boom(o, 0.0, 0.22, 120.0, 84.0, 0.32)
-        voice(o, 0.03, 0.5, 330.0, 494.0, 0.8, attack = 0.09, release = 0.2, bright = 0.7)
-        voice(o, 0.03, 0.5, 495.0, 741.0, 0.22, attack = 0.14, release = 0.2, bright = 0.3)
-        shimmer(o, 0.05, 0.45, 1400.0, 3200.0, 0.10, fadeIn = 0.22, fadeOut = 0.14, resonance = 0.5)
-        voice(o, 0.42, 0.3, 988.0, 988.0, 0.16, attack = 0.02, release = 0.24, bright = 0.1)
-        return o
-    }
-
-    private fun auraDown(): DoubleArray {
-        val o = buffer(0.72)
-        voice(o, 0.0, 0.48, 494.0, 330.0, 0.8, attack = 0.03, release = 0.26, bright = 0.7)
-        voice(o, 0.0, 0.44, 741.0, 495.0, 0.2, attack = 0.03, release = 0.26, bright = 0.3)
-        shimmer(o, 0.0, 0.42, 3000.0, 1200.0, 0.09, fadeIn = 0.04, fadeOut = 0.26, resonance = 0.5)
-        boom(o, 0.36, 0.22, 110.0, 76.0, 0.28)
-        return o
-    }
-
-    private fun pulseUp(): DoubleArray {
-        val o = buffer(0.76)
-        boom(o, 0.0, 0.16, 130.0, 96.0, 0.3)
-        voice(o, 0.0, 0.15, 392.0, 392.0, 0.85, attack = 0.008, release = 0.1, bright = 0.8)
-        voice(o, 0.17, 0.17, 587.0, 587.0, 0.8, attack = 0.008, release = 0.11, bright = 0.7)
-        voice(o, 0.31, 0.42, 392.0, 392.0, 0.42, attack = 0.06, release = 0.3, bright = 0.6)
-        voice(o, 0.31, 0.42, 587.0, 588.5, 0.42, attack = 0.06, release = 0.3, bright = 0.5)
-        return o
-    }
-
-    private fun pulseDown(): DoubleArray {
-        val o = buffer(0.62)
-        voice(o, 0.0, 0.16, 587.0, 587.0, 0.8, attack = 0.008, release = 0.11, bright = 0.7)
-        voice(o, 0.17, 0.3, 392.0, 380.0, 0.85, attack = 0.008, release = 0.22, bright = 0.8)
-        boom(o, 0.17, 0.2, 120.0, 80.0, 0.3)
-        return o
-    }
-
-    private fun horizonUp(): DoubleArray {
-        val o = buffer(0.9)
-        for ((i, f) in doubleArrayOf(293.7, 440.0, 659.3).withIndex()) {
-            voice(o, 0.04 * i, 0.8 - 0.04 * i, f, f, 0.5, attack = 0.26, release = 0.32, bright = 0.75)
-            voice(o, 0.04 * i, 0.8 - 0.04 * i, f * 1.004, f * 1.004, 0.3, attack = 0.3, release = 0.32, bright = 0.4)
+    /** A soft mallet note (like a marimba bar): a clear pitch with a gentle knock that rings out in a fraction of a second. */
+    private fun mallet(o: DoubleArray, at: Double, f: Double, gain: Double, decay: Double = 0.11) {
+        val i0 = (at * RATE).toInt()
+        val n = (decay * 7 * RATE).toInt()
+        for (k in 0 until n) {
+            val i = i0 + k
+            if (i >= o.size) break
+            val t = k.toDouble() / RATE
+            val w = 2 * PI * f * t
+            val rise = min(1.0, t / 0.003)
+            // The overtones die away faster than the note itself, so it starts bright and ends pure.
+            o[i] += gain * rise * (exp(-t / decay) * sin(w) + 0.3 * exp(-t / (decay * 0.35)) * sin(4 * w) + 0.12 * exp(-t / (decay * 0.2)) * sin(9.2 * w))
         }
-        shimmer(o, 0.1, 0.6, 1600.0, 2800.0, 0.07, fadeIn = 0.3, fadeOut = 0.25, resonance = 0.5)
-        return o
     }
 
-    private fun horizonDown(): DoubleArray {
-        val o = buffer(0.74)
-        for (f in doubleArrayOf(293.7, 440.0, 659.3)) {
-            voice(o, 0.0, 0.66, f, f * 0.93, 0.5, attack = 0.03, release = 0.42, bright = 0.75)
-            voice(o, 0.0, 0.66, f * 1.004, f * 0.934, 0.3, attack = 0.03, release = 0.42, bright = 0.4)
+    /** A clear glass note: a pure pitch with a faint shimmer just above it. */
+    private fun glass(o: DoubleArray, at: Double, f: Double, gain: Double, decay: Double = 0.16) {
+        val i0 = (at * RATE).toInt()
+        val n = (decay * 7 * RATE).toInt()
+        for (k in 0 until n) {
+            val i = i0 + k
+            if (i >= o.size) break
+            val t = k.toDouble() / RATE
+            val w = 2 * PI * f * t
+            val rise = min(1.0, t / 0.004)
+            o[i] += gain * rise * (exp(-t / decay) * sin(w) + 0.22 * exp(-t / (decay * 0.6)) * sin(2 * w) + 0.1 * exp(-t / (decay * 0.3)) * sin(3.01 * w))
         }
-        return o
+    }
+
+    /** A soft, rounded pop: a very short tone that dips in pitch as it ends, like a bubble. */
+    private fun pop(o: DoubleArray, at: Double, f0: Double, f1: Double, gain: Double) {
+        val i0 = (at * RATE).toInt()
+        val n = (0.11 * RATE).toInt()
+        var ph = 0.0
+        for (k in 0 until n) {
+            val i = i0 + k
+            if (i >= o.size) break
+            val t = k.toDouble() / RATE
+            ph += 2 * PI * (f1 + (f0 - f1) * exp(-t / 0.018)) / RATE
+            o[i] += gain * min(1.0, t / 0.002) * exp(-t / 0.03) * (sin(ph) + 0.25 * sin(2 * ph))
+        }
     }
 
     /**

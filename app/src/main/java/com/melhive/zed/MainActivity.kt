@@ -35,6 +35,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         // The wake word service may only start while ZED is on screen (Android 14 microphone rules).
         val c = (application as ZedApp).container
+        com.melhive.zed.android.CrashReporter.guard()
         // Have Gemma ready before the first question.
         c.warmUpModel()
         c.appScope.launch {

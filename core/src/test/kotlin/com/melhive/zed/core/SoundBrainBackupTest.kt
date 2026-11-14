@@ -34,7 +34,7 @@ class SoundSynthTest {
             val pcm = SoundSynth.render(style, start)
             val name = "${style.id}/${if (start) "start" else "stop"}"
             val seconds = pcm.size.toDouble() / SoundSynth.RATE
-            assertTrue(seconds in 0.3..1.2, "$name lasts $seconds s")
+            assertTrue(seconds in 0.25..0.8, "$name lasts $seconds s")
             val peak = pcm.maxOf { abs(it.toInt()) }
             assertTrue(peak in 17_000..20_000, "$name peak $peak")
             assertEquals(0, pcm.first().toInt(), "$name starts at silence")
@@ -67,7 +67,7 @@ class SoundSynthTest {
             val perSecond = crossings * SoundSynth.RATE.toDouble() / pcm.size
             println("${style.id} start=$start crossings/s=$perSecond")
             assertTrue(perSecond > 700, "${style.id} start=$start is a dull sine: $perSecond crossings/s")
-            assertTrue(perSecond < 2600, "${style.id} start=$start is shrill: $perSecond crossings/s")
+            assertTrue(perSecond < 4200, "${style.id} start=$start is shrill: $perSecond crossings/s")
         }
     }
 
@@ -78,8 +78,8 @@ class SoundSynthTest {
         assertTrue(ack.maxOf { abs(it.toInt()) } in 10_000..13_000)
     }
 
-    @Test fun retiredSoundsFallBackToAura() {
-        listOf("arc", "droid", "retro", "turbine", "mech", "holo", "reactor", "neural", "scan", "armor", "sonar", "core", "command", null).forEach { assertEquals(SoundSynth.Style.AURA, SoundSynth.Style.parse(it)) }
+    @Test fun retiredSoundsFallBackToDuo() {
+        listOf("arc", "droid", "retro", "turbine", "mech", "holo", "reactor", "neural", "scan", "armor", "sonar", "core", "command", "aura", "pulse", "horizon", null).forEach { assertEquals(SoundSynth.Style.DUO, SoundSynth.Style.parse(it)) }
     }
 
     @Test fun startAndStopDifferAndRenderingIsDeterministic() {
@@ -100,7 +100,8 @@ class SoundSynthTest {
 
     @Test fun offIsSilentAndIdsAreUnique() {
         assertEquals(0, SoundSynth.render(SoundSynth.Style.OFF, true).size)
-        assertEquals(SoundSynth.Style.HORIZON, SoundSynth.Style.parse("horizon"))
+        assertEquals(SoundSynth.Style.GLASS, SoundSynth.Style.parse("glass"))
+        assertEquals(10, SoundSynth.Style.entries.size - 1)
         assertEquals(SoundSynth.Style.entries.size, SoundSynth.Style.entries.map { it.id }.toSet().size)
     }
 }

@@ -130,6 +130,11 @@ class LiveSessionController(
     private var lastImage: com.melhive.zed.intelligence.ImageInput? = null
     private var lastImageAt = 0L
     private var haptics = true
+    private var startedAt = 0L
+    private var endedAt = 0L
+    /** A screen wants a session (set by start, cleared by end): used when a start is put off for a moment. */
+    private var wanted = false
+    private var restartPending = false
     /** Listening for "stop" while ZED talks on the loudspeaker. */
     private var eavesdropping = false
     private var stopWordEnabled = true
@@ -146,7 +151,7 @@ class LiveSessionController(
     private var bargeInEnabled = true
     private var listenJob: Job? = null
 
-    private var soundStyle = com.melhive.zed.core.voice.SoundSynth.Style.AURA
+    private var soundStyle = com.melhive.zed.core.voice.SoundSynth.Style.DUO
     private var hideBeep = true
 
     /**
@@ -155,6 +160,18 @@ class LiveSessionController(
      */
     fun start(greet: Boolean = false, announcement: String? = null) {
         if (_state.value.active) return
+        // Opened again within a moment of closing (flicking between screens): give the microphone, the voice and the
+        // speech engine a moment to let go first, instead of tearing down and starting up on top of each other.
+        val sinceEnd = System.currentTimeMillis() - endedAt
+        if (sinceEnd in 0..699) {
+            if (!restartPending) {
+                restartPending = true
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ restartPending = false; if (wanted) start(greet, announcement) }, 700 - sinceEnd)
+            }
+            wanted = true
+            return
+        }
+        wanted = true
         if (!PermissionCatalog.isGranted(context, PermissionCatalog.MICROPHONE)) {
             _state.value = LiveUiState(orb = OrbState.ERROR, error = "Microphone permission is required for ZED LIVE.")
             return
@@ -164,7 +181,12 @@ class LiveSessionController(
             com.melhive.zed.android.CrashReporter.recordNonFatal("live session", e)
             runCatching { setOrb(OrbState.ERROR, "Something went wrong — tap the orb to try again") }
         }
+        com.melhive.zed.android.CrashReporter.guard()
         com.melhive.zed.android.CrashReporter.crumb("voice session starts")
+        // A clean slate: nothing left over from the session before.
+        replyFinished = true; streamText = ""; spokenChars = 0; emptyResults = 0; consecutiveErrors = 0
+        pendingUtterances.clear(); utteranceText.clear(); queuedAt.clear()
+        startedAt = System.currentTimeMillis()
         val s = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + guard)
         scope = s
         WakeWordService.paused.value = true // LIVE takes the microphone
@@ -221,9 +243,14 @@ class LiveSessionController(
 
     /** Ends the voice session. Background tasks keep running. */
     fun end() {
+        wanted = false
         eavesdropping = false
         if (_state.value.active) {
-            com.melhive.zed.android.CrashReporter.crumb("voice session ends")
+            endedAt = System.currentTimeMillis()
+            com.melhive.zed.android.CrashReporter.crumb("voice session ends" + if (!replyFinished) " (cancelling the answer in progress)" else "")
+            // An answer still being worked out belongs to this session: stop it, or it would run on behind the next one.
+            if (!replyFinished) runCatching { orchestrator.cancelCurrent() }
+            replyFinished = true
             ZedSounds.play(context, soundStyle, start = false)
             if (haptics) ZedHaptics.end(context)
             // A call with a few exchanges gets a short summary at the top of its conversation.
@@ -236,10 +263,12 @@ class LiveSessionController(
         WakeWordService.paused.value = false
         listenJob?.cancel()
         requestJob?.cancel()
-        monitor?.stop()
-        stt?.cancel(); stt?.release()
-        tts?.stop(); tts?.release()
-        focus?.release()
+        // Each part is let go separately: one that fails must not keep the others (or the app) from finishing.
+        runCatching { monitor?.stop() }.onFailure { com.melhive.zed.android.CrashReporter.recordNonFatal("session end: monitor", it) }
+        runCatching { stt?.cancel(); stt?.release() }.onFailure { com.melhive.zed.android.CrashReporter.recordNonFatal("session end: hearing", it) }
+        runCatching { tts?.stop(); tts?.release() }.onFailure { com.melhive.zed.android.CrashReporter.recordNonFatal("session end: voice", it) }
+        runCatching { focus?.release() }.onFailure { com.melhive.zed.android.CrashReporter.recordNonFatal("session end: audio focus", it) }
+        com.melhive.zed.android.CrashReporter.crumb("voice session released")
         scope?.cancel()
         stt = null; tts = null; monitor = null; focus = null; scope = null
         pendingUtterances.clear()
