@@ -59,6 +59,8 @@ class HearingTest {
         assertEquals("forex trading", LearnAsk.topic("research forex trading and learn it"))
         assertEquals("the Philippine eagle", LearnAsk.topic("learn about the Philippine eagle"))
         assertEquals(null, LearnAsk.topic("what is the weather"))
+        assertEquals(null, LearnAsk.topic("research best telescopes 2026"))
+        assertEquals("gold prices", LearnAsk.topic("look up gold prices and remember it"))
         assertEquals(listOf("forex trading", "astronomy"), LearnAsk.interests("I'm interested in forex trading and astronomy"))
         assertEquals(emptyList(), LearnAsk.interests("I'm tired"))
     }

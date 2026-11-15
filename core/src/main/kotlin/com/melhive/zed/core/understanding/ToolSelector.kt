@@ -34,7 +34,7 @@ object ToolSelector {
         "memory.confirm" to w("(?:that'?s|you(?:'re| are)) right about", "confirm (?:what you learned|that)"),
         "chats.clear" to w("(?:clear|delete|erase|wipe) (?:[\\w']+ ){0,3}(?:chats?|conversations?|history)"),
         "teach.word" to w("learn (?:the|this) (?:word|name|term|symbol|ticker)", "to your (?:vocabulary|dictionary)"),
-        "learn.topic" to w("research", "learn about", "read up on", "study", "find out about"),
+        "learn.topic" to w("learn about", "read up on", "study", "and (?:learn|remember|keep) (?:it|that)"),
         "people.forget" to w("forget .+ face", "forget who"),
         "brain.show" to w("brain", "everything (?:you know )?about", "show me (?:what|all)"),
         "phone.call" to w("call", "phone", "ring", "dial"),

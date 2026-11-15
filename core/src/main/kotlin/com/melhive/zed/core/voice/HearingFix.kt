@@ -226,15 +226,17 @@ object LearnAsk {
     private val opt = RegexOption.IGNORE_CASE
     private val WORD = Regex("^(?:please )?(?:learn|remember|add|save)(?: this| the)? (?:word|name|term|symbol|ticker)[: ]+(.+?)(?: (?:to|in) (?:your |my )?(?:vocabulary|dictionary|words))?[.!]?$", opt)
     private val WORD2 = Regex("^(?:please )?add (.+?) to (?:your|my|the) (?:vocabulary|dictionary|words)[.!]?$", opt)
-    private val TOPIC = Regex("^(?:please )?(?:research|study|read up on|learn about|learn everything about|find out about|look into)(?: the topic(?: of)?)? (.+?)(?: (?:and|then) (?:learn|remember|keep|save)(?: it| that| what you find)?| for me)?[.!]?$", opt)
+    // "Learn about X", "study X", "read up on X": keep it. Plain "research X" is a question to answer now, unless it says to keep it.
+    private val TOPIC_LEARN = Regex("^(?:please )?(?:learn about|learn everything about|learn all about|study|read up on)(?: the topic(?: of)?)? (.+?)(?: for me)?[.!]?$", opt)
+    private val TOPIC_KEEP = Regex("^(?:please )?(?:research|find out about|look into|look up|search for)(?: the topic(?: of)?)? (.+?) (?:and|then) (?:learn|remember|keep|save|memori[sz]e)(?: it| that| them| what you find)?[.!]?$", opt)
     private val INTEREST = Regex("^(?:i(?:'m| am) (?:really |very )?(?:interested in|into)|my interests? (?:is|are|include)|i(?:'m| am) (?:learning|studying)|i (?:trade|follow|study)) (.+?)[.!]?$", opt)
 
     /** "learn the word XAUUSD" → "XAUUSD". */
     fun word(text: String): String? = (WORD.matchEntire(text.trim()) ?: WORD2.matchEntire(text.trim()))?.groupValues?.get(1)?.trim()?.trim('"', '“', '”', '\'')
         ?.let { HearingFix.joinLetters(it) }?.takeIf { it.isNotEmpty() && it.split(' ').size <= 4 }
 
-    /** "research forex trading and learn it" → "forex trading". Plain "research X" also counts: the point of researching is to keep it. */
-    fun topic(text: String): String? = TOPIC.matchEntire(text.trim())?.groupValues?.get(1)?.trim()?.takeIf { it.length >= 3 && it.split(' ').size <= 10 && !it.startsWith("my ", true) && !it.startsWith("this", true) }
+    /** "research forex trading and learn it" or "learn about forex trading" → "forex trading". */
+    fun topic(text: String): String? = (TOPIC_KEEP.matchEntire(text.trim()) ?: TOPIC_LEARN.matchEntire(text.trim()))?.groupValues?.get(1)?.trim()?.takeIf { it.length >= 3 && it.split(' ').size <= 10 && !it.startsWith("my ", true) && !it.startsWith("this", true) }
 
     /** "I'm interested in forex trading and astronomy" → ["forex trading", "astronomy"]. */
     fun interests(text: String): List<String> = INTEREST.matchEntire(text.trim())?.groupValues?.get(1)

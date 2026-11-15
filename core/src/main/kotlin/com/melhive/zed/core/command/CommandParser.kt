@@ -300,7 +300,7 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         Rule(rx("(?:please )?(?:learn|remember|add|save)(?: this| the)? (?:word|name|term|symbol|ticker)[: ]+.+|(?:please )?add .+ to (?:your|my|the) (?:vocabulary|dictionary|words)")) { m ->
             com.melhive.zed.core.voice.LearnAsk.word(m.value)?.let { tool("teach.word", "word" to it) }
         },
-        Rule(rx("(?:please )?(?:research|study|read up on|learn about|learn everything about|find out about|look into) .+")) { m ->
+        Rule(rx("(?:please )?(?:research|study|read up on|learn about|learn everything about|learn all about|find out about|look into|look up|search for) .+")) { m ->
             com.melhive.zed.core.voice.LearnAsk.topic(m.value)?.let { tool("learn.topic", "topic" to it) }
         },
         // Whose eyes ZED wears in Eye mode.
