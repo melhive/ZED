@@ -296,6 +296,13 @@ class CommandParser(private val clock: () -> LocalDateTime = { LocalDateTime.now
         },
         Rule(rx("forget (?:that |about )?(.+)")) { m -> tool("memory.forget", "query" to m.groupValues[1]) },
 
+        // Teaching ZED a word it should recognise, or a subject it should study.
+        Rule(rx("(?:please )?(?:learn|remember|add|save)(?: this| the)? (?:word|name|term|symbol|ticker)[: ]+.+|(?:please )?add .+ to (?:your|my|the) (?:vocabulary|dictionary|words)")) { m ->
+            com.melhive.zed.core.voice.LearnAsk.word(m.value)?.let { tool("teach.word", "word" to it) }
+        },
+        Rule(rx("(?:please )?(?:research|study|read up on|learn about|learn everything about|find out about|look into) .+")) { m ->
+            com.melhive.zed.core.voice.LearnAsk.topic(m.value)?.let { tool("learn.topic", "topic" to it) }
+        },
         // Whose eyes ZED wears in Eye mode.
         Rule(rx("(?:use|show|switch to|change to|give me|wear|put on|have|make them|make your eyes)(?: the| your)? (owl|human|cat|lion|wolf|leopard)(?:'s)? eyes?|(owl|human|cat|lion|wolf|leopard) eyes?(?: please)?|(?:change|set) (?:your |the )?eyes? (?:style )?to (owl|human|cat|lion|wolf|leopard)")) { m ->
             tool("settings.set", "key" to "eye_style", "value" to m.groupValues.drop(1).first { it.isNotEmpty() }.lowercase())

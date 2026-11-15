@@ -51,7 +51,7 @@ class SkillRegistry(val catalog: ToolCatalog, skills: List<SkillDescriptor>) {
             SkillDescriptor("memory.personal", "Personal Memory", "Remembers facts only when you ask, and forgets on request.", listOf("memory.remember", "memory.list", "memory.forget", "brain.show", "memory.pin", "memory.confirm", "people.forget")),
             SkillDescriptor("history.search", "Conversation History", "Searches your past conversations.", listOf("history.search", "chats.clear")),
             SkillDescriptor("app.settings", "Settings Control", "Changes any ZED setting and opens any ZED screen by voice or chat.", listOf("settings.set", "app.show", "app.undo")),
-            SkillDescriptor("learning.teach", "Learns From You", "Learns how to pronounce words, how you like answers and your own shortcuts when you tell it.", listOf("teach.pronounce", "teach.rule", "teach.alias", "teach.forget", "teach.list")),
+            SkillDescriptor("learning.teach", "Learns From You", "Learns how to pronounce words, how you like answers and your own shortcuts when you tell it.", listOf("teach.pronounce", "teach.rule", "teach.alias", "teach.forget", "teach.list", "teach.word", "learn.topic")),
             SkillDescriptor("automation.workflows", "Workflows", "Runs predefined multi-step workflows.", listOf("workflow.run")),
             SkillDescriptor("phone.comms", "Calls & Messages", "Finds contacts, places calls (always confirmed) and prepares text messages.", listOf("contacts.find", "phone.call", "sms.compose", "message.reply", "messages.read")),
             SkillDescriptor("device.control", "Phone Control", "Flashlight, volume, Do Not Disturb, settings panels, camera and phone status.",

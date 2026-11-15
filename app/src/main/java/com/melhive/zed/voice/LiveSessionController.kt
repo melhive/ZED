@@ -132,6 +132,14 @@ class LiveSessionController(
     private var lastImage: com.melhive.zed.intelligence.ImageInput? = null
     private var lastImageAt = 0L
     private var haptics = true
+    /** Puts right what was heard, using the user's own words (set by the container). */
+    @Volatile var hearingFix: ((String) -> String)? = null
+    /** A word was just taught by voice: this takes the next thing heard as how it sounds, and returns what to say. */
+    @Volatile var wordTeacher: ((String) -> String?)? = null
+    /** The user edited what ZED heard: (what was heard, what they meant). */
+    @Volatile var onCorrected: ((String, String) -> Unit)? = null
+    /** The last thing heard, before and after correction, for learning from an edit. */
+    private var lastHeard: Pair<String, String>? = null
     /** "Only my voice": how much an utterance sounds like the owner (0..1), or null when that can't be told. */
     @Volatile var voiceCheck: (suspend (FloatArray) -> Float?)? = null
     /** The owner proved who they are (fingerprint or PIN) in this session: the voice is not questioned again. */
@@ -301,6 +309,22 @@ class LiveSessionController(
         if (!on) { stopEavesdrop(); tts?.stop(); pendingUtterances.clear(); monitor?.stop(); focus?.release(); if (replyFinished) listen() }
     }
 
+    /** What ZED last heard, as shown: the user can edit it when it was misheard. */
+    fun lastHeardText(): String? = lastHeard?.second
+
+    /**
+     * The user fixed what ZED heard. The changed words are learned, so they are heard right next time, and the
+     * corrected sentence is answered in place of the misheard one.
+     */
+    fun correctLast(corrected: String) {
+        val heard = lastHeard ?: return
+        val right = corrected.trim()
+        if (right.isEmpty() || right == heard.second) return
+        runCatching { onCorrected?.invoke(heard.first, right) }
+        lastHeard = right to right
+        submitText(right)
+    }
+
     /** "It's me": the owner unlocked with a fingerprint or PIN, so full access is back for this session. */
     fun trustVoice() { voiceTrusted = true; _state.update { it.copy(voiceGuest = false) } }
 
@@ -442,7 +466,21 @@ class LiveSessionController(
                 val audio = if (text.isNotEmpty()) (stt as? OnDeviceSpeechToText)?.lastAudio else null
                 if (audio != null) runCatching { onUtterance?.invoke(audio) }
                 _state.update { it.copy(partial = "", micLevel = 0f) }
-                if (text.isEmpty()) onNothingHeard() else { emptyResults = 0; submit(text, audio = audio) }
+                if (text.isEmpty()) onNothingHeard() else {
+                    emptyResults = 0
+                    // A word being taught: this is how it sounds. Otherwise correct what was heard with the user's own words.
+                    val taught = runCatching { wordTeacher?.invoke(text) }.getOrNull()
+                    if (taught != null) {
+                        _state.update { it.copy(transcript = it.transcript + LiveTurn(true, text) + LiveTurn(false, taught)) }
+                        replyFinished = true
+                        if (_state.value.speakerOn) speakChunk(taught)
+                        if (pendingUtterances.isEmpty()) listen()
+                    } else {
+                        val fixed = runCatching { hearingFix?.invoke(text) }.getOrNull()?.takeIf { it.isNotBlank() } ?: text
+                        lastHeard = text to fixed
+                        submit(fixed, audio = audio)
+                    }
+                }
             }
             is SttEvent.Error -> {
                 _state.update { it.copy(micLevel = 0f) }

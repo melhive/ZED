@@ -100,6 +100,9 @@ class AssistantOrchestrator(
     /** The user's own shortcuts ("lights out" → what it means), applied before anything else. */
     var aliases: (() -> Map<String, String>)? = null
 
+    /** How ZED hears the user's own words: corrections learned from the user, taught words and a gathered vocabulary. */
+    var hearing: com.melhive.zed.learning.HearingStore? = null
+
     /** True while the phone is locked: ZED answers as a guest, with nothing personal in what the model sees. */
     var guest: (suspend () -> Boolean)? = null
     @Volatile private var guestTurn = false
@@ -193,11 +196,27 @@ class AssistantOrchestrator(
     }
 
     suspend fun respond(conversationId: Long, text: String, attachmentName: String? = null, attachmentText: String? = null, voice: Boolean = false, image: com.melhive.zed.intelligence.ImageInput? = null): AssistantReply {
-        val trimmed = text.trim()
+        guestTurn = runCatching { guest?.invoke() }.getOrNull() == true
+        var trimmed = text.trim()
+        // "No, I said Kaelyn": the user is correcting what ZED heard. Learn it and answer the sentence as it was meant.
+        if (image == null && attachmentText == null && !guestTurn) runCatching {
+            val meantWord = com.melhive.zed.core.voice.HearingFix.correction(trimmed)
+            val before = if (meantWord != null) conversations.history(conversationId, 6).lastOrNull { it.role == Role.USER }?.content else null
+            if (meantWord != null && before != null) com.melhive.zed.core.voice.HearingFix.place(before, meantWord)?.let { (heard, corrected) ->
+                hearing?.learn(heard, meantWord)
+                trimmed = corrected
+            }
+        }
         val userContent = if (attachmentText != null) "$trimmed\n\n[Attached file: $attachmentName]\n$attachmentText" else trimmed
         conversations.addMessage(conversationId, "user", userContent, attachmentName = attachmentName ?: if (image != null) "📷 Photo" else null)
         currentImage = image
-        guestTurn = runCatching { guest?.invoke() }.getOrNull() == true
+        // What the user says they care about is remembered as an interest, and its words join their vocabulary.
+        if (!guestTurn && image == null) runCatching {
+            com.melhive.zed.core.voice.LearnAsk.interests(trimmed).forEach { interest ->
+                memory.remember("I am interested in $interest", "interest")
+                hearing?.addWords(com.melhive.zed.core.voice.HearingFix.vocabulary(interest))
+            }
+        }
         turnStartedAt = System.nanoTime()
         setPhase(AssistantPhase.THINKING, conv = conversationId)
         _streamingText.value = ""
@@ -206,7 +225,7 @@ class AssistantOrchestrator(
             // Local models: let the runtime decide from the file itself (it explains when a copy has no vision).
             val localSees = provider?.id == "local"
             if (image != null && (provider == null || (provider.id == "local" && !localSees))) {
-                val msg = "This model can't look at photos. Gemma 4 E2B or E4B can, right on your phone: download one in Model Manager, or add a Gemini, OpenAI or Claude key."
+                val msg = "This model can't look at photos. Gemma 4 E2B or E4B can, right on your phone: download one in Model Manager."
                 conversations.addMessage(conversationId, "assistant", msg, source = "system")
                 setPhase(AssistantPhase.COMPLETED, null, conversationId)
                 return AssistantReply(msg, false, "system")
@@ -221,6 +240,8 @@ class AssistantOrchestrator(
             val final = reply ?: if (provider != null) handleWithModel(conversationId, provider, voice, meant) else nativeConversation(conversationId, meant)
             // Instant (native) replies record how long the whole turn took; model replies are timed while streaming.
             runCatching { conversations.setTotalOnLastReply(conversationId, (System.nanoTime() - turnStartedAt) / 1_000_000) }
+            // What ZED looked up for the user is kept, dated, so it knows it next time (and can say it may be out of date).
+            if (final.ok && !guestTurn && researchSources.isNotEmpty() && image == null) appScope.launch { runCatching { keepWebNote(meant, final.text) } }
             if (final.source == "native") com.melhive.zed.diagnostics.SpeedLog.record(com.melhive.zed.diagnostics.SpeedLog.Stage.NATIVE, (System.nanoTime() - turnStartedAt) / 1_000_000)
             setPhase(if (final.ok) AssistantPhase.COMPLETED else AssistantPhase.ERROR, if (final.ok) null else final.text, conversationId)
             final
@@ -400,22 +421,25 @@ class AssistantOrchestrator(
         val ranked = com.melhive.zed.core.understanding.MemoryRanker.rank(
             userText,
             allFacts.map { com.melhive.zed.core.understanding.MemoryFact(it.id, it.text, it.pinned, com.melhive.zed.core.brain.BrainStrength.of(it.uses, it.lastUsedAt, it.createdAt, it.pinned, now0)) },
-            previous = previousUser, limit = if (tinyContext) 3 else 6,
-            // Only memories this conversation is actually about — no second-hand associations that drag in old topics.
-            bridges = false,
+            // The topic is the thread, not one sentence: the last two things the user said count, more weakly.
+            previous = listOfNotNull(previousUser, history0.dropLast(1).filter { it.role == Role.USER }.dropLast(1).lastOrNull()?.content).joinToString(" ").ifBlank { null },
+            limit = if (tinyContext) 3 else 6,
+            // Only memories this conversation is actually about: no second-hand associations, and a memory must
+            // clearly bear on the topic to get in at all. Pinned ones are no exception.
+            bridges = false, strict = true,
         )
-        val profile = buildList {
-            userName?.let { add("name $it") }
-            allFacts.filter { it.pinned && it.source != "preference" && ranked.none { r -> r.fact.id == it.id } }.take(3).forEach { add(it.text) }
-        }
+        val relatedIds = ranked.filter { it.related }.map { it.fact.id }.toSet()
+        // Only the name: everything else ZED knows waits until the conversation is about it.
+        val profile = buildList { userName?.let { add("name $it") } }
         // What ZED learned by itself is marked, so the model treats it as less certain than what the user said.
         val sourceOf = allFacts.associate { it.id to it.source }
         fun label(f: com.melhive.zed.core.understanding.MemoryFact) = when (sourceOf[f.id]) {
             "learned" -> "${f.text} (learned, not confirmed)"
             "correction" -> "${f.text} (the user corrected you — follow this)"
             "preference" -> "${f.text} (the user's rule for how you answer — always follow it)"
+            "web" -> "${f.text} (you looked this up online; it may be out of date)"
             else -> f.text
-        }
+        }.let { if (f.id in relatedIds) "$it (possibly related: mention it once, briefly, only if it helps; otherwise leave it out)" else it }
         // How the user wants ZED to answer: always included, whatever the question.
         // Every rule, newest first; when two disagree the newer one wins (the latest correction counts).
         val rules = allFacts.filter { it.source == "preference" }.sortedByDescending { it.createdAt }.take(25)
@@ -547,6 +571,45 @@ class AssistantOrchestrator(
     }
 
     /** A short side generation (a plan, a check) that isn't shown as a chat message. Null when it fails. */
+    private fun firstSentences(text: String, n: Int): String =
+        text.replace(Regex("\\[\\d+]"), "").replace(Regex("\\s+"), " ").trim().split(Regex("(?<=[.!?])\\s+")).filter { it.length > 8 }.take(n).joinToString(" ")
+
+    /** Keeps a short, dated note of what a web search found. Old, never-used notes make room for new ones. */
+    private suspend fun keepWebNote(question: String, answer: String) {
+        val found = firstSentences(answer, 2).take(260)
+        if (found.length < 20 || question.length > 160) return
+        val day = java.time.LocalDate.now().format(DateTimeFormatter.ofPattern("d MMM yyyy", java.util.Locale.ENGLISH))
+        memory.remember("${question.trim().trimEnd('?', '.', '!').removePrefix("Search the web for ")}: $found (found online $day)", "web")
+        hearing?.addWords(com.melhive.zed.core.voice.HearingFix.vocabulary(question).take(12))
+        val web = memory.list(1000).filter { it.source == "web" }
+        if (web.size > 150) memory.delete(web.sortedWith(compareBy({ it.uses }, { it.createdAt })).take(web.size - 150).map { it.id })
+    }
+
+    /**
+     * "Research X and learn it": searches the web, keeps the main facts as dated notes and the subject's words as
+     * vocabulary. Returns whether it worked and what to say.
+     */
+    suspend fun learnTopic(topic: String): Pair<Boolean, String> {
+        val out = tools.execute(ToolRequest("web.research", mapOf("query" to topic), ToolRequest.Origin.NATIVE))
+        if (!out.isSuccess()) return false to "I couldn't look up $topic just now: ${out.message.take(140)}"
+        val results = (out as ToolOutcome.Executed).result.message.take(6000)
+        val provider = providers.active()
+        val byModel = provider?.let {
+            runCatching {
+                generateText(it, "You extract facts. From the search results, write up to six short, self-contained facts about the topic, one per line. Plain sentences, no numbering, no sources, nothing that isn't in the results.",
+                    "Topic: $topic\n\n$results", 280, "learn-topic")
+            }.getOrNull()
+        }?.lines()?.map { l -> l.trim().trimStart('-', '•', '*', ' ').replace(Regex("^\\d+[.)]\\s*"), "") }?.filter { it.length in 20..240 }?.take(6)
+        val facts = byModel?.takeIf { it.isNotEmpty() }
+            ?: results.replace(Regex("\\[\\d+]"), "").split(Regex("(?<=[.!?])\\s+")).map { it.trim() }.filter { it.length in 40..220 && !it.contains("http") }.distinct().take(4)
+        if (facts.isEmpty()) return false to "I searched for $topic but found nothing clear enough to keep."
+        val day = java.time.LocalDate.now().format(DateTimeFormatter.ofPattern("d MMM yyyy", java.util.Locale.ENGLISH))
+        facts.forEach { memory.remember("${it.trimEnd('.')} (about $topic; found online $day)", "web") }
+        memory.remember("I asked ZED to learn about $topic", "interest")
+        hearing?.addWords(com.melhive.zed.core.voice.HearingFix.vocabulary(topic + " " + facts.joinToString(" ")).take(40))
+        return true to "I've read up on $topic and kept ${facts.size} thing${if (facts.size == 1) "" else "s"}. ${facts.take(2).joinToString(" ") { it.trimEnd('.') + "." }}"
+    }
+
     /** Two short lines on what a call was about, or null when no model is available. */
     suspend fun summarize(conversationId: Long): String? {
         val provider = providers.active() ?: return null

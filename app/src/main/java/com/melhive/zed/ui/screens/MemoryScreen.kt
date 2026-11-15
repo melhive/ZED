@@ -190,7 +190,7 @@ fun MemoryScreen(onBack: () -> Unit, initialTab: Int = 0, onOpenBrain: (() -> Un
                         }
                         val learned = f.source == "learned"
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("${formatTime(f.createdAt)} · ${if (learned) "learned by ZED — not confirmed" else f.source.replace('_', ' ')}", style = MaterialTheme.typography.labelSmall, color = if (learned) ZedColors.Amber else ZedColors.Muted, modifier = Modifier.weight(1f))
+                            Text("${formatTime(f.createdAt)} · ${when { learned -> "learned by ZED — not confirmed"; f.source == "web" -> "looked up online — may be out of date"; f.source == "interest" -> "your interest"; else -> f.source.replace('_', ' ') }}", style = MaterialTheme.typography.labelSmall, color = if (learned) ZedColors.Amber else ZedColors.Muted, modifier = Modifier.weight(1f))
                             if (learned) TextButton(onClick = { scope.launch { c.learner.confirm(f.id) } }) { Text("It's right", style = MaterialTheme.typography.labelSmall) }
                         }
                     }

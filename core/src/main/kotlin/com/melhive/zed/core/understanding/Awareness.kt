@@ -28,18 +28,25 @@ object MemoryRanker {
 
     fun keys(text: String): Set<String> = BrainRecall.keys(text).map { SYNONYMS[it] ?: it }.toSet()
 
-    data class Ranked(val fact: MemoryFact, val score: Float)
+    /** [related]: connected to the topic but not what was asked about — it may be mentioned once, as a suggestion, or left out. */
+    data class Ranked(val fact: MemoryFact, val score: Float, val related: Boolean = false)
 
     /**
      * The memories connected to [question] (and, more weakly, to the [previous] message), best first.
      * [bridges] also adds memories that only share an idea with a matched one (good for the Live
      * Brain; off for answers, where they drag unrelated old topics into the conversation).
+     *
+     * [strict] is for answers. A memory gets in only when it clearly bears on what is being discussed:
+     * it shares a word that few memories have (a name, a specific thing), or several ordinary ones. A word
+     * that appears in many memories ("work", "today") proves nothing by itself. Memories that only connect
+     * through the previous message, or only weakly, come back marked [Ranked.related], at most two of them.
      */
-    fun rank(question: String, facts: List<MemoryFact>, previous: String? = null, limit: Int = 6, bridges: Boolean = true): List<Ranked> {
+    fun rank(question: String, facts: List<MemoryFact>, previous: String? = null, limit: Int = 6, bridges: Boolean = true, strict: Boolean = false): List<Ranked> {
         val q = keys(question)
         val prev = previous?.let { keys(it) - q }.orEmpty()
         if (q.isEmpty() && prev.isEmpty()) return emptyList()
         val factKeys = facts.associate { it.id to keys(it.text) }
+        if (strict) return strict(q, prev, facts, factKeys, limit)
         val direct = HashMap<Long, Float>()
         for (f in facts) {
             val k = factKeys.getValue(f.id)
@@ -57,6 +64,30 @@ object MemoryRanker {
         }
         return scored.sortedByDescending { it.score }.take(limit)
     }
+
+    private fun strict(q: Set<String>, prev: Set<String>, facts: List<MemoryFact>, factKeys: Map<Long, Set<String>>, limit: Int): List<Ranked> {
+        // How telling a word is: one that a single memory has says a lot, one that twenty have says little.
+        val seen = HashMap<String, Int>()
+        for (k in factKeys.values) for (w in k) seen[w] = (seen[w] ?: 0) + 1
+        fun weight(w: String): Float = 1f / (1f + kotlin.math.ln((seen[w] ?: 1).toFloat()))
+        val direct = mutableListOf<Ranked>()
+        val related = mutableListOf<Ranked>()
+        for (f in facts) {
+            val k = factKeys.getValue(f.id)
+            val now = k.filter { it in q }.sumOf { weight(it).toDouble() }.toFloat()
+            val before = k.filter { it in prev }.sumOf { weight(it).toDouble() }.toFloat()
+            val bonus = (if (f.pinned) 0.1f else 0f) + 0.1f * f.strength
+            when {
+                now >= DIRECT -> direct += Ranked(f, 3f * now + before + bonus)
+                now >= RELATED || before >= DIRECT -> related += Ranked(f, 3f * now + before + bonus, related = true)
+            }
+        }
+        val best = direct.sortedByDescending { it.score }.take(limit)
+        return best + related.sortedByDescending { it.score }.take(minOf(2, limit - best.size).coerceAtLeast(0))
+    }
+
+    private const val DIRECT = 0.95f
+    private const val RELATED = 0.55f
 }
 
 /**

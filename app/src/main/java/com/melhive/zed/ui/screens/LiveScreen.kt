@@ -128,6 +128,7 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit, onOpenEye: () -> Un
     DisposableEffect(Unit) { c.voiceScreens.incrementAndGet(); onDispose { if (c.voiceScreens.decrementAndGet() <= 0) live.end() } }
 
     var history by remember { mutableStateOf(false) }
+    var fixHeard by remember { mutableStateOf(false) }
 
     // "What is this?": ZED looks through the camera you chose (back by default here, since the phone is in your hand).
     // The camera opens only for the moment of the picture, unless recognising people is on (then the front one watches).
@@ -207,9 +208,10 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit, onOpenEye: () -> Un
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    if (!lastUser.isNullOrBlank()) Text(lastUser, color = ZedColors.Muted, style = if (large) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodySmall, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                    // Your words: tap them when ZED misheard, to fix them.
+                    if (!lastUser.isNullOrBlank()) Text(lastUser, modifier = Modifier.clickable(enabled = live.lastHeardText() != null) { fixHeard = true }, color = ZedColors.Muted, style = if (large) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodySmall, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, textAlign = TextAlign.Center)
                     if (!zedLine.isNullOrBlank()) Text(zedLine, color = ZedColors.Cyan.copy(alpha = 0.9f), style = if (large) MaterialTheme.typography.titleLarge else MaterialTheme.typography.bodyMedium, maxLines = if (compact) 2 else if (large) 4 else 3, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 2.dp))
-                    Text("Tap or swipe up for the conversation", color = ZedColors.Muted.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 4.dp))
+                    Text("Tap your words to fix them · swipe up for the conversation", color = ZedColors.Muted.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 4.dp))
                 }
             }
 
@@ -299,6 +301,7 @@ fun LiveScreen(onClose: () -> Unit, onOpenTasks: () -> Unit, onOpenEye: () -> Un
             } else { orbPart(); talkPart() }
         }
         if (history) com.melhive.zed.ui.components.VoiceHistoryPanel(state.conversationId, state.transcript) { history = false }
+        if (fixHeard) com.melhive.zed.ui.components.HeardFixDialog { fixHeard = false }
     }
 }
 

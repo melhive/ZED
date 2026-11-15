@@ -156,6 +156,12 @@ class ToolCatalog(specs: List<ToolSpec>) {
                     p("fact", STRING, "The fact to remember"),
                 ), MODIFY),
                 ToolSpec("memory.list", "List memories", "Lists remembered facts.", emptyList(), READ_ONLY),
+                ToolSpec("teach.word", "Learn a word", "Adds a name, symbol or term to the words ZED recognises when the user speaks (e.g. XAUUSD, Kaelyn).", listOf(
+                    p("word", STRING, "The word, written the way it should appear"),
+                ), MODIFY),
+                ToolSpec("learn.topic", "Research and learn a subject", "Searches the web for a subject, keeps its main facts and learns its words. Use when the user asks ZED to research, study or learn about something.", listOf(
+                    p("topic", STRING, "The subject to learn about"),
+                ), MODIFY),
                 ToolSpec("people.forget", "Forget a face", "Forgets a person ZED learned to recognise in Eye mode, by name.", listOf(
                     p("name", STRING, "The person's name"),
                 ), DESTRUCTIVE),

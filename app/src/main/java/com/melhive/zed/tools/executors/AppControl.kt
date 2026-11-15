@@ -432,8 +432,20 @@ fun registerAppControl(tm: ToolManager, c: AppContainer, context: Context) {
         c.teaching.alias(phrase, meaning)
         ok("Got it — when you say “$phrase”, I'll take it as “$meaning”.")
     }
+    tm.register("teach.word") { a, _ ->
+        val word = a.string("word").trim().trim('"', '“', '”')
+        c.hearing.addWord(word)
+        if (c.live.state.value.active) { c.hearing.awaitSaid(word); ok("Added $word. Say it once now, so I learn how it sounds.") }
+        else ok("Added $word to the words I recognise when you speak.")
+    }
+    tm.register("learn.topic") { a, _ ->
+        val (good, text) = c.orchestrator.learnTopic(a.string("topic").trim())
+        ToolResult(good, text)
+    }
     tm.register("teach.forget") { a, _ ->
         val what = a.string("what").trim().trim('"', '“', '”')
+        // A word ZED learned to recognise, or a correction of what it heard.
+        if (c.hearing.forget(what)) return@register ok("Forgot the word “$what”.")
         val rules = c.memory.list(1000).filter { it.source == "preference" }
         if (what.lowercase() in ALL || what.lowercase() in setOf("lessons", "everything you learned")) {
             val n = rules.size + c.teaching.pronunciations.size + c.teaching.aliases.size
@@ -455,6 +467,12 @@ fun registerAppControl(tm: ToolManager, c: AppContainer, context: Context) {
         val rules = c.memory.list(1000).filter { it.source == "preference" }.map { it.text }
         val say = c.teaching.pronunciations
         val alias = c.teaching.aliases
+        val heardWords = c.hearing.taughtWords(); val heardFixes = c.hearing.learnedPairs()
+        if (rules.isEmpty() && say.isEmpty() && alias.isEmpty() && (heardWords.isNotEmpty() || heardFixes.isNotEmpty()))
+            return@register ok(listOfNotNull(
+                heardWords.takeIf { it.isNotEmpty() }?.let { "Words I recognise when you speak: " + it.takeLast(40).joinToString(", ") + "." },
+                heardFixes.takeIf { it.isNotEmpty() }?.let { "What I learned to hear right:\n" + it.entries.toList().takeLast(20).joinToString("\n") { e -> "• “${e.key}” → ${e.value}" } },
+            ).joinToString("\n\n"))
         if (rules.isEmpty() && say.isEmpty() && alias.isEmpty())
             return@register ok("You haven't taught me anything yet. Try “from now on keep answers short”, “pronounce Cebu as seh-boo” or “when I say lights out, I mean turn off the lights”.")
         ok(buildList {

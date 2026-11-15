@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -102,4 +103,26 @@ fun VoiceHistoryPanel(conversationId: Long?, transcript: List<LiveTurn>, onClose
             item { Box(Modifier.padding(bottom = 12.dp)) }
         }
     }
+}
+
+/**
+ * Fix what ZED heard. The corrected sentence is answered in place of the misheard one, and the changed words
+ * are learned, so ZED hears them right next time.
+ */
+@Composable
+fun HeardFixDialog(onDismiss: () -> Unit) {
+    val c = rememberContainer()
+    var text by remember { androidx.compose.runtime.mutableStateOf(c.live.lastHeardText().orEmpty()) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss, containerColor = ZedColors.SurfaceHigh,
+        title = { Text("What did you say?") },
+        text = {
+            Column {
+                Text("Correct what I heard. I'll answer that, and learn the words for next time.", style = MaterialTheme.typography.bodySmall, color = ZedColors.Muted)
+                androidx.compose.material3.OutlinedTextField(value = text, onValueChange = { text = it }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), maxLines = 4)
+            }
+        },
+        confirmButton = { androidx.compose.material3.TextButton(onClick = { c.live.correctLast(text); onDismiss() }) { Text("Use this") } },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }

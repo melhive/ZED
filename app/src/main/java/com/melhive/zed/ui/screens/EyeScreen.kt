@@ -120,6 +120,7 @@ fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long?) -> Unit, onOpenLive: () -
     var touched by remember { mutableIntStateOf(0) }
     var closing by remember { mutableStateOf(false) }
     var history by remember { mutableStateOf(false) }
+    var fixHeard by remember { mutableStateOf(false) }
     var asleep by remember { mutableStateOf(false) }
     var peopleDialog by remember { mutableStateOf(false) }
     var testLine by remember { mutableStateOf("") }
@@ -400,6 +401,7 @@ fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long?) -> Unit, onOpenLive: () -
                 EyeRow("CONVERSATION") {
                     EyeChip("Mic", if (state.micMuted) "Muted" else "On", lit = !state.micMuted) { touched++; live.toggleMute() }
                     EyeChip("History", "Open") { controls = false; history = true }
+                    EyeChip("Heard wrong?", "Fix") { controls = false; fixHeard = true }
                     EyeChip("People", if (recognising) "On" else "Off", lit = recognising) { controls = false; peopleDialog = true }
                 }
                 Text(
@@ -411,6 +413,7 @@ fun EyeScreen(onClose: () -> Unit, onOpenChat: (Long?) -> Unit, onOpenLive: () -
         if (history) com.melhive.zed.ui.components.VoiceHistoryPanel(state.conversationId, state.transcript) { history = false }
     }
 
+    if (fixHeard) com.melhive.zed.ui.components.HeardFixDialog { fixHeard = false }
     if (peopleDialog) PeopleDialog(
         recognising = recognising, people = people, voiceId = voiceId, faceInView = { camera.faceSeen && camera.running },
         onDismiss = { peopleDialog = false },

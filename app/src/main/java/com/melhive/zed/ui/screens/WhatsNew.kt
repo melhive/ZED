@@ -31,6 +31,16 @@ data class Release(val version: String, val date: String, val title: String, val
 /** Release history shown in More → What's new and after each update. Newest first. */
 object Changelog {
     val releases = listOf(
+        Release("0.1.46", "2026-11-15", "Hears your words, learns from you, stays on topic", listOf(
+            "Spelled letters become one word: “x a u u s d” is heard as XAUUSD, “b t c” as BTC.",
+            "ZED gathers your own words by itself — contacts' names, names and symbols in your memories, typed chats, document names, searches — and uses them to correct what it heard (“call kay lin” becomes “call Kaelyn”). Everyday words are never changed into names.",
+            "It learns from your corrections: say “no, I said Kaelyn”, or tap your own words in LIVE (or Heard wrong? in Eye mode) and fix them. It answers the corrected sentence and hears it right next time.",
+            "Teach a word directly: “learn the word XAUUSD”. In a call ZED then asks you to say it once, to learn how it sounds. “What have I taught you?” lists the words; “forget the word …” removes one.",
+            "“Research forex trading and learn it” (or “learn about …”): ZED searches the web, keeps the main facts as dated notes and learns the subject's words. What it looks up for you in ordinary questions is kept the same way, marked as found online.",
+            "Say “I'm interested in …” and ZED remembers it as an interest.",
+            "Staying on topic: a memory now reaches the answer only when it clearly bears on what you're discussing. Pinned memories no longer ride along with every question, and a word that many memories share doesn't pull them in. Something merely related may be mentioned once, briefly, when it helps.",
+            "Memory shows where each thing came from: you said it, ZED learned it, or it was looked up online (and may be out of date).",
+        )),
         Release("0.1.45", "2026-11-15", "Briefings that say each thing once", listOf(
             "The briefing and every routine now speak as one piece. Facts are gathered first and each is said once: the greeting, what's urgent, the weather, your calendar, reminders, tasks and what you missed. The calendar is no longer read twice, and nothing starts with “Good morning routine:”.",
             "What is empty is folded into one sentence (“Nothing on your calendar and no reminders today”), task numbers and bullets are gone, and long task names are shortened to their first clause.",

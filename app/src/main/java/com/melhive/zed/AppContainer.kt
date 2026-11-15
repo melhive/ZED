@@ -85,6 +85,8 @@ class AppContainer(val context: Context) {
     val privateStore by lazy { com.melhive.zed.security.PrivateStore(context) }
     /** "Private mode" / "lock private mode" by voice: true asks the Live Brain to unlock, false to lock. */
     val brainPrivate = kotlinx.coroutines.flow.MutableStateFlow<Boolean?>(null)
+    /** How ZED hears the user's own words (corrections, taught words, a vocabulary it gathers by itself). */
+    val hearing: com.melhive.zed.learning.HearingStore by lazy { com.melhive.zed.learning.HearingStore(context, this) }
     /** Turns speech into a voiceprint (the owner's voice for "only my voice" and for recognising who is talking). */
     val voiceId: com.melhive.zed.eyes.VoiceId by lazy { com.melhive.zed.eyes.VoiceId(context) }
     /** The owner's name, for "That's only for …" (read once; the guest gate can't wait for the database). */
@@ -112,6 +114,7 @@ class AppContainer(val context: Context) {
             o.routineMatcher = { text -> routines.matchPhrase(text)?.name }
             o.aliases = { teaching.aliases }
             o.awareness = { com.melhive.zed.agents.AwarenessCollector(context, this).collect() }
+            o.hearing = hearing
             o.guest = { (settings.current().lockGuard && phoneLocked()) || live.state.value.voiceGuest }
         }
     }
@@ -140,6 +143,10 @@ class AppContainer(val context: Context) {
             .also { it.userName = { memory.userName() } }
             .also { live ->
                 live.lockedNow = { settings.current().lockGuard && phoneLocked() }
+                // What was heard is put right with the user's own words before it is shown or answered.
+                live.hearingFix = { heard -> hearing.fix(heard) }
+                live.wordTeacher = { raw -> hearing.heardWord(raw) }
+                live.onCorrected = { heard, corrected -> com.melhive.zed.core.voice.HearingFix.learnFrom(heard, corrected).forEach { (h, m) -> hearing.learn(h, m) } }
                 // "Only my voice": compare what was heard with the owner's recorded voice (needs the voice model and at least three samples).
                 live.voiceCheck = { audio ->
                     if (!settings.current().ownerVoiceOnly || people.ownerVoices() < 3 || audio.size < com.melhive.zed.eyes.VoiceId.RATE * 3 / 2) null
